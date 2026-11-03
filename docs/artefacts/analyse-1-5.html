@@ -59,7 +59,7 @@
 <body>
 <div class="page">
 <h1>Analyse du connecteur et du module Développeur</h1>
-<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée constat par constat dans le code de la 1.6.3, le 2 novembre 2026 : chaque carte porte son état (fait, en partie, ouvert).</p>
+<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée constat par constat dans le code de la 1.6.4, le 2 novembre 2026 : chaque carte dit son état ; ce qui est corrigé est écrit au passé, en fin de section.</p>
 
 <div class="encadre"><b>Verdict.</b> La base est solide : 585 tests Swift, des tests Lua sur un SDK simulé, un jeton de liaison bien conçu, une couverture très large des réglages du module Développeur. Les gains viennent maintenant de trois endroits : <b>alléger ce que le modèle lit</b> (23 000 caractères de descriptions), <b>fiabiliser le pont</b> avec Lightroom, et <b>protéger la photo de l'empilement</b> de réglages.</div>
 
@@ -70,6 +70,8 @@
 <div class="encadre"><b>Livré avec la 1.6.1 (2 novembre 2026).</b> Deux seuils du relevé fixés sur ton ordre : sous-exposition sous un L* médian de 25 au lieu de 28 (le Suivi refait son analyse en tâche de fond), et nature de l'écrêtage dite à partir de 0,13 % au lieu de 0,1 %.</div>
 <div class="encadre"><b>Livré avec la 1.6 (2 novembre 2026).</b> Les trois garde-fous jugés « forts » ici sont faits : plafonds de dose sur la valeur finale (Clarté 25, Correction du voile 20, Texture et Vibrance 30), barre et croix d'une commande longue, réponses gardées et reprises au lieu d'être refaites · recherche par le sens, rendu d'une autre photo (<code>match_look</code>), habitudes en chiffres, masques relus et premier relevé des seuils · nom affiché « Développeur IA pour Lightroom ».</div>
 <div class="encadre"><b>Livré avec la 1.5.1 (1<sup>er</sup> novembre 2026).</b> Les consignes du connecteur ne citent plus de <code>preview</code> pour <code>preview_settings</code> (le constat de l'Analyse), et un test vérifie chaque paramètre qu'elles nomment · Fibo 2 change un objet entier par un masque d'objet de Lightroom · règle du titre de la fenêtre corrigée.</div>
+
+<div class="encadre"><b>Où on en est (1.6.4).</b> Sur les 32 cartes et lignes des sections 1 à 6 : <span class="pastille fait">5 corrigées</span> (les trois de la section 1, la réponse perdue, l'annulation), <span class="pastille partiel">11 en partie</span>, <span class="pastille ouvert">15 ouvertes</span> et 1 sans objet. Les plus fortes encore ouvertes : le ciblage des photos d'un outil à l'autre et le poids de la liste des outils.</div>
 
 <div class="bilan">
   <div class="chiffre"><b>37</b><span>outils exposés depuis la 1.6 (35 à l'analyse) ; leur liste pèse 55 à 60 000 jetons à chaque session, schémas compris</span></div>
@@ -90,67 +92,101 @@
 
 <h2>2. Le connecteur MCP (ce que le modèle voit)</h2>
 <div class="carte"><h3>Ciblage des photos différent d'un outil à l'autre <span class="pastille ouvert">ouvert</span><span class="pastille fort">fort</span></h3>
-<p>Toujours cinq formes : <code>photo_id</code> seul (14 outils), <code>photo_ids</code> + <code>selection</code> (16), <code>photo_ids</code> seul (<code>show_photo</code>), <code>photo_id</code> + <code>photo_ids</code> (<code>match_look</code>, nouveau), <code>collection</code>/<code>folder</code> (9). Le schéma de <code>photo_id</code> ne dit pas « une seule photo », et aucun test ne vérifie le vocabulaire. <b>Reste :</b> un seul vocabulaire, ou « une seule » écrit dans le schéma, avec un test.</p>
-<p class="preuve">Tools.swift:195-197 · Tools.swift:420-431</p></div>
+<p>Le modèle doit retenir cinq façons de viser une photo : <code>photo_id</code> seul (14 outils), <code>photo_ids</code> avec <code>selection</code> (16), <code>photo_ids</code> sans <code>selection</code> (<code>show_photo</code>), <code>photo_id</code> et <code>photo_ids</code> ensemble (<code>match_look</code>), <code>collection</code> ou <code>folder</code> (9). La description de <code>photo_id</code> ne dit pas « une seule photo », et aucun test ne vérifie ce vocabulaire. Seul filet : après un refus, le serveur propose la bonne clé (<code>photo_ids</code> à la place de <code>photo_id</code>, et l'inverse).</p>
+<p><b>À faire :</b> un seul vocabulaire pour tous les outils, ou au moins « une seule photo » écrit dans le schéma de <code>photo_id</code>, avec un test qui le vérifie.</p>
+<p class="preuve">tools/list du connecteur 1.6.4 · Tools.swift:195-197 · Tools.swift:424</p></div>
 <div class="carte"><h3>tools/list trop lourd <span class="pastille ouvert">ouvert</span><span class="pastille fort">fort</span></h3>
-<p>La liste a grossi : 26 610 caractères de descriptions (23 000 à l'analyse), 8 outils au-dessus de 1 000 (<code>view_photo</code> 1 823, <code>add_mask</code> 1 716, <code>match_series</code> 1 270…). Avec les schémas, <code>tools/list</code> pèse environ 219 000 caractères, soit 55 à 60 000 jetons à chaque session : le schéma de masque est recopié dans <code>add_mask</code> (19 839) et <code>generative_edit</code> (13 777). <b>Reste :</b> budget global testé, schéma de masque partagé, détails vers les ressources <code>developpeur://</code>.</p>
-<p class="preuve">tools/list du connecteur 1.6.3 · MCPServerTests.swift:275</p></div>
-<div class="carte"><h3>Fusionner ce qui sert le même moment <span class="pastille ouvert">ouvert</span><span class="pastille moyen">moyen</span></h3>
-<p>Aucune fusion : <code>list_profiles</code> et <code>list_presets</code>, <code>compare_variants</code> et <code>choose_variant</code> restent à part ; <code>export_photos</code> se règle par drapeaux ; <code>set_metadata</code> a 20 paramètres, du classement au GPS.</p>
-<p class="preuve">Tools.swift:186-193</p></div>
-<div class="carte"><h3>Erreurs sans code lisible par le modèle <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
-<p>Déjà là avant l'analyse : 14 outils déclarent leur sortie (<code>outputSchema</code>, <code>structuredContent</code>). Les erreurs restent du texte seul : pas de <code>{code, reessayable, action}</code>, et le code « jeton » ou « arrêt » du module ne remonte pas au modèle.</p>
-<p class="preuve">Tools.swift:517-551 · LightroomBridge.swift:41-42</p></div>
+<p>Depuis l'analyse, la liste a grossi : 37 outils, 26 610 caractères de descriptions (23 000 à l'analyse), 8 outils au-dessus de 1 000 (<code>view_photo</code> 1 823, <code>add_mask</code> 1 716, <code>match_series</code> 1 270…). Avec les schémas, <code>tools/list</code> pèse 219 701 caractères, soit environ 55 à 60 000 jetons à chaque session. Les gros morceaux sont recopiés : le schéma de masque dans <code>add_mask</code> (19 839) et <code>generative_edit</code> (13 777), celui des réglages dans <code>apply_settings</code> et <code>preview_settings</code> (13 026 chacun), et <code>compare_variants</code> en porte 27 652. Un seul test borne une longueur : la description d'<code>add_mask</code>, à 2 048.</p>
+<p><b>À faire :</b> un budget global testé, un schéma de masque et de réglages écrit une seule fois, les détails déplacés vers les ressources <code>developpeur://</code>.</p>
+<p class="preuve">tools/list du connecteur 1.6.4 · MCPServerTests.swift:275</p></div>
+<div class="carte"><h3>Des outils qui servent le même moment restent séparés <span class="pastille ouvert">ouvert</span><span class="pastille moyen">moyen</span></h3>
+<p>Aucune fusion : <code>list_profiles</code> et <code>list_presets</code>, <code>compare_variants</code> et <code>choose_variant</code> restent à part. <code>export_photos</code> a 34 paramètres réglés par drapeaux ; <code>set_metadata</code> en a 20, du classement au GPS.</p>
+<p><b>À faire :</b> regrouper les paires qui vont ensemble et alléger les deux outils à drapeaux.</p>
+<p class="preuve">Tools.swift:186-192 · tools/list du connecteur 1.6.4</p></div>
 <div class="carte"><h3>Détails de cohérence <span class="pastille ouvert">ouvert</span><span class="pastille faible">faible</span></h3>
-<p><code>step_name</code> exigé par le schéma alors qu'un nom par défaut est pris quand il manque, <code>reason</code> exigé nulle part · pagination en trois formes (défauts 50, 100, 200, tranche de 30) · branche « outil inconnu » gardée comme filet, jamais testée. <b>Fait :</b> <code>remove_distractions</code> nomme déjà la poussière depuis la 1.0 (le constat était sans fondement).</p>
-<p class="preuve">Tools.swift:568-579 · MCPServer.swift:171-173</p></div>
+<p><code>step_name</code> est exigé par le schéma de cinq outils, alors qu'un nom par défaut est pris quand il manque ; <code>reason</code> n'est exigé nulle part. La pagination change d'un outil à l'autre : <code>limit</code> par défaut à 50 (<code>list_selection</code>, <code>find_photos</code>), 100 (<code>list_presets</code>) ou 200 (<code>list_keywords</code>) ; <code>offset</code> par pages pour <code>find_photos</code>, par tranches pour <code>cull_photos</code>, par planches de 30 pour <code>contact_sheet</code>.</p>
+<p><b>À faire :</b> rendre <code>step_name</code> facultatif (ou retirer le défaut), et une même pagination partout.</p>
+<p class="preuve">Tools+Retouche.swift:124, 147, 161 · Tools+Locales.swift:233, 253 · Tools.swift:572-574 · tools/list du connecteur 1.6.4</p></div>
+<div class="carte"><h3>Erreurs sans code lisible par le modèle <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
+<p><b>Fait :</b> 14 outils déclarent leur sortie (<code>outputSchema</code>, <code>structuredContent</code>). Un paramètre inconnu est refusé avant tout envoi, avec la liste des paramètres acceptés et la bonne clé proposée. Les deux étaient déjà là avant l'analyse.</p>
+<p><b>Reste à faire :</b> les erreurs restent du texte seul, sans <code>{code, reessayable, action}</code>. Le pont lit bien les codes « jeton » et « arret » du module, mais le modèle ne reçoit que le message.</p>
+<p class="preuve">MCPServer.swift:241-244 · Tools.swift:424-429, 435, 475 · LightroomBridge.swift:409-414</p></div>
+<div class="carte"><h3>Deux constats sans fondement <span class="pastille partiel">sans objet</span></h3>
+<p>« Branche outil inconnu jamais testée » : elle est testée depuis le 25 octobre, avant l'analyse, au niveau de l'outil comme du protocole. « <code>remove_distractions</code> ne nomme pas la poussière » : sa description la nomme depuis la 1.0.</p>
+<p class="preuve">MCPServerTests.swift:49, 381-382 · Tools+Retouche.swift:149</p></div>
 
-<h2>3. Le module Lightroom (Lua) et le pont</h2>
-<div class="carte"><h3>Réponse perdue : aucune trace, aucune reprise <span class="pastille fait">fait en 1.6</span><span class="pastille fort">fort</span></h3>
-<p>Le module garde ses 20 dernières réponses (10 min, 64 Ko au plus) sous un identifiant de commande tiré par le serveur, qui règle aussi la question du nonce ; le serveur reprend une réponse perdue sans jamais rejouer une écriture.</p>
-<p class="preuve">Liaison.lua:113-115, 473-531 · LightroomBridge.swift:218-251 · essais-reprise.lua</p></div>
-<div class="carte"><h3>Aucune annulation, pas de progression pour les commandes seules <span class="pastille fait">fait en 1.6</span><span class="pastille fort">fort</span></h3>
-<p>Après 3 s, une commande seule ouvre la barre « Claude : … » avec sa croix ; elle s'arrête au prochain point sûr, jamais au milieu d'une écriture.</p>
-<p class="preuve">Progression.lua:10-39 · Rendu.lua:126</p></div>
+<h2>3. Le module Lightroom (Lua) et le pont : deux corrigés, deux à finir</h2>
 <div class="carte"><h3>Prise occupée : cinq essais puis échec définitif <span class="pastille ouvert">ouvert</span><span class="pastille moyen">moyen</span></h3>
-<p>Toujours cinq essais à 1 s d'écart, puis l'erreur reste ; ni attente croissante ni état « en attente du port » dans le voyant. Le port en préférence est sans objet : les ports restent fixes par règle du projet.</p></div>
-<div class="carte"><h3>Autres <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
-<p>Les fausses prises des tests passent par <code>LrSocket.bind</code> depuis la 1.2, mais <code>onError</code>, <code>onClosed</code> et <code>onMessage</code> ne sont jamais déclenchés · <code>get_status</code> dit versions, plafonds, index du sens et espèces, sans objet <code>capacites</code> · fenêtre toujours à 1 623 × 1 200, sans mode compact · aperçus jamais lus laissés dans le dossier temporaire du système, et <code>Temporaire/PhotoActive</code> jamais vidé (137 Mo) · corrections de Dany lues par comparaison, sans observateur.</p></div>
+<p>Quand le port est encore tenu (liaison relancée trop vite, autre Lightroom ouvert), le module réessaie cinq fois, à 1 s d'écart, puis l'erreur reste. Pas d'attente qui s'allonge, et le voyant ne dit pas « en attente du port ». Le port réglé dans les préférences est sans objet : les ports restent fixes par règle du projet.</p>
+<p><b>À faire :</b> des essais de plus en plus espacés, sans limite tant que la liaison est démarrée, et un état « en attente du port » dans le voyant.</p>
+<p class="preuve">Liaison.lua:140 (ESSAIS_MAX = 5) · Liaison.lua:674-686</p></div>
+<div class="carte"><h3>Autres points du module <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
+<p><b>Fait :</b> en 1.6.4, au chargement du module, le ménage vide <code>Temporaire/PhotoActive</code> (137 Mo chez toi), l'onglet Aperçu, les images collées et les petits fichiers d'une commande interrompue. Tes conversations ne sont jamais touchées, et rien ne s'efface tant qu'une fenêtre du module est ouverte ou que Claude travaille (<code>Menage.lua:44</code>, <code>Menage.lua:91-110</code>, <code>Tests/Lua/Fenetre/essais-menage.lua</code>).</p>
+<p><b>Reste à faire :</b></p>
+<ul>
+<li>Les fausses prises des tests passent par <code>LrSocket.bind</code>, mais ne déclenchent jamais <code>onError</code>, <code>onClosed</code> ni <code>onMessage</code> : le cas du port occupé n'est pas essayé.</li>
+<li><code>get_status</code> dit les versions, les limites et plafonds de dose, l'index du sens et les espèces, mais n'a pas d'objet <code>capacites</code> qui dirait d'un coup ce qui marche.</li>
+<li>La fenêtre Claude reste à 1 623 × 1 200, sans mode compact pour un petit écran.</li>
+<li>Les aperçus rendus dans le dossier temporaire du système ne s'effacent que quand le serveur les lit ; un aperçu jamais lu (réponse perdue) y reste, et le ménage ne touche pas ce dossier.</li>
+<li>Tes corrections à la main se lisent par comparaison (nombre de modifications et date), à la retouche suivante, sans observateur.</li>
+</ul>
+<p class="preuve">tests.lua:3886-3891 · Tools.swift:481-507 · Dispositions.lua:55 · Rendu.lua:129 · Vignettes.lua:171 · Tools.swift:675-683 · Ecriture.lua:774-780</p></div>
+<div class="carte"><h3>Une réponse perdue ne se reprenait pas <span class="pastille fait">corrigé en 1.6</span></h3>
+<p><b>Le problème était :</b> une réponse de Lightroom perdue en route ne laissait aucune trace, et le serveur pouvait refaire la retouche.</p>
+<p><b>Corrigé :</b> chaque commande part avec un identifiant tiré par le serveur. Le module garde ses 20 dernières réponses (10 min, 64 Ko au plus) ; le serveur redemande celle qui s'est perdue, sans jamais rejouer une écriture.</p>
+<p class="preuve">Liaison.lua:113-115, 474-497, 509-531 · LightroomBridge.swift:216-251 · essais-reprise.lua</p></div>
+<div class="carte"><h3>Une commande seule n'avait ni barre ni croix <span class="pastille fait">corrigé en 1.6</span></h3>
+<p><b>Le problème était :</b> une commande longue hors d'une série (un rendu, une lecture) ne montrait rien et ne pouvait pas s'arrêter.</p>
+<p><b>Corrigé :</b> après 3 s, la barre « Claude : … » s'ouvre avec sa croix. La commande s'arrête à son prochain point sûr, jamais au milieu d'une écriture. Restent sans barre, exprès, les commandes qui t'attendent, l'exportation (elle a sa propre barre) et les calculs de Lightroom qui ne s'arrêtent pas en chemin.</p>
+<p class="preuve">Progression.lua:11-25, 39, 48 · Rendu.lua:126-127, 187-189</p></div>
 
 <h2>4. La retouche : qualité et garde-fous</h2>
-<div class="carte"><h3>Pas de plafond dur sur Clarté, Dehaze, Texture, netteté locale <span class="pastille partiel">en partie (1.6)</span><span class="pastille fort">fort</span></h3>
-<p>Fait pour la photo entière : plafonds sur la valeur finale (Clarté 25, Correction du voile 20, Texture et Vibrance 30), refus sauf demande claire. <b>Reste :</b> une table de doses par type de masque et un plafond de netteté locale : <code>add_mask</code> n'en a aucun, seule la peau a ses doses.</p>
-<p class="preuve">Peau.swift</p></div>
-<div class="carte"><h3>Empilement : le nombre de passes n'est pas contrôlé <span class="pastille partiel">en partie (1.6)</span><span class="pastille fort">fort</span></h3>
-<p>Les plafonds jugent la valeur cumulée de toutes les passes ; le bilan de <code>view_photo</code> signale la dérive ; les consignes limitent à deux passes correctives. <b>Reste :</b> un compte des passes et un cumul par réglage renvoyés en chiffres.</p></div>
-<div class="carte"><h3>match_series n'harmonise que exposition, balance des blancs, contraste <span class="pastille partiel">en partie (1.6)</span><span class="pastille fort">fort</span></h3>
-<p><code>match_look</code> (1.6) reprend la couleur des tons et la Vibrance d'une référence. <code>match_series</code> reste à trois réglages ; ombres et noirs ne s'harmonisent nulle part.</p></div>
-<div class="carte"><h3>Le guide de style est de la prose que personne n'applique en chiffres <span class="pastille partiel">en partie (1.6)</span><span class="pastille fort">fort</span></h3>
-<p><code>remember_style</code> avec <code>habits</code> lit tes réglages de 4 ★ et plus, par appareil et ISO, et en tire des phrases pour le guide après ton accord. <b>Reste :</b> un « style numérique » proposé comme point de départ (profil par scène, courbe signature).</p></div>
-<div class="carte"><h3>Fragilités à réparer <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
-<p>Toujours ouverts : la rubrique de l'apprentissage par <code>contains</code> (<code>LuminanceSmoothing</code> tombe dans « color ») et le parseur des effets locaux coupé à la première accolade. En partie : l'outil du relevé des seuils (1.6) a fixé quatre seuils sur tes photos, mais il n'y a pas encore de jeu fixe d'environ 40 photos annotées qui les rejoue.</p></div>
+<div class="carte"><h3>Deux fragilités dans l'apprentissage et les effets locaux <span class="pastille ouvert">ouvert</span><span class="pastille moyen">moyen</span></h3>
+<p>Quand Développeur apprend de tes corrections ou relève tes habitudes, il range chaque réglage dans une rubrique du guide en cherchant un bout de son nom. Ainsi, <code>LuminanceSmoothing</code> (réduction du bruit) contient « Luminance » et tombe dans « couleur ». De plus, la lecture des effets locaux de Lightroom s'arrête à la première accolade fermante : un effet aux valeurs imbriquées ne serait lu qu'en partie.</p>
+<p><b>À faire :</b> une table exacte des rubriques par nom de réglage, et une lecture des effets qui suit les accolades, chacune avec son test.</p>
+<p class="preuve">Apprentissage.swift:42-49 · Habitudes.swift:311 · EffetsLocaux.swift:87-88</p></div>
+<div class="carte"><h3>Pas de plafond dur sur les réglages locaux <span class="pastille partiel">en partie</span><span class="pastille fort">fort</span></h3>
+<p><b>Fait :</b> en 1.6, des plafonds sur la photo entière, jugés sur la valeur finale : Clarté 25, Correction du voile 20, Texture et Vibrance 30. Au-delà, c'est refusé et rien n'est écrit, sauf si tu le demandes clairement. La peau a aussi ses doses : un lissage plus fort que « Lite » est refusé si tu ne l'as pas demandé.</p>
+<p><b>Reste à faire :</b> <code>add_mask</code> accepte la Clarté, la Texture, la Correction du voile et la netteté locales de −100 à +100, sans refus. Les doses du « tireur » (éclaircir et assombrir) ne sont que du texte dans les consignes. Il manque une table de doses par type de masque, avec un plafond de netteté locale.</p>
+<p class="preuve">Catalogue.swift:429-431 · Tools+Retouche.swift:608-609 · Plans.lua:804-819 · Peau.swift:123-126 · Tools+Locales.swift:17-23 · Prompts.swift:322-326</p></div>
+<div class="carte"><h3>Empilement : le nombre de passes n'est pas compté <span class="pastille partiel">en partie</span><span class="pastille fort">fort</span></h3>
+<p><b>Fait :</b> en 1.6, les plafonds jugent la valeur cumulée de toutes les passes. Le bilan de <code>view_photo</code> signale une « regression » : écrêtage, ombres ou dominante qui s'aggravent. Il signale aussi un aller-retour d'une passe à l'autre et une dérive lente depuis le premier <code>view_photo</code>. Les consignes limitent à deux passes correctives, puis demandent un avant/après depuis l'état d'avant Claude.</p>
+<p><b>Reste à faire :</b> rien ne compte les passes. Aucun résultat ne donne en chiffres le cumul, réglage par réglage, depuis l'état d'avant Claude : le bilan compare des mesures de l'image, pas des réglages. La limite de deux passes dépend de la bonne volonté du modèle.</p>
+<p class="preuve">Plans.lua:804-819 · Bilan.swift:116-123, 442-456 · Prompts.swift:67-68</p></div>
+<div class="carte"><h3>match_series n'harmonise que trois réglages <span class="pastille partiel">en partie</span><span class="pastille fort">fort</span></h3>
+<p><b>Fait :</b> en 1.6, <code>match_look</code> reprend le rendu d'une photo de référence : exposition, contraste, couleur des ombres, des tons moyens et des hautes lumières, et Vibrance.</p>
+<p><b>Reste à faire :</b> <code>match_series</code> s'en tient à l'exposition, à la balance des blancs et au contraste. Ni l'un ni l'autre n'harmonise les ombres ou les noirs.</p>
+<p class="preuve">Tools+Serie.swift:45, 321-344 · Tools+Reference.swift:26 · Reference.swift:30-31</p></div>
+<div class="carte"><h3>Le guide de style reste de la prose <span class="pastille partiel">en partie</span><span class="pastille fort">fort</span></h3>
+<p><b>Fait :</b> en 1.6, <code>remember_style</code> avec <code>habits</code> lit les réglages de tes photos notées 4 ★ et plus, par appareil et par ISO. Il propose des phrases pour le guide, ajoutées seulement avec ton accord. En 1.6.4, les six boutons de retouche (Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports) font lire ton guide avant de commencer.</p>
+<p><b>Reste à faire :</b> un « style en chiffres » proposé comme point de départ (profil par genre de scène, courbe signature) et appliqué tel quel, au lieu d'être relu comme du texte.</p>
+<p class="preuve">Tools+Style.swift:17, 31 · Habitudes.swift:380-392 · Consignes.lua:129-132, 143-163</p></div>
+<div class="carte"><h3>Seuils provisoires : pas de jeu de photos pour les rejouer <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
+<p><b>Fait :</b> en 1.6, l'outil du relevé des seuils (<code>--mesures</code>) mesure tes photos. En 1.6.1, deux seuils en sont sortis : sous-exposition sous un L* médian de 25 (au lieu de 28), et nature de l'écrêtage dite à partir de 0,13 % de la photo (au lieu de 0,1 %).</p>
+<p><b>Reste à faire :</b> un jeu fixe d'environ 40 photos annotées, que les tests rejouent à chaque version. Beaucoup d'autres seuils restent provisoires : ceux des habitudes, et ceux de la netteté et du bruit dans le bilan.</p>
+<p class="preuve">ReleveSeuils.swift:6-25 · Carnet.swift:44 · Mesures.swift:60 · Habitudes.swift:13 · Bilan.swift:126</p></div>
 
 <h2>5. Le parcours du photographe</h2>
 <table>
 <tr><th>Manque ou excès</th><th>État au 2 novembre 2026</th><th>Impact · effort</th></tr>
-<tr><td>Aucun geste d'import (« Nouvelle sortie »)</td><td><span class="pastille ouvert">ouvert</span> Tri, groupes de lumière et notation existent séparément ; rien ne les enchaîne.</td><td>fort · moyen</td></tr>
-<tr><td>Pas d'avant/après de la photo entière</td><td><span class="pastille partiel">en partie</span> Claude le montre en fin de retouche (1.3.7) et un clic sur une étape montre le sien ; il manque un bouton « Avant Claude / Maintenant » à tout moment.</td><td>moyen · moyen</td></tr>
-<tr><td>Export sans livraison type</td><td><span class="pastille partiel">en partie</span> La fenêtre Publication a ses profils Web, Instagram et Impression ; il manque « Partager » dans la fenêtre Claude et un profil Courriel.</td><td>moyen · petit</td></tr>
-<tr><td>Notation sans revue rapide</td><td><span class="pastille ouvert">ouvert</span> La carte Note accepte une photo à la fois ; le reste se demande à Claude en mots.</td><td>moyen · moyen</td></tr>
-<tr><td>Raccourcis : manipulation système</td><td><span class="pastille ouvert">ouvert</span> Expliqué dans le Gestionnaire et le README, pas au premier lancement.</td><td>moyen · petit</td></tr>
-<tr><td>Suivi surdimensionné</td><td><span class="pastille ouvert">ouvert</span> Rien d'allégé : calendrier et champs Du/au toujours là ; <code>Releve.lua</code> est passé de 1 886 à 2 040 lignes.</td><td>fort · grand</td></tr>
-<tr><td>Onze genres de photo, peu fiables</td><td><span class="pastille ouvert">ouvert</span> Toujours onze, seuils provisoires.</td><td>moyen · moyen</td></tr>
+<tr><td>Notation sans revue rapide</td><td><span class="pastille ouvert">ouvert</span> La carte Note montre la photo active seule : tu acceptes ou changes une note à la fois. Le bouton Noter de la Demande rapide pose les notes de Claude d'un coup, sans revue. <b>À faire :</b> une revue qui fait défiler les notes proposées, avec Accepter ou Changer pour chacune.<p class="preuve">Fenetre.lua:2869 · FenetreRapide.lua:66</p></td><td>moyen · moyen</td></tr>
+<tr><td>Raccourcis : manipulation système</td><td><span class="pastille ouvert">ouvert</span> Le raccourci ne se pose que par le bouton « Poser le raccourci » du Gestionnaire de modules externes ; rien ne le propose au premier lancement. <b>À faire :</b> le proposer à la première ouverture.<p class="preuve">PluginInfoProvider.lua:277-281</p></td><td>moyen · petit</td></tr>
+<tr><td>Suivi surdimensionné</td><td><span class="pastille ouvert">ouvert</span> Rien d'allégé : le calendrier et les champs « Du » et « au » sont toujours là ; <code>Releve.lua</code> compte 2 040 lignes et <code>FenetreSuivi.lua</code> 1 448. <b>À faire :</b> garder l'essentiel et retirer le reste.<p class="preuve">FenetreSuivi.lua:7, 213 · Releve.lua</p></td><td>fort · grand</td></tr>
+<tr><td>Onze genres de photo, peu fiables</td><td><span class="pastille ouvert">ouvert</span> Toujours onze genres, règles en version 1 et seuils provisoires du 26 octobre. Les espèces de la 1.6.3 ne changent rien aux genres. <b>À faire :</b> relever les seuils sur tes photos, ou réduire la liste.<p class="preuve">Genre.swift:25, 29-41, 76</p></td><td>moyen · moyen</td></tr>
+<tr><td>Aucun geste d'import (« Nouvelle sortie »)</td><td><span class="pastille partiel">en partie</span> <b>Fait :</b> en 1.6.4, le bouton Retouche pro de la Demande rapide enchaîne, sur la sélection, les groupes de lumière, la retouche d'une référence par groupe, la copie et l'harmonisation. Dans Claude Desktop, l'invite <code>harmoniser_serie</code> enchaîne déjà tri, groupes et retouche. <b>Reste :</b> un seul geste après l'import qui fait aussi le tri et la notation ; Noter reste un bouton à part, et rien ne se lance à l'import.<p class="preuve">Consignes.lua:468-480 · FenetreRapide.lua:68 · Prompts.swift:91</p></td><td>fort · moyen</td></tr>
+<tr><td>Pas d'avant/après de la photo entière</td><td><span class="pastille partiel">en partie</span> <b>Fait :</b> Claude montre l'avant/après en fin de retouche (1.3.7), et un clic sur une étape montre le sien. <b>Reste :</b> un bouton « Avant Claude / Maintenant » à tout moment ; seul le menu « Revenir à « Avant Claude » » existe, et il défait la retouche.<p class="preuve">Tools+Analyse.swift:16 · Rendus.swift:114 · Fenetre.lua:2253 · MenuRevenir.lua:1</p></td><td>moyen · moyen</td></tr>
+<tr><td>Export sans livraison type</td><td><span class="pastille partiel">en partie</span> <b>Fait :</b> la fenêtre Publication, ouverte depuis l'en-tête de la fenêtre Claude, a ses profils Web, Instagram et Impression. En 1.6.4, quand tu demandes un tirage à Claude, il vérifie qu'il reste au moins 240 ppp après le recadrage et te prévient sinon. <b>Reste :</b> un profil Courriel, et un bouton « Partager » qui fait préparer le partage par Claude (l'invite <code>partage</code> n'existe que dans le connecteur).<p class="preuve">Publication.lua:24-31 · Vues.lua:288 · Tools+Livraison.swift:79, 110 · Prompts.swift:273</p></td><td>moyen · petit</td></tr>
 </table>
 
 <h2>6. Qualité logicielle et livraison</h2>
 <table>
 <tr><th>Constat</th><th>État au 2 novembre 2026</th></tr>
-<tr><td>Installation sans retour arrière</td><td><span class="pastille ouvert">ouvert</span> Aucun <code>.precedent</code> ; le serveur est remplacé avant de tester <code>--version</code>.</td></tr>
-<tr><td>Mise à jour sans contrôle d'intégrité, tributaire de <code>gh</code></td><td><span class="pastille ouvert">ouvert</span> Pas de <code>.sha256</code>, pas de repli sur l'API publique.</td></tr>
-<tr><td>Code de recette dans le binaire livré</td><td><span class="pastille ouvert">ouvert</span> Recette et relevé (environ 4 000 lignes) toujours dans <code>DeveloppeurKit</code>.</td></tr>
-<tr><td>Pont local : le jeton ne protège pas d'un processus du même compte</td><td><span class="pastille ouvert">ouvert</span> « Confirmer dans Lightroom » n'existe qu'en mode Proposer d'abord ; rien de propre à l'export, aux rejets ou au retour à l'original.</td></tr>
-<tr><td>Fichiers Lua et <code>MotsClesVision.swift</code> très gros</td><td><span class="pastille ouvert">ouvert</span> <code>Fenetre.lua</code> : 4 554 lignes ; module Lua : 36 298 lignes (34 197 en 1.4).</td></tr>
-<tr><td>Pas de workflow de publication</td><td><span class="pastille partiel">en partie (1.6.2)</span> La CI compare les numéros de version et compile en release ; rien ne se lance sur un tag <code>v*</code>.</td></tr>
+<tr><td>Installation sans retour arrière</td><td><span class="pastille ouvert">ouvert</span> L'installation remplace le serveur, puis lit seulement sa version : si le nouveau serveur ne démarre pas, l'ancien est déjà perdu. Pour le module, l'ancien est effacé avant que le nouveau prenne sa place, sans copie de secours. <b>À faire :</b> garder l'ancien en <code>.precedent</code> et le remettre si <code>--version</code> échoue.<p class="preuve">install.sh:67-71 · install.sh:109-113</p></td></tr>
+<tr><td>Mise à jour sans contrôle d'intégrité, tributaire de <code>gh</code></td><td><span class="pastille ouvert">ouvert</span> <code>--status</code> demande la dernière version à <code>gh</code> seul : sans <code>gh</code>, il n'en dit rien. Aucune empreinte <code>.sha256</code> n'accompagne l'archive. <b>À faire :</b> un repli sur l'API publique de GitHub, et une empreinte publiée avec chaque Release.<p class="preuve">MiseAJour.swift:4-5, 14</p></td></tr>
+<tr><td>Code de recette dans le binaire livré</td><td><span class="pastille ouvert">ouvert</span> Recette et relevés (environ 4 200 lignes) sont toujours dans <code>DeveloppeurKit</code>, donc dans le serveur que tu installes. <b>À faire :</b> les sortir dans une cible à part, réservée au développement.<p class="preuve">Package.swift:15 · Recette.swift (2 234 l.) · Recette+13.swift (554) · ReleveSeuils.swift (1 201)</p></td></tr>
+<tr><td>Pont local : le jeton ne protège pas d'un processus du même compte</td><td><span class="pastille ouvert">ouvert</span> « Confirmer dans Lightroom » ne joue qu'en mode Proposer d'abord, et la préférence est éteinte par défaut. Le retour à l'original ne demande aucun accord. <b>À faire :</b> un accord dans Lightroom propre à l'export, aux rejets et au retour à l'original, en tout mode.<p class="preuve">Ecriture.lua:152 · Preferences.lua:31 · Annulation.lua:244</p></td></tr>
+<tr><td>Fichiers Lua et <code>MotsClesVision.swift</code> très gros</td><td><span class="pastille ouvert">ouvert</span> <code>Fenetre.lua</code> : 4 560 lignes ; module Lua : 36 586 lignes (34 197 en 1.4) ; <code>MotsClesVision.swift</code> : 1 383 lignes. <b>À faire :</b> découper par rôle.<p class="preuve">Lightroom/Developpeur.lrplugin/Fenetre.lua · Lightroom/Developpeur.lrplugin/*.lua · Sources/DeveloppeurKit/MotsClesVision.swift</p></td></tr>
+<tr><td>Pas de workflow de publication</td><td><span class="pastille partiel">en partie</span> <b>Fait (1.6.2) :</b> la CI compare les numéros de version, compile en release et vérifie <code>--version</code>. <b>Reste :</b> rien ne se lance sur un tag <code>v*</code>.<p class="preuve">.github/workflows/tests.yml:9-12, 23-34</p></td></tr>
 </table>
 
 <h2>7. Alléger la relecture (nettoyage des notes)</h2>
