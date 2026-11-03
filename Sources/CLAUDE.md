@@ -60,7 +60,9 @@ toucher :
 - **`match_look`** (1.6, `Reference.swift`) : couleur des zones sur leurs pixels peu saturés, jamais
   par la mesure d'`Eclairage` ; la part commune aux zones est la balance (seulement avec
   `white_balance`) ; une écriture absolue par passe, deux au plus ; pentes provisoires
-  (`--etalonnage`).
+  (`--etalonnage`). Exposition (0,5 IL, `expositionMax`) et contraste (30) bornés en tout par
+  appel, depuis la valeur de départ (`traduire(…, depart:)` à la passe 2) : l'écart de clarté vient
+  aussi de la scène (constaté le 2 novembre 2026).
 - **Harmoniser par lumière** (`GroupesLumiere.former`, pure) : `groups` est refusé avec
   `reference_id` ; aucun original ouvert ; rien n'est écrit, le plan seulement (`planDesGroupes`).
   `view_photo` retire `prise_de_vue` avant Claude.

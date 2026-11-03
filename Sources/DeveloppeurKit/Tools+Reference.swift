@@ -23,7 +23,7 @@ extension ToolHandler {
     var referenceDefinitions: [JSONValue] {
         [
             tool("match_look",
-                 "Donne à une photo le rendu d'une photo de référence du catalogue (reference_id), déjà retouchée : tons (Exposition, Contraste), couleur des ombres, des tons moyens et des hautes lumières (Étalonnage des couleurs), saturation (Vibrance seulement), balance sur demande. La couleur de chaque zone se mesure sur ses pixels peu saturés, sans les visages ; seul le partage entre zones se copie (la part commune, c'est la balance : adjust white_balance). Sans confirm : le plan, sans rien changer, à montrer. Avec confirm = true : valeurs finales en une étape « Claude · <step_name> : passe N » par passe, nouvelle mesure, une seconde passe si l'écart reste (deux au plus) ; le résultat donne les écarts par zone avant et après (rapproche_pct). Saturation de l'étalonnage \(Int(Reference.saturationMax)) au plus par zone, Vibrance sous son plafond de dose ; si la peau bouge nettement, la passe 2 rend la moitié du changement des tons moyens (a_verifier). Pour neutraliser une série prise ensemble : match_series.",
+                 "Donne à une photo le rendu d'une photo de référence du catalogue (reference_id), déjà retouchée : tons (Contraste, \(Int(Reference.contrasteMax)) au plus ; Exposition, \(Reference.texteIL(Reference.expositionMax)) IL au plus en tout, l'écart de clarté venant aussi de la scène : l'exposition se demande à part), couleur des ombres, des tons moyens et des hautes lumières (Étalonnage des couleurs), saturation (Vibrance seulement), balance sur demande. La couleur de chaque zone se mesure sur ses pixels peu saturés, sans les visages ; seul le partage entre zones se copie (la part commune, c'est la balance : adjust white_balance). Sans confirm : le plan, sans rien changer, à montrer. Avec confirm = true : valeurs finales en une étape « Claude · <step_name> : passe N » par passe, nouvelle mesure, une seconde passe si l'écart reste (deux au plus) ; le résultat donne les écarts par zone avant et après (rapproche_pct). Saturation de l'étalonnage \(Int(Reference.saturationMax)) au plus par zone, Vibrance sous son plafond de dose ; si la peau bouge nettement, la passe 2 rend la moitié du changement des tons moyens (a_verifier). Pour neutraliser une série prise ensemble : match_series.",
                  properties: [
                     ("reference_id", prop("integer", "Photo du catalogue dont on veut le rendu (son aperçu développé).")),
                     ("photo_id", photoIDProperty),
@@ -196,7 +196,7 @@ extension ToolHandler {
                     var entiere = options
                     entiere.force = 1
                     var suite = Reference.traduire(Reference.ecartVise(reste: reste, avant: ecartAvant, force: options.force),
-                                                   etat: mesuree.etat, options: entiere, pentes: pentes)
+                                                   etat: mesuree.etat, options: entiere, pentes: pentes, depart: photo.etat)
                     // La peau a bougé d'un écart qui se voit : la passe 2 rend la moitié du changement des tons moyens.
                     if let p0 = photo.peau, let p1 = mesuree.peau, Teint.ecart(p1, p0) >= Teint.deplacementVisible {
                         let cles = Reference.clesZones[1]

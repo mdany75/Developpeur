@@ -96,6 +96,7 @@ défait ensuite.
 **Étalonnage (`match_look`) et habitudes**
 
 - Peau déplacée de 2,5 ou 5,2 (`Teint.deplacementVisible`), rendu côte à côte — avec Dany (à l'œil) ([match_look](#à-constater-match_look)).
+- Exposition bornée à 0,5 IL en tout (`Reference.expositionMax`, provisoire) et contraste à 30 en tout : la dune contre la remise de diplôme, puis le camping au crépuscule, sur de nouvelles copies d'Essais — à la main dans Lightroom ([match_look](#étalonnage-daprès-une-référence-match_look-16)).
 - `saturationMax`, `vibranceMaxPasse`, chroma des couleurs vives déplacée par l'étalonnage, ordre du traitement, référence au rendu marqué — à la main dans Lightroom (`--etalonnage --balayage`) ([match_look](#à-constater-match_look)).
 - Phrases des habitudes (« est-ce bien toi ? ») avant de lever « provisoires » — avec Dany ([habitudes](#16--tes-habitudes-en-chiffres-remember_style-avec-habits)).
 - « Comment je règle d'habitude mes belles photos ? » dans la fenêtre Claude — à la main dans Lightroom ([habitudes, point 6](#16--tes-habitudes-en-chiffres-remember_style-avec-habits)).
@@ -10134,8 +10135,14 @@ part commune (avec elle si la balance se copie).
 
 **Traduction** (`Reference.traduire`), en valeurs finales, seulement celles qui changent :
 
-- tons : Exposure2012 (comme `match_series`, ±2 IL par passe) et Contrast2012 (`PentesSerie`,
-  30 par passe au plus) ; une seule voie pour le contraste, pas de courbe (critique du plan) ;
+- tons : Exposure2012 (pente de `match_series`) et Contrast2012 (`PentesSerie`) ; une seule voie
+  pour le contraste, pas de courbe (critique du plan). Bornés **en tout** par appel, passes 1 et 2
+  comprises, depuis la valeur de départ de la photo (`traduire(…, depart:)`) : l'exposition de
+  0,5 IL au plus (`Reference.expositionMax`, provisoire), le contraste de 30 au plus
+  (`Reference.contrasteMax`, celui d'une passe de `match_series` ; borné par passe seulement, deux
+  passes pouvaient le changer de 60). Une borne atteinte se dit dans `limites` (« Exposition changée
+  de 0,5 IL au plus : l'écart de clarté vient aussi de la scène ; demander l'exposition à part si
+  voulu ») ; revenir vers la valeur de départ reste libre ;
 - étalonnage, par zone dont l'écart relatif passe 1,5 : le vecteur actuel (teinte et saturation
   posées, par le modèle) plus `strength` × l'écart, rendu en teinte et saturation. Clés réellement
   acceptées par apply_settings (constaté le 1er novembre 2026) : `SplitToningShadowHue/Saturation`,
@@ -10177,6 +10184,20 @@ erreur sans rien d'écrit, l'erreur comme avant. Les vidéos de `photo_ids` s'é
 `vignettes` (comme le tri), avant tout aperçu (`videos_ecartees`). La fenêtre Claude traite match_look
 comme match_series (`Conversation.SERIES`) : pas de repère pendant l'appel, étapes lues dans
 `photos[].etapes`, propositions closes sur les photos retouchées.
+
+**Constaté dans Lightroom Classic (2 novembre 2026)**, sur des copies d'Essais : référence = une
+dune de sable claire (étalonnage sarcelle et orange), photo = une remise de diplôme sur rideau noir.
+match_look a posé Exposure2012 +1,8 (l'écart d'exposition, plafonné à 3 IL × la pente, borné à
+±2 par passe) et Contrast2012 −30 : photo délavée, brûlée. La distance des scènes (`scenes_pct`)
+était 34, sous `seuilScenes` (72) : le garde-fou « scènes différentes » ne s'est pas déclenché.
+Sur une autre photo (camping au crépuscule), le rendu était juste et discret. L'écart de clarté
+vient aussi de la scène : depuis, l'exposition change de 0,5 IL au plus en tout par appel, et le
+contraste de 30 au plus en tout (voir Traduction). Règle de la simulation : le faux rendu de
+`ReferenceTests` (`brancherRendu`, référence claire, photo sombre à bandes noires, exposition qui
+rend peu, contraste non rendu) ; test `testUneSceneTresDifferenteNeCopiePasSonExposition`, qui
+échoue sans la borne (+4 IL et −60 sur deux passes). À la prochaine recette : rejouer la dune
+contre la remise de diplôme (nouvelles copies d'Essais remises à l'origine) et lire Exposure2012
+(0,5 au plus) et `limites`.
 
 ### À constater (match_look)
 

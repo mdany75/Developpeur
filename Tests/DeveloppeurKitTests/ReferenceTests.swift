@@ -316,13 +316,50 @@ final class ReferenceTests: XCTestCase {
         XCTAssertEqual(Set(reglages.keys), ["Exposure2012", "Contrast2012"], "ni courbe ni autre réglage pour les tons")
     }
 
+    /// Constaté le 2 novembre 2026 dans Lightroom (dune claire contre remise de diplôme sur rideau
+    /// noir, scènes à 34 %) : match_look avait posé Exposure2012 +1,8. L'exposition change de
+    /// `expositionMax` au plus en tout, depuis la valeur de départ, et la limite le dit.
+    func testExpositionBorneeEnToutDepuisLeDepart() {
+        XCTAssertEqual(Reference.expositionMax, 0.5)
+        let clair = ecart([nil, nil, nil], exposition: 3)
+        let (reglages, limites) = Reference.traduire(clair, etat: neutre, options: .init(), pentes: .init())
+        XCTAssertEqual(reglages["Exposure2012"] ?? 0, 0.5, accuracy: 0.001, "et non +1,8")
+        XCTAssertTrue(limites.contains("Exposition changée de 0,5 IL au plus : l'écart de clarté vient aussi de la scène ; demander l'exposition à part si voulu."), "\(limites)")
+        let sombre = Reference.traduire(ecart([nil, nil, nil], exposition: -3), etat: .init(reglages: ["Exposure2012": 0.4], raw: false),
+                                        options: .init(), pentes: .init())
+        XCTAssertEqual(sombre.reglages["Exposure2012"] ?? 0, -0.1, accuracy: 0.001, "depuis sa valeur de départ (0,4)")
+        // La passe 2 part de la passe 1 (+0,5) : rien de plus au-delà du départ (0).
+        let passe2 = Reference.traduire(clair, etat: .init(reglages: ["Exposure2012": 0.5], raw: false), options: .init(), pentes: .init(), depart: neutre)
+        XCTAssertNil(passe2.reglages["Exposure2012"])
+        XCTAssertTrue(passe2.limites.contains { $0.hasPrefix("Exposition changée de 0,5 IL au plus") })
+        // Un petit écart passe sans limite.
+        let petit = Reference.traduire(ecart([nil, nil, nil], exposition: 0.5), etat: neutre, options: .init(), pentes: .init())
+        XCTAssertFalse(petit.limites.contains { $0.hasPrefix("Exposition") })
+    }
+
+    /// Revue du 2 novembre 2026 : le contraste était borné à 30 par passe, donc 60 sur deux passes ;
+    /// il l'est maintenant en tout, depuis la valeur de départ.
+    func testContrasteBorneEnToutSurLesDeuxPasses() {
+        let plat = ecart([nil, nil, nil], contraste: -20)
+        let passe1 = Reference.traduire(plat, etat: neutre, options: .init(), pentes: .init())
+        XCTAssertEqual(passe1.reglages["Contrast2012"], -30)
+        let passe2 = Reference.traduire(plat, etat: .init(reglages: ["Contrast2012": -30], raw: false), options: .init(), pentes: .init(), depart: neutre)
+        XCTAssertNil(passe2.reglages["Contrast2012"], "pas −60")
+        XCTAssertTrue(passe2.limites.contains("Contraste changé de 30 au plus en tout (les deux passes comprises) : l'écart de tons vient aussi de la scène."))
+        // Revenir vers le départ reste libre.
+        let retour = Reference.traduire(ecart([nil, nil, nil], contraste: 5), etat: .init(reglages: ["Contrast2012": -30], raw: false),
+                                        options: .init(), pentes: .init(), depart: neutre)
+        XCTAssertEqual(retour.reglages["Contrast2012"] ?? 0, -14, accuracy: 1)
+    }
+
     // MARK: L'outil, sur un faux rendu
 
     /// Le faux module : la photo 1 (référence) a des ombres sarcelle et des hautes lumières orange ;
     /// la photo 2, grise, se rend d'après ses réglages, avec un gain réel de `gainReel` a*b* par point
     /// de saturation (plus fort que le modèle de match_look, `Reference.gainDepart` : la passe 2 corrige).
     func brancherRendu(gainReel: Double = 0.6, reference: [Reference.Vecteur] = [.init(a: -3, b: -4), .zero, .init(a: 3, b: 4)],
-                       peau: CGRect? = nil) -> () -> [String: Double] {
+                       peau: CGRect? = nil, clarteReference: Double = 0, clartePhoto: Double = 0,
+                       effetExposition: Double = 10) -> () -> [String: Double] {
         var etat: [String: Double] = [:]
         let verrou = NSLock()
         fake.onSend = { [unowned fake] command, params in
@@ -331,13 +368,13 @@ final class ReferenceTests: XCTestCase {
                 verrou.lock(); let reglages = etat; verrou.unlock()
                 let couleur: (Int, Int) -> (UInt8, UInt8, UInt8)
                 if id == 1 {
-                    couleur = Self.degrade(ombres: reference[0], moyens: reference[1], hautes: reference[2], peau: peau)
+                    couleur = Self.degrade(ombres: reference[0], moyens: reference[1], hautes: reference[2], exposition: clarteReference, peau: peau)
                 } else {
                     func v(_ z: Int) -> Reference.Vecteur {
                         let cles = Reference.clesZones[z]
                         return Reference.vecteur(teinte: reglages[cles.teinte] ?? 0, saturation: reglages[cles.saturation] ?? 0, gain: gainReel)
                     }
-                    couleur = Self.degrade(ombres: v(0), moyens: v(1), hautes: v(2), exposition: 10 * (reglages["Exposure2012"] ?? 0), peau: peau)
+                    couleur = Self.degrade(ombres: v(0), moyens: v(1), hautes: v(2), exposition: clartePhoto + effetExposition * (reglages["Exposure2012"] ?? 0), peau: peau)
                 }
                 var lus: [String: JSONValue] = [:]
                 for (cle, valeur) in reglages { lus[cle] = .number(valeur) }
@@ -390,6 +427,29 @@ final class ReferenceTests: XCTestCase {
         // Le gain réel (0,6) est plus fort que le modèle (0,41 aux ombres) : la passe 2 baisse la saturation.
         let s1 = try XCTUnwrap(ecritures[0].params["reglages"]?["SplitToningShadowSaturation"]?.double)
         XCTAssertLessThan(etat()["SplitToningShadowSaturation"] ?? 99, s1)
+    }
+
+    /// Simulation du constat du 2 novembre 2026 dans Lightroom : une référence très claire (dune de
+    /// sable, étalonnage sarcelle et orange) et une photo sombre (rideau noir), dont l'exposition rend
+    /// peu (la passe 2 voudrait pousser encore) et dont le contraste ne se rend pas (la passe 2 le
+    /// voudrait encore). Sur les deux passes : l'exposition change de 0,5 IL au plus, le contraste de
+    /// 30, et les limites le disent.
+    func testUneSceneTresDifferenteNeCopiePasSonExposition() throws {
+        let etat = brancherRendu(clarteReference: 25, clartePhoto: -10, effetExposition: 3)
+        let fait = try appel(["reference_id": 1, "photo_id": 2, "confirm": true, "strength": 1])
+        let ecritures = fake.calls.filter { $0.command == "appliquer" }
+        XCTAssertEqual(ecritures.count, 2)
+        let ligne = try XCTUnwrap(fait["photos"]?.array?.first)
+        XCTAssertGreaterThan(ligne["ecart_avant"]?["exposition_IL"]?.double ?? 0, 1, "la référence est bien plus claire")
+        XCTAssertLessThan(ligne["ecart_avant"]?["scenes_pct"]?.double ?? 100, Reference.seuilScenes, "le garde-fou des scènes ne joue pas")
+        for ecriture in ecritures {
+            if let e = ecriture.params["reglages"]?["Exposure2012"]?.double { XCTAssertLessThanOrEqual(abs(e), 0.5 + 1e-9) }
+            if let c = ecriture.params["reglages"]?["Contrast2012"]?.double { XCTAssertLessThanOrEqual(abs(c), 30) }
+        }
+        XCTAssertEqual(etat()["Exposure2012"] ?? 0, 0.5, accuracy: 0.001, "et non +1,8")
+        XCTAssertGreaterThanOrEqual(etat()["Contrast2012"] ?? 0, -30, "et non −60")
+        let limites = ligne["limites"]?.array?.compactMap(\.string) ?? []
+        XCTAssertTrue(limites.contains { $0.hasPrefix("Exposition changée de 0,5 IL au plus") }, "\(limites)")
     }
 
     func testUnePhotoDejaProcheNestPasTouchee() throws {
