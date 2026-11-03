@@ -78,15 +78,15 @@
   <div class="chiffre"><b>1 931</b><span>lignes de notes retirées (CLAUDE.md, CHANGELOG, README)</span></div>
 </div>
 
-<h2>1. À corriger tout de suite (petit effort, fort effet) : fait</h2>
-<div class="carte"><h3>Les consignes serveur citent un paramètre qui n'existe pas <span class="pastille fait">fait en 1.5.1</span><span class="pastille fort">fort</span><span class="pastille petit">petit</span></h3>
-<p>« preview_settings, preview = true » : <code>preview</code> n'existe que sur <code>add_mask</code> et <code>edit_mask</code>. Les paramètres inconnus étant refusés, un modèle qui suit la consigne obtient une erreur.</p>
-<p class="preuve">ServerInfo.swift · Tools+Retouche.swift:124-137 · Tools+Locales.swift:209</p>
-<p><b>Faire :</b> corriger la phrase, et ajouter un test qui vérifie que chaque paramètre cité dans les consignes existe dans l'outil nommé (la limite de longueur est à 3 787 sur 3 796 : refaire le calcul).</p></div>
-<div class="carte"><h3>CI : ni la version ni le build release ne sont vérifiés <span class="pastille fait">fait en 1.6.2</span><span class="pastille fort">fort</span><span class="pastille petit">petit</span></h3>
-<p><b>Faire :</b> ajouter <code>swift build -c release</code> puis comparer <code>--version</code> à Info.plist ; sortir le contrôle de versions de <code>build.sh</code> dans <code>scripts/verifier-versions.sh</code>.</p></div>
-<div class="carte"><h3>Le Suivi et le « classement » : fonctions faites, mais sans bouton <span class="pastille fait">fait en 1.6.2</span><span class="pastille fort">fort</span><span class="pastille petit">petit</span></h3>
-<p>Mots-clés, lieu et légende existent comme outils, sans invite ni bouton dans la Demande rapide. <b>Faire :</b> invite « Classer » + 4ᵉ bouton, en « Proposer d'abord » par défaut.</p></div>
+<h2>1. À corriger tout de suite : les trois sont corrigés</h2>
+<div class="carte"><h3>Les consignes du connecteur citaient un paramètre qui n'existe pas <span class="pastille fait">corrigé en 1.5.1</span></h3>
+<p><b>Le problème était :</b> « preview_settings, preview = true », alors que <code>preview</code> n'existe que sur <code>add_mask</code> et <code>edit_mask</code> ; un modèle qui suivait la consigne recevait un refus.</p>
+<p><b>Corrigé :</b> la phrase dit maintenant « preview_settings ou add_mask, preview = true » (<code>ServerInfo.swift:48</code>), et un test refuse toute consigne qui cite un paramètre absent de l'outil nommé (<code>Version24Tests.swift:208</code>).</p></div>
+<div class="carte"><h3>La CI ne vérifiait ni la version ni le build release <span class="pastille fait">corrigé en 1.6.2</span></h3>
+<p><b>Corrigé :</b> à chaque poussée, la CI lance <code>scripts/verifier-versions.sh</code> (les trois numéros et le CHANGELOG d'accord), compile en release et compare <code>--version</code> à <code>Info.plist</code> (<code>.github/workflows</code>, l. 25 à 34). <code>build.sh</code> appelle le même script.</p></div>
+<div class="carte"><h3>Le classement n'avait pas de bouton <span class="pastille fait">corrigé en 1.6.2</span></h3>
+<p><b>Le problème était :</b> mots-clés, lieu et légende existaient comme outils, sans invite ni bouton.</p>
+<p><b>Corrigé :</b> l'invite Classer et un 4<sup>e</sup> bouton dans la Demande rapide et la fenêtre Claude. Elle propose seulement et n'écrit rien sans ton accord (<code>Consignes.lua</code>, invite <code>classer</code>) ; essayée dans Lightroom le 2 novembre 2026.</p></div>
 
 <h2>2. Le connecteur MCP (ce que le modèle voit)</h2>
 <div class="carte"><h3>Ciblage des photos différent d'un outil à l'autre <span class="pastille ouvert">ouvert</span><span class="pastille fort">fort</span></h3>
