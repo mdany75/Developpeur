@@ -1,14 +1,33 @@
 -- Chemins.lua : dossiers et réglages de la fenêtre Claude.
 --
---   ~/Library/Application Support/Developpeur/
+-- Deux racines (dossier commun, demandé par Dany le 3 novembre 2026 : deux Mac, un SSD « Photos »
+-- qui passe de l'un à l'autre, jamais les deux en même temps ; « que je travaille sur l'un ou
+-- l'autre, tout est pareil ») :
+--   - la racine LOCALE, ~/Library/Application Support/Developpeur/ (Chemins.locale, Chemins.racine) ;
+--   - la racine DES DONNÉES (Chemins.donnees) : le dossier commun s'il est réglé, sinon la racine
+--     locale. Le pointeur local dossier-commun.json ({"format":1,"dossier":"<chemin absolu>"}),
+--     écrit seulement par le réglage du Gestionnaire de modules externes (DossierCommun.lua), est
+--     relu à chaque accès : rien n'en est gardé en mémoire. Réglé mais absent (SSD débranché) : tout
+--     accès aux données est refusé (Chemins.messageAbsent), jamais de repli sur la racine locale
+--     (deux versions divergeraient).
+--
+--   Racine locale (toujours sur ce Mac) :
 --       mcp-developpeur                        le connecteur MCP-Développeur (installé par install.sh)
---       Conversations/<id>/conversation.json   le fil, et les images que Claude a regardées
+--       liaison.jeton, liaison.jeton.nouveau   le jeton privé de la liaison
+--       dossier-commun.json                    le pointeur vers le dossier commun (absent : aucun)
 --       Sessions/<id>-<date>-<n>/              échanges avec un processus Claude Code (relais.sh), et
 --                                              ses consignes (consignes.md, écrites à son lancement)
 --       Atelier/                               dossier de travail de Claude Code (vide)
 --       Temporaire/                            fichiers de passage (images collées, sorties de
 --                                              commandes, vignettes du Suivi)
 --       connecteur.json                        configuration MCP, écrite à chaque lancement
+--       Avant le dossier commun <date>/        les données de ce Mac mises de côté quand le dossier
+--                                              commun a été choisi (jamais effacées)
+--   Racine des données (Chemins.NOMS_DONNEES ; le dossier commun quand il est réglé) :
+--       Conversations/<id>/conversation.json   le fil, et les images que Claude a regardées
+--       Claude Code/<session>.jsonl            les échanges des sessions Claude Code de la fenêtre,
+--                                              copiés par relais.sh (reprise sur l'autre Mac)
+--       guide-de-style.md, rendus.json, Index/, Modeles/   tenus par le serveur
 --       consommation.json, publication.json    jetons comptés, profils de publication de l'utilisateur
 --       notation.json                          notes proposées par Claude
 --       carnet.json                            carnet de progrès (Carnet.lua, 1.3), une table par
@@ -42,13 +61,138 @@ local function sous(...)
     return chemin
 end
 
-function Chemins.racine() return sous('Library', 'Application Support', 'Developpeur') end
-function Chemins.conversations() return LrPathUtils.child(Chemins.racine(), 'Conversations') end
-function Chemins.sessions() return LrPathUtils.child(Chemins.racine(), 'Sessions') end
-function Chemins.atelier() return LrPathUtils.child(Chemins.racine(), 'Atelier') end
-function Chemins.configMCP() return LrPathUtils.child(Chemins.racine(), 'connecteur.json') end
-function Chemins.temporaire() return LrPathUtils.child(Chemins.racine(), 'Temporaire') end
-function Chemins.etapes() return LrPathUtils.child(Chemins.racine(), 'Etapes') end
+-- La racine locale (ce Mac) ; Chemins.racine en garde le nom d'avant le dossier commun.
+function Chemins.locale() return sous('Library', 'Application Support', 'Developpeur') end
+function Chemins.racine() return Chemins.locale() end
+function Chemins.sessions() return LrPathUtils.child(Chemins.locale(), 'Sessions') end
+function Chemins.atelier() return LrPathUtils.child(Chemins.locale(), 'Atelier') end
+function Chemins.configMCP() return LrPathUtils.child(Chemins.locale(), 'connecteur.json') end
+function Chemins.temporaire() return LrPathUtils.child(Chemins.locale(), 'Temporaire') end
+
+-- Dossier commun -------------------------------------------------------------------------------
+
+-- Ce qui va dans la racine des données (le dossier commun quand il est réglé) ; tout le reste de la
+-- racine locale y reste. Le serveur tient la même liste (guide de style, rendus, Index, Modeles).
+Chemins.NOMS_DONNEES = {
+    'guide-de-style.md', 'Conversations', 'suivi.json', 'suivi.journal', 'carnet.json', 'notation.json',
+    'mes-demandes.json', 'publication.json', 'consommation.json', 'rendus.json', 'Etapes', 'Index', 'Modeles',
+    'Claude Code',
+}
+-- Les copies illisibles mises de côté, rangées avec leur fichier.
+Chemins.MOTIFS_DONNEES = { '^suivi%-illisible%-.+%.json$', '^carnet%-illisible%-', '^mes%-demandes%-illisible%-' }
+
+local nomsDonnees = {}
+for _, nom in ipairs(Chemins.NOMS_DONNEES) do
+    nomsDonnees[nom] = true
+end
+
+-- Vrai si `nom` (un nom de fichier ou de dossier de la racine) est une donnée du dossier commun.
+function Chemins.estDonnee(nom)
+    if type(nom) ~= 'string' or nom == '' then
+        return false
+    end
+    if nomsDonnees[nom] then
+        return true
+    end
+    for _, motif in ipairs(Chemins.MOTIFS_DONNEES) do
+        if nom:find(motif) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Le pointeur, toujours local ; seul DossierCommun.lua l'écrit.
+function Chemins.pointeur() return LrPathUtils.child(Chemins.locale(), 'dossier-commun.json') end
+
+-- L'état du dossier commun, relu à chaque appel : { regle, chemin, present }. Pointeur absent,
+-- illisible ou sans « dossier » non vide : regle = false (la racine locale sert).
+function Chemins.dossierCommun()
+    local f = io.open(Chemins.pointeur(), 'rb')
+    if not f then
+        return { regle = false, present = false }
+    end
+    local texte = f:read('*a')
+    f:close()
+    local ok, t = pcall(function() return require('Json').decode(texte or '') end)
+    local dossier = ok and type(t) == 'table' and t.dossier or nil
+    if type(dossier) ~= 'string' or not dossier:find('%S') then
+        return { regle = false, present = false }
+    end
+    if #dossier > 1 then
+        dossier = dossier:gsub('/+$', '')
+    end
+    return { regle = true, chemin = dossier, present = LrFileUtils.exists(dossier) == 'directory' }
+end
+
+-- Le refus quand le dossier commun réglé est introuvable.
+function Chemins.messageAbsent(chemin)
+    return string.format("Le dossier commun (%s) est introuvable : branchez le SSD qui le contient, ou réglez un autre dossier "
+        .. "dans Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom.", tostring(chemin))
+end
+
+-- Le refus (texte) si les données ne sont pas accessibles, sinon nil.
+function Chemins.refusDonnees()
+    local commun = Chemins.dossierCommun()
+    if commun.regle and not commun.present then
+        return Chemins.messageAbsent(commun.chemin)
+    end
+    return nil
+end
+
+-- La racine des données : le dossier commun s'il est réglé, sinon la racine locale. Réglé mais
+-- introuvable : une erreur (Chemins.messageAbsent), jamais la racine locale à sa place.
+function Chemins.donnees()
+    local commun = Chemins.dossierCommun()
+    if not commun.regle then
+        return Chemins.locale()
+    end
+    if not commun.present then
+        error(Chemins.messageAbsent(commun.chemin), 0)
+    end
+    return commun.chemin
+end
+
+-- Un fichier ou un dossier de la racine des données.
+function Chemins.donnee(nom) return LrPathUtils.child(Chemins.donnees(), nom) end
+function Chemins.conversations() return Chemins.donnee('Conversations') end
+function Chemins.etapes() return Chemins.donnee('Etapes') end
+function Chemins.claudeCode() return Chemins.donnee('Claude Code') end
+
+-- Un chemin absolu rangé dans un fichier de données (écrit sur ce Mac ou sur l'autre, avant ou après
+-- le dossier commun) : « …/Library/Application Support/Developpeur/<donnée>/… » se lit dans la racine
+-- des données actuelle (le nom d'utilisateur peut différer d'un Mac à l'autre). Tout autre chemin,
+-- ou des données inaccessibles : rendu tel quel. La seule fonction de rebasage.
+local MARQUE = '/Library/Application Support/Developpeur/'
+function Chemins.rebaser(chemin)
+    if type(chemin) ~= 'string' then
+        return chemin
+    end
+    local debut, fin = chemin:find(MARQUE, 1, true)
+    if not debut then
+        return chemin
+    end
+    local reste = chemin:sub(fin + 1)
+    if not Chemins.estDonnee(reste:match('^[^/]+')) then
+        return chemin
+    end
+    local ok, racine = pcall(Chemins.donnees)
+    if not ok then
+        return chemin
+    end
+    return LrPathUtils.child(racine, reste)
+end
+
+-- Avant d'ouvrir une fenêtre qui lit ou écrit les données : si elles ne sont pas accessibles, le
+-- refus est montré et la fonction rend faux ; sinon vrai.
+function Chemins.verifierDonnees(titre)
+    local refus = Chemins.refusDonnees()
+    if not refus then
+        return true
+    end
+    import('LrDialogs').message(titre or "Dossier commun introuvable", refus, 'warning')
+    return false
+end
 function Chemins.journaux() return sous('Library', 'Logs', 'Developpeur') end
 function Chemins.journal() return LrPathUtils.child(Chemins.journaux(), 'conversation.log') end
 

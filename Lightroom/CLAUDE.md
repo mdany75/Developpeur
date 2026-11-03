@@ -31,6 +31,27 @@ CLAUDE.md principal, qui garde les règles communes à tout le projet. Le détai
   `scripts/tester-module.sh` refuse l'un et l'autre. À la fermeture de Lightroom, `Arret.lua` ne
   s'exécute pas (constaté) : le ménage se fait au chargement (`Menage.lua`, depuis `Init.lua`).
 
+## Dossier commun (deux Mac, un SSD)
+
+- Deux racines (`Chemins.lua`) : locale (`Chemins.locale`, `Chemins.racine` : connecteur, jeton,
+  `Sessions/`, `Atelier/`, `Temporaire/`, `connecteur.json`, le pointeur `dossier-commun.json`,
+  tout ce qui touche Fibo) et celle des données (`Chemins.donnees` : les noms de
+  `Chemins.NOMS_DONNEES`, copies illisibles comprises). Tout fichier de données passe par
+  `Chemins.donnees`, `Chemins.donnee`, `Chemins.conversations`, `Chemins.etapes` ou
+  `Chemins.claudeCode`, jamais par `Chemins.racine`. Le pointeur se relit à chaque accès ; seul
+  `DossierCommun.lua` l'écrit (Gestionnaire de modules externes).
+- Réglé mais introuvable (SSD débranché) : refus (`Chemins.messageAbsent`), **jamais de repli sur
+  la racine locale** ; les fenêtres le disent à l'ouverture (`Chemins.verifierDonnees`), le Suivi se
+  met en pause (`Releve.relancer`). Un registre en mémoire se relit quand son fichier change de
+  racine (jamais écrit dans l'autre). Un chemin absolu relu d'un fichier de données passe par
+  `Chemins.rebaser`, la seule fonction de rebasage.
+- Le réglage copie (copie récursive, `DossierCommun.copierArbre`), met de côté les données de ce
+  Mac (« Avant le dossier commun <date> »), n'efface jamais rien ; « Revenir au dossier de ce Mac »
+  ne retire que le pointeur. `relais.sh` copie `Claude Code/<id>.jsonl` du dossier commun avant
+  `--resume` et vers lui après la fin (`DEVELOPPEUR_DONNEES`), jamais rien d'autre de `~/.claude`.
+  `uninstall.sh` ne touche jamais le dossier commun. Essais : `essais-dossier-commun.lua` des deux
+  suites (jamais le vrai `~/.claude` : `CLAUDE_CONFIG_DIR` simulé).
+
 ## Écritures et mémoire
 
 - Toute écriture dans le catalogue passe par `withWriteAccessDo` (`ecrire` dans `Ecriture.lua`) ;

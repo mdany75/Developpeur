@@ -416,6 +416,10 @@ function FenetrePublication.construire(f, p)
 end
 
 function FenetrePublication.afficher()
+    -- Dossier commun introuvable : dit, rien n'est lu ni écrit ailleurs.
+    if not FenetrePublication.ouverte and not Chemins.verifierDonnees("La fenêtre Publication ne s'ouvre pas") then
+        return
+    end
     if FenetrePublication.ouverte then
         if FenetrePublication.controle and FenetrePublication.controle.toFront then
             FenetrePublication.controle.toFront()

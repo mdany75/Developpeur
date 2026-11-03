@@ -320,6 +320,10 @@ local function boucle()
 end
 
 function FenetreRapide.afficher()
+    -- Dossier commun introuvable : dit, rien n'est lu ni écrit ailleurs.
+    if not FenetreRapide.ouverte and not Chemins.verifierDonnees("La Demande rapide ne s'ouvre pas") then
+        return
+    end
     -- Une ouverture (ou un rappel par le menu, ⌘⌃⌥C) : la sélection compte au Suivi, même inchangée.
     Releve.revoir()
     if FenetreRapide.ouverte then

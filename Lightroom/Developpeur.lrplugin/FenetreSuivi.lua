@@ -1379,6 +1379,10 @@ FenetreSuivi.generation = 0
 -- graphiques se refont à chaque ouverture (la boucle, dans une tâche) ; leurs dossiers s'effacent à
 -- la fermeture.
 function FenetreSuivi.afficher()
+    -- Dossier commun introuvable : dit (le relevé est en pause), rien n'est lu ni écrit ailleurs.
+    if not FenetreSuivi.ouverte and not Chemins.verifierDonnees("La fenêtre Suivi ne s'ouvre pas") then
+        return
+    end
     if FenetreSuivi.ouverte then
         if FenetreSuivi.controle and FenetreSuivi.controle.toFront then
             FenetreSuivi.controle.toFront()

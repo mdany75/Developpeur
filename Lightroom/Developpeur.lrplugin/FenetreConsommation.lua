@@ -10,6 +10,7 @@ local LrFunctionContext = import 'LrFunctionContext'
 local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
+local Chemins = require 'Chemins'
 local Consommation = require 'Consommation'
 local Journal = require 'Journal'
 local Moteur = require 'Moteur'
@@ -221,6 +222,10 @@ local function boucle()
 end
 
 function FenetreConsommation.afficher()
+    -- Dossier commun introuvable : dit, rien n'est lu ni écrit ailleurs.
+    if not FenetreConsommation.ouverte and not Chemins.verifierDonnees("La fenêtre Consommation ne s'ouvre pas") then
+        return
+    end
     if FenetreConsommation.ouverte then
         if FenetreConsommation.controle and FenetreConsommation.controle.toFront then
             FenetreConsommation.controle.toFront()

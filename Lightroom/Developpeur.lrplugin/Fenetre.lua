@@ -4348,6 +4348,10 @@ function Fenetre.etapesActives()
 end
 
 function Fenetre.afficher()
+    -- Dossier commun introuvable : dit, rien n'est lu ni écrit ailleurs.
+    if not Fenetre.ouverte and not Chemins.verifierDonnees("La fenêtre Claude ne s'ouvre pas") then
+        return
+    end
     Etapes.actifPour = Fenetre.etapesActives
     if Fenetre.ouverte then
         if Fenetre.controle and Fenetre.controle.toFront then

@@ -67,6 +67,8 @@ local function echouer(message)
 end
 
 local registre
+-- Le fichier d'où le registre a été lu (la racine des données peut changer : dossier commun).
+local registreFichier
 
 -- Écritures de Notation.poser en cours. Elles rendent la main (écriture dans le catalogue, relecture
 -- des photos) : une fenêtre a pu relever une photo avant que sa note y soit posée, et rien ne se
@@ -74,7 +76,7 @@ local registre
 local ecrituresEnCours = 0
 
 function Notation.fichier()
-    return LrPathUtils.child(Chemins.racine(), 'notation.json')
+    return LrPathUtils.child(Chemins.donnees(), 'notation.json')
 end
 
 -- Copie neuve, sans métatable ni Json.null.
@@ -140,6 +142,13 @@ end
 
 local function charger()
     local courant = cheminCatalogue()
+    -- Le fichier relu à chaque accès (dossier commun réglé ou changé : relu ; introuvable :
+    -- Chemins.donnees refuse, rien n'est lu ni écrit ailleurs).
+    local fichier = Notation.fichier()
+    if registre and registreFichier ~= fichier then
+        registre = nil
+    end
+    registreFichier = fichier
     if registre and courant and registre.catalogue and courant ~= registre.catalogue then
         -- Un autre catalogue (Lightroom relancé sur lui) : le fichier dit s'il a déjà un registre.
         registre = nil
@@ -148,7 +157,7 @@ local function charger()
         registre.catalogue = registre.catalogue or courant
         return registre
     end
-    local contenu = Fichiers.lire(Notation.fichier())
+    local contenu = Fichiers.lire(fichier)
     local ok, r = pcall(function() return contenu and Json.decode(contenu) end)
     if ok and type(r) == 'table' then
         registre = normaliser(r)

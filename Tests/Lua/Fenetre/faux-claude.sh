@@ -11,12 +11,33 @@
 # fais » et « J'ai fini » sont retirés avec la leçon de la photo et « Je le fais » au correctif
 # 1.3.6.)
 
+# Dossier commun (essais-dossier-commun.lua) : avec FAUX_PROJET (le dossier du projet de Claude Code
+# que l'essai attend, sous un dossier personnel simulé), il dit si l'échange de la session reprise
+# (--resume) y était à son lancement (« echange-repris=<première ligne> » ou « echange-absent ») et
+# y range chaque message reçu, comme Claude Code dans <id>.jsonl.
+
 printf '%s\n' "$@" > arguments.txt
 session=session-essai
+reprise=""
+precedent=""
+for argument in "$@"; do
+    [ "$precedent" = "--resume" ] && reprise=$argument
+    precedent=$argument
+done
+if [ -n "$FAUX_PROJET" ] && [ -n "$reprise" ]; then
+    if [ -f "$FAUX_PROJET/$reprise.jsonl" ]; then
+        echo "echange-repris=$(head -n 1 "$FAUX_PROJET/$reprise.jsonl")" >> arguments.txt
+    else
+        echo "echange-absent" >> arguments.txt
+    fi
+fi
 [ -n "$ANTHROPIC_API_KEY" ] && echo "cle-api-presente" >> arguments.txt
 echo "MAX_MCP_OUTPUT_TOKENS=$MAX_MCP_OUTPUT_TOKENS" >> arguments.txt
 printf '%s\n' '{"type":"system","subtype":"init","session_id":"'$session'","model":"claude-essai","mcp_servers":[{"name":"developpeur","status":"connected"}],"tools":[]}'
 while IFS= read -r ligne; do
+    if [ -n "$FAUX_PROJET" ]; then
+        mkdir -p "$FAUX_PROJET" && printf '%s\n' "$ligne" >> "$FAUX_PROJET/$session.jsonl"
+    fi
     case "$ligne" in
         *control_request*)
             printf '%s\n' '{"type":"control_response","response":{"subtype":"success","request_id":"interruption-1"}}'
