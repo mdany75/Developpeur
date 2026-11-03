@@ -34,13 +34,14 @@ extension ToolHandler {
                 throw LightroomError.invalid("Rien n'a été ajouté : proposer la phrase à l'utilisateur, attendre son accord, puis rappeler remember_style avec confirm = true.")
             }
             let guide = try guideStyle.ajouter(preference, rubrique: args.string("category") ?? "other")
-            return ["ajoute": .string(preference), "fichier": .string(guideStyle.fichier.path), "guide": .string(guide)]
+            return ["ajoute": .string(preference), "fichier": .string(try guideStyle.fichier().path), "guide": .string(guide)]
         }
-        guard let guide = guideStyle.lire() else {
-            return ["guide": .null, "fichier": .string(guideStyle.fichier.path),
+        let fichier = try guideStyle.fichier()
+        guard let guide = try guideStyle.lire() else {
+            return ["guide": .null, "fichier": .string(fichier.path),
                     "a_savoir": "Pas encore de guide de style : il se remplit avec remember_style, après l'accord de l'utilisateur, ou à la main dans ce fichier."]
         }
-        return ["guide": .string(guide), "fichier": .string(guideStyle.fichier.path)]
+        return ["guide": .string(guide), "fichier": .string(fichier.path)]
     }
 
     /// Les reprises à la main d'une série (commande `reglages` par photo, `corrections_utilisateur`),
@@ -159,7 +160,7 @@ extension ToolHandler {
         do {
             let contents: [JSONValue]
             if uri == Self.ressourceGuide {
-                let texte = guideStyle.lire() ?? "# Guide de style\n\nPas encore de préférence enregistrée.\n"
+                let texte = try guideStyle.lire() ?? "# Guide de style\n\nPas encore de préférence enregistrée.\n"
                 contents = [["uri": .string(uri), "mimeType": "text/markdown", "text": .string(texte)]]
             } else if uri == Self.ressourceNotation {
                 contents = [["uri": .string(uri), "mimeType": "text/markdown", "text": .string(Notation.standard)]]

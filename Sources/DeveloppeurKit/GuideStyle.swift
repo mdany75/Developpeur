@@ -2,7 +2,8 @@ import Foundation
 
 /// Guide de style personnel : les goûts de l'utilisateur en retouche (profils préférés, contraste,
 /// saturation, rendu des peaux, noir et blanc, grain…), dans un fichier Markdown qu'il peut ouvrir
-/// et modifier lui-même : `~/Library/Application Support/Developpeur/guide-de-style.md`.
+/// et modifier lui-même : `guide-de-style.md` de la racine des données (`DossierDonnees` : le dossier
+/// commun s'il est réglé, sinon `~/Library/Application Support/Developpeur`), relue à chaque accès.
 /// L'invite `retouche_pro` l'inclut, une ressource MCP le rend lisible, et `remember_style` y ajoute
 /// une préférence apprise en conversation, seulement après l'accord de l'utilisateur.
 public struct GuideStyle {
@@ -15,19 +16,34 @@ public struct GuideStyle {
     /// Taille au-delà de laquelle le guide est coupé dans une invite (il reste entier dans le fichier).
     public static let tailleInvite = 6000
 
-    public let fichier: URL
+    public static let nomFichier = "guide-de-style.md"
 
-    public init(fichier: URL = GuideStyle.fichierParDefaut) {
-        self.fichier = fichier
+    /// Un fichier donné (essais), ou le guide de la racine des données, cherchée à chaque accès.
+    private let fixe: URL?
+    private let donnees: DossierDonnees
+
+    /// Un fichier fixe (essais).
+    public init(fichier: URL) {
+        fixe = fichier
+        donnees = DossierDonnees()
     }
 
-    public static var fichierParDefaut: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Developpeur/guide-de-style.md")
+    /// Le guide de la racine des données (le dossier commun s'il est réglé).
+    public init(donnees: DossierDonnees = DossierDonnees()) {
+        fixe = nil
+        self.donnees = donnees
     }
 
-    /// Le guide, ou nil s'il n'existe pas encore (ou est vide).
-    public func lire() -> String? {
+    /// Le fichier du guide ; refus si le dossier commun réglé est introuvable.
+    public func fichier() throws -> URL {
+        if let fixe { return fixe }
+        return try donnees.url(Self.nomFichier)
+    }
+
+    /// Le guide, ou nil s'il n'existe pas encore (ou est vide) ; refus si le dossier commun réglé
+    /// est introuvable (jamais le guide d'un autre dossier).
+    public func lire() throws -> String? {
+        let fichier = try self.fichier()
         guard let texte = try? String(contentsOf: fichier, encoding: .utf8),
               !texte.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         return texte
@@ -51,7 +67,8 @@ public struct GuideStyle {
         }
         let jour = ISO8601DateFormatter.string(from: date, timeZone: .current, formatOptions: [.withFullDate])
         let ligne = "- \(texte.replacingOccurrences(of: "\n", with: " ")) _(ajouté le \(jour))_"
-        var lignes = (lire() ?? Self.entete).components(separatedBy: "\n")
+        let fichier = try self.fichier()
+        var lignes = (try lire() ?? Self.entete).components(separatedBy: "\n")
         let titre = "## " + rubrique.titre
         if let debut = lignes.firstIndex(of: titre) {
             // À la fin de la rubrique, avant la suivante.
@@ -70,8 +87,11 @@ public struct GuideStyle {
     }
 
     /// Le guide pour une invite : entier, ou coupé avec une note.
+    /// Dossier commun introuvable : la note qui le dit, à la place du guide.
     public func pourInvite() -> String? {
-        guard let texte = lire() else { return nil }
+        let lu: String?
+        do { lu = try lire() } catch { return "(Guide de style indisponible : \(error.localizedDescription))" }
+        guard let texte = lu else { return nil }
         guard texte.count > Self.tailleInvite else { return texte }
         return String(texte.prefix(Self.tailleInvite)) + "\n\n(Guide coupé ici ; le reste : ressource developpeur://guide-de-style.)"
     }

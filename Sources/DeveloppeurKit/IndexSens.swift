@@ -45,7 +45,7 @@ public final class IndexSens {
     var fichierVerrou: URL { dossier.appendingPathComponent("verrou") }
 
     /// Le dossier de l'index d'un catalogue sous `racine`.
-    public static func dossier(catalogue: String, racine: URL = Sens.racineIndex) -> URL {
+    public static func dossier(catalogue: String, racine: URL) -> URL {
         racine.appendingPathComponent(Sens.empreinte(catalogue: catalogue), isDirectory: true)
     }
 

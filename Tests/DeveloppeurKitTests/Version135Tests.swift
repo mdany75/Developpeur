@@ -226,7 +226,7 @@ final class Version135Tests: XCTestCase {
         XCTAssertEqual(regle["reglage"]?.string, "Dehaze")
         XCTAssertTrue(regle["constat"]?.string?.hasPrefix("Tu baisses") == true, regle["constat"]?.string ?? "")
         XCTAssertNotNil(regle["phrase_proposee"])
-        XCTAssertNil(guide.lire(), "rien n'est ajouté au guide sans accord")
+        XCTAssertNil(try guide.lire(), "rien n'est ajouté au guide sans accord")
         XCTAssertFalse(fake.commands.contains { $0 != "reglages" }, "des lectures seulement")
         // Sans série, la demande est refusée.
         XCTAssertTrue(tools.call(name: "remember_style", arguments: ["learn": true]).isError)

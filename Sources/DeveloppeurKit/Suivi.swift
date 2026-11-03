@@ -139,11 +139,16 @@ public enum Suivi {
     /// (Developpeur/Index ; un dossier temporaire dans les essais).
     public struct IndexeurSens {
         public var ouvrir: () throws -> EncodeurSens
-        public var racine: URL
+        /// La racine des index, cherchée à chaque accès (le dossier commun peut changer pendant que
+        /// le serveur tourne) ; refus si le dossier commun réglé est introuvable.
+        public var racineDesIndex: () throws -> URL
+        public var racine: URL { get throws { try racineDesIndex() } }
         /// Les fichiers du modèle qui manquent (vide : tout est là), pour get_status.
         public var manquants: () -> [String]
-        public init(racine: URL = Sens.racineIndex, manquants: @escaping () -> [String] = { [] }, ouvrir: @escaping () throws -> EncodeurSens) {
-            self.racine = racine
+        /// `racine` fixe (essais), sinon Index de la racine des données de `donnees`.
+        public init(racine: URL? = nil, donnees: DossierDonnees = DossierDonnees(), manquants: @escaping () -> [String] = { [] },
+                    ouvrir: @escaping () throws -> EncodeurSens) {
+            if let racine { racineDesIndex = { racine } } else { racineDesIndex = { try Sens.racineIndex(donnees) } }
             self.manquants = manquants
             self.ouvrir = ouvrir
         }
@@ -235,7 +240,7 @@ public enum Suivi {
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 let encodeur = try sens.ouvrir()
-                let index = try IndexSens(ecrire: IndexSens.dossier(catalogue: catalogue, racine: sens.racine), modele: encodeur.modele,
+                let index = try IndexSens(ecrire: IndexSens.dossier(catalogue: catalogue, racine: try sens.racine), modele: encodeur.modele,
                                           dimension: encodeur.dimension, catalogue: catalogue)
                 boite.valeur = .success(Empreintes(encodeur: encodeur, index: index))
             } catch {
@@ -293,8 +298,8 @@ public enum Suivi {
     /// `{ok, erreur}` s'il ne s'ouvre pas ; `{ok, manquants}` sans les fichiers. Sans regles_sens, le
     /// module n'en demande pas. `catalogue` (facultatif) : le nombre de photos de son index et sa
     /// génération (absente : pas d'index).
-    public static func etatSens(_ texte: String, fichiers: (fichiers: Sens.Fichiers?, manquants: [String]), racine: URL = Sens.racineIndex,
-                                ouvrir: (() throws -> EncodeurSens)? = nil) -> Reponse {
+    public static func etatSens(_ texte: String, fichiers: (fichiers: Sens.Fichiers?, manquants: [String]), racine donnee: URL? = nil,
+                                donnees: DossierDonnees = DossierDonnees(), ouvrir: (() throws -> EncodeurSens)? = nil) -> Reponse {
         let catalogue = (try? JSONCoding.parse(texte))?["catalogue"]?.string
         guard let trouves = fichiers.fichiers else {
             return Reponse(ligne: ["ok": true, "manquants": .array(fichiers.manquants.map(JSONValue.string))], code: 0)
@@ -307,6 +312,12 @@ public enum Suivi {
         }
         var ligne: [String: JSONValue] = ["ok": true, "regles_sens": .number(Double(Sens.regles)), "modele": .string(Sens.nomModele)]
         if let catalogue {
+            let racine: URL
+            if let donnee { racine = donnee } else {
+                do { racine = try Sens.racineIndex(donnees) } catch {
+                    return Reponse(ligne: ["ok": true, "erreur": .string(error.localizedDescription)], code: 0)
+                }
+            }
             let index = IndexSens(lire: IndexSens.dossier(catalogue: catalogue, racine: racine))
             ligne["indexees"] = .number(Double(index?.nombre ?? 0))
             if let generation = index?.generation { ligne["generation"] = .string(generation) }

@@ -60,9 +60,11 @@ public enum Sens {
         public var imageCompilee: Bool { image.pathExtension != "mlpackage" }
     }
 
-    /// Developpeur/Modeles : les modèles compilés et le vocabulaire.
-    public static var dossierModeles: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Developpeur/Modeles", isDirectory: true)
+    /// Modeles de la racine des données (le dossier commun s'il est réglé, sinon
+    /// Developpeur/Modeles) : les modèles compilés et le vocabulaire. Refus si le dossier commun
+    /// réglé est introuvable.
+    public static func dossierModeles(_ donnees: DossierDonnees = DossierDonnees()) throws -> URL {
+        try donnees.url("Modeles", dossier: true)
     }
 
     /// Le cache de Hugging Face où `hf download apple/coreml-mobileclip` range les modèles.
@@ -76,7 +78,14 @@ public enum Sens {
     /// Les fichiers trouvés : dans `modeles` (compilés, `mobileclip_s2_image.mlmodelc`), sinon les
     /// .mlpackage du cache de Hugging Face (le dernier instantané) ; nil si un manque, avec la liste
     /// de ce qui manque.
-    public static func trouver(modeles: URL = dossierModeles, cache: URL = cacheHuggingFace) -> (fichiers: Fichiers?, manquants: [String]) {
+    /// Sans `modeles`, ceux de la racine des données ; dossier commun introuvable : son refus est le
+    /// seul manquant (rien n'est cherché ailleurs).
+    public static func trouver(modeles donne: URL? = nil, cache: URL = cacheHuggingFace,
+                               donnees: DossierDonnees = DossierDonnees()) -> (fichiers: Fichiers?, manquants: [String]) {
+        let modeles: URL
+        if let donne { modeles = donne } else {
+            do { modeles = try dossierModeles(donnees) } catch { return (nil, [error.localizedDescription]) }
+        }
         let fm = FileManager.default
         func existe(_ url: URL) -> Bool { fm.fileExists(atPath: url.path) }
         let instantanes = cache.appendingPathComponent("models--apple--coreml-mobileclip/snapshots", isDirectory: true)
@@ -120,9 +129,11 @@ public enum Sens {
         SHA256.hash(data: Data(catalogue.utf8)).map { String(format: "%02x", $0) }.joined().prefix(24).description
     }
 
-    /// Developpeur/Index : un dossier par catalogue, sous l'empreinte de son chemin.
-    public static var racineIndex: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Developpeur/Index", isDirectory: true)
+    /// Index de la racine des données (le dossier commun s'il est réglé, sinon Developpeur/Index) :
+    /// un dossier par catalogue, sous l'empreinte de son chemin. Refus si le dossier commun réglé est
+    /// introuvable.
+    public static func racineIndex(_ donnees: DossierDonnees = DossierDonnees()) throws -> URL {
+        try donnees.url("Index", dossier: true)
     }
 }
 

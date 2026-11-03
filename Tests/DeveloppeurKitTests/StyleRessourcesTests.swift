@@ -21,7 +21,7 @@ final class StyleRessourcesTests: XCTestCase {
 
     func testRememberStyleNeedsTheUsersAgreementAndFilesUnderItsCategory() throws {
         XCTAssertTrue(tools.call(name: "remember_style", arguments: ["preference": "Noirs denses"]).isError, "pas sans accord")
-        XCTAssertNil(guide.lire())
+        XCTAssertNil(try guide.lire())
         let lu = try JSONCoding.parse(tools.call(name: "remember_style", arguments: ["read": true]).text)
         XCTAssertTrue(lu["a_savoir"]?.string?.contains("Pas encore") == true)
 

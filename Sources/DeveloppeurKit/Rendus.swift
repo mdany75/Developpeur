@@ -9,12 +9,25 @@ import Foundation
 /// (`ToolHandler.noterLeRendu`). Gardés dans `rendus.json` ; seul `serve()` en donne un (ni
 /// `--call`, ni la recette, ni les tests, qui passent un fichier temporaire).
 public struct RegistreRendus {
-    public let fichier: URL
+    /// Un fichier donné (essais), ou `rendus.json` de la racine des données (le dossier commun s'il
+    /// est réglé), cherchée à chaque accès.
+    private let fixe: URL?
+    private let donnees: DossierDonnees
 
-    public init(fichier: URL = RegistreRendus.fichierParDefaut) { self.fichier = fichier }
+    public init(fichier: URL) {
+        fixe = fichier
+        donnees = DossierDonnees()
+    }
 
-    public static var fichierParDefaut: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Developpeur/rendus.json")
+    public init(donnees: DossierDonnees = DossierDonnees()) {
+        fixe = nil
+        self.donnees = donnees
+    }
+
+    /// Le fichier ; refus si le dossier commun réglé est introuvable (rien lu ni écrit ailleurs).
+    public func fichier() throws -> URL {
+        if let fixe { return fixe }
+        return try donnees.url("rendus.json")
     }
 
     /// Les réglages comparés, et l'écart au-delà duquel deux rendus ne se ressemblent plus.
@@ -40,7 +53,7 @@ public struct RegistreRendus {
     }
 
     func lire() -> [String: [Rendu]] {
-        guard let data = try? Data(contentsOf: fichier) else { return [:] }
+        guard let fichier = try? fichier(), let data = try? Data(contentsOf: fichier) else { return [:] }
         let lecteur = JSONDecoder()
         lecteur.dateDecodingStrategy = .iso8601
         return (try? lecteur.decode([String: [Rendu]].self, from: data)) ?? [:]
@@ -50,6 +63,7 @@ public struct RegistreRendus {
         let ecrivain = JSONEncoder()
         ecrivain.dateEncodingStrategy = .iso8601
         ecrivain.outputFormatting = [.sortedKeys]
+        let fichier = try self.fichier()
         try FileManager.default.createDirectory(at: fichier.deletingLastPathComponent(), withIntermediateDirectories: true)
         try ecrivain.encode(registre).write(to: fichier, options: .atomic)
     }
@@ -66,6 +80,7 @@ public struct RegistreRendus {
     /// Un fichier d'avant la 1.3.6 se relit tel quel : il gardait déjà le dernier rendu de chaque
     /// série.
     func noter(_ rendu: Rendu) throws -> JSONValue? {
+        _ = try fichier() // dossier commun introuvable : refus avant toute lecture
         var registre = lire()
         let cle = String(rendu.photo)
         var liste = registre[cle] ?? []
@@ -129,6 +144,13 @@ extension ToolHandler {
         let entrees = (photos.first { $0["photo"]?["id"]?.int == id } ?? photos.first)?["entrees"]?.array ?? []
         let retours = entrees.filter { $0["type"]?.string == "retour" }.count
         let rendu = RegistreRendus.Rendu(photo: id, le: quand, reglages: reglages, profil: apercu["profil"]?.string, retours: retours)
-        return (try? registre.noter(rendu)) ?? nil
+        do {
+            return try registre.noter(rendu)
+        } catch let introuvable as DossierDonnees.DossierCommunIntrouvable {
+            // Dossier commun débranché : rien n'est gardé ailleurs, et la vue le dit.
+            return ["indisponible": .string(introuvable.localizedDescription)]
+        } catch {
+            return nil
+        }
     }
 }

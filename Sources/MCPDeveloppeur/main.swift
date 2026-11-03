@@ -36,7 +36,7 @@ func usage(erreur: Bool = false) {
     Usage : mcp-developpeur              lance le serveur (stdio, pour Claude)
             mcp-developpeur --install    inscrit cet exécutable dans Claude Desktop et Claude Code
             mcp-developpeur --uninstall  retire l'inscription
-            mcp-developpeur --status     inscriptions, module Lightroom, jeton de la liaison, écran, liaison et mise à jour (par gh)
+            mcp-developpeur --status     inscriptions, module Lightroom, jeton de la liaison, dossier commun, écran, liaison et mise à jour (par gh)
             mcp-developpeur --version
 
     Pour la fenêtre Claude et le développement (parlent au module Lightroom directement, sauf --marquer-af, --focus,
@@ -59,9 +59,9 @@ func usage(erreur: Bool = false) {
                 le Suivi (fenêtre Claude) : les défauts de la prise de vue mesurés sur les vignettes du cache de
                 Lightroom données (exposition, hautes lumières, netteté, bruit à ISO élevé, yeux fermés), comme le tri ;
                 ni Lightroom ni l'original ; 20 photos au plus, une ligne JSON (Tests/Contrats/suivi.json) ; depuis la 1.6,
-                avec catalogue et uuid, l'empreinte du sens (MobileCLIP) rangée dans Developpeur/Index
+                avec catalogue et uuid, l'empreinte du sens (MobileCLIP) rangée dans Index (dossier commun s'il est réglé)
             mcp-developpeur --sens-etat '{"catalogue": …}'   le Suivi : ce connecteur fait-il l'empreinte du sens ? (une ligne JSON)
-            mcp-developpeur --compiler-sens   compile MobileCLIP S2 dans Developpeur/Modeles (install.sh, le Suivi)
+            mcp-developpeur --compiler-sens   compile MobileCLIP S2 dans Modeles (dossier commun s'il est réglé ; install.sh, le Suivi)
             mcp-developpeur --preparer-sens ["phrase"]   compile MobileCLIP S2, dit sa description, les jetons et les temps
             mcp-developpeur --sens-essai (--collection <nom> | --dossier <chemin> | --ids 1,2,… | --images <dossier>)
                 [--nombre 200] [--requetes '["a dog", …]'] [--garder <dossier>]
@@ -148,6 +148,8 @@ func outils() -> ToolHandler {
     let tools = ToolHandler(lightroom: LightroomBridge.fromEnvironment())
     tools.lireEcran = Ecran.lire
     tools.lireSauvegardes = Sauvegardes.lire
+    // Le dossier commun de ce Mac, que get_status dit (les tests, non : nil).
+    tools.dossierDonnees = DossierDonnees()
     // Fibo 2 (generative_edit) : le vrai mflux de ce Mac, pour le serveur et --call seulement.
     var fibo = Fibo()
     // Développement : garder les fichiers d'un appel (DEVELOPPEUR_FIBO_GARDER=<dossier>).
@@ -168,6 +170,8 @@ func outils() -> ToolHandler {
 /// Face) et les index de Developpeur/Index ; pour le serveur, --call et --analyser seulement.
 func moteurSens() -> Suivi.IndexeurSens {
     Suivi.IndexeurSens(manquants: { Sens.trouver().manquants }) {
+        // Dossier commun réglé mais introuvable : son refus, tel quel.
+        _ = try DossierDonnees().racine()
         let trouves = Sens.trouver()
         guard let fichiers = trouves.fichiers else {
             throw LightroomError.invalid("Recherche par le sens : il manque \(trouves.manquants.joined(separator: " ; ")).")
@@ -184,6 +188,7 @@ func moteurEspeces() -> ToolHandler.MoteurEspeces {
 
 /// Le classeur des espèces et le temps de son ouverture (encodeur, liste, vecteurs relus ou calculés).
 func ouvrirEspeces(avancement: ((Int, Int) -> Void)? = nil) throws -> (classeur: ClasseurEspeces, fichiers: Especes.Fichiers, secondes: Double) {
+    _ = try DossierDonnees().racine()
     let trouves = Especes.trouver()
     guard let fichiers = trouves.fichiers else {
         throw LightroomError.invalid("Espèces : il manque \(trouves.manquants.joined(separator: " ; ")).")
@@ -257,6 +262,8 @@ func status() {
     print(line: "Module Lightroom : \(pluginInstalled ? "installé (\(pluginPath))" : "absent de \(pluginPath)")")
     // L'état du fichier du jeton, jamais sa valeur.
     print(line: "Jeton de la liaison : \(JetonLiaison.etat(JetonLiaison.fichierParDefaut()))")
+    // Le dossier commun (réglé ou non, chemin, présent ou non), lu dans le pointeur à chaque appel.
+    print(line: DossierDonnees().ligneStatut())
     // L'écran se dit même Lightroom fermé : avant la liaison, qui peut finir en échec. Son nom
     // seulement, comme get_status (correctif 1.3.6 : plus rien sur l'étalonnage) ; son profil, par
     // --ecran.

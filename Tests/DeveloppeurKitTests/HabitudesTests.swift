@@ -241,7 +241,7 @@ final class HabitudesTests: XCTestCase {
         let fake = FakeLightroom()
         let guide = GuideStyle(fichier: TestSupport.temporaryDirectory().appendingPathComponent("guide-de-style.md"))
         _ = try guide.ajouter("Jamais de vignetage", rubrique: "other")
-        let avant = guide.lire()
+        let avant = try guide.lire()
         let tools = ToolHandler(lightroom: fake, guideStyle: guide)
         fauxModule(fake, total: 600)
         let resultat = tools.call(name: "remember_style", arguments: ["habits": true, "camera": "X-H2S"])
@@ -258,7 +258,7 @@ final class HabitudesTests: XCTestCase {
         let phrases = try XCTUnwrap(reponse["phrases"]?.array)
         XCTAssertEqual(phrases.count, 1, "les hautes lumières seulement : les ombres sont de Claude, la netteté au défaut")
         XCTAssertTrue(phrases[0]["phrase_proposee"]?.string?.contains("Hautes lumières") == true)
-        XCTAssertEqual(guide.lire(), avant, "le guide n'est pas modifié")
+        XCTAssertEqual(try guide.lire(), avant, "le guide n'est pas modifié")
         XCTAssertNotNil(reponse["regle_de_lecture"])
     }
 

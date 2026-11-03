@@ -213,7 +213,7 @@ extension ToolHandler {
     /// L'index du sens du catalogue ouvert, s'il a des photos (nil sinon).
     func indexSensOuvert(_ sens: Suivi.IndexeurSens) throws -> IndexSens? {
         guard let chemin = try lightroom.send("etat", [:], timeout: 10)["chemin_catalogue"]?.string,
-              let index = IndexSens(lire: IndexSens.dossier(catalogue: chemin, racine: sens.racine)), index.nombre > 0 else { return nil }
+              let index = IndexSens(lire: IndexSens.dossier(catalogue: chemin, racine: try sens.racine)), index.nombre > 0 else { return nil }
         return index
     }
 

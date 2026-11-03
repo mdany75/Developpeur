@@ -107,6 +107,9 @@ public final class ToolHandler {
     /// view_photo avec compare = before_claude) : nil par défaut ; seul `serve()` en donne un, comme
     /// `noterAuCarnet`.
     public var registreRendus: RegistreRendus?
+    /// Le dossier commun (1.7, `DossierDonnees`), dont get_status dit l'état : nil par défaut (les
+    /// tests ne lisent jamais le vrai pointeur) ; main.swift pose le vrai.
+    public var dossierDonnees: DossierDonnees?
     /// Les constats de la prise de vue partent au carnet de progrès (commande carnet du module).
     /// Faux par défaut : seul le serveur lancé par Claude (`serve` de main.swift) le pose ; ni
     /// `--call`, ni la recette, ni les tests ne remplissent le carnet.
@@ -503,6 +506,7 @@ public final class ToolHandler {
         }
         if let index = etatIndexSens(catalogue: chemin) { etat["recherche_par_le_sens"] = index }
         if let bloc = etatEspeces() { etat["especes"] = bloc }
+        if let dossierDonnees { etat["dossier_commun"] = dossierDonnees.etatJSON() }
         return .object(etat)
     }
 

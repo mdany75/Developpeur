@@ -33,7 +33,7 @@ extension ToolHandler {
             throw LightroomError.invalid("La recherche par le sens n'est pas installée sur ce Mac (modèle MobileCLIP absent) : chercher par les autres critères.")
         }
         let chemin = try lightroom.send("etat", [:], timeout: 10)["chemin_catalogue"]?.string
-        guard let chemin, let index = IndexSens(lire: IndexSens.dossier(catalogue: chemin, racine: sens.racine)), index.nombre > 0 else {
+        guard let chemin, let index = IndexSens(lire: IndexSens.dossier(catalogue: chemin, racine: try sens.racine)), index.nombre > 0 else {
             throw LightroomError.invalid("Aucune photo indexée pour ce catalogue : l'index se remplit pendant l'analyse du Suivi (fenêtre Claude ouverte, photos vues). Chercher par les autres critères ; get_status dit où il en est.")
         }
 
@@ -194,7 +194,13 @@ extension ToolHandler {
         let manquants = sens.manquants()
         var bloc: [String: JSONValue] = ["modele": .string(Sens.nomModele), "installee": .bool(manquants.isEmpty)]
         if !manquants.isEmpty { bloc["manquants"] = .array(manquants.map(JSONValue.string)) }
-        let index = catalogue.flatMap { IndexSens(lire: IndexSens.dossier(catalogue: $0, racine: sens.racine)) }
+        let racine: URL
+        do { racine = try sens.racine } catch {
+            // Dossier commun introuvable : l'index n'est lu nulle part ailleurs.
+            bloc["erreur"] = .string(error.localizedDescription)
+            return .object(bloc)
+        }
+        let index = catalogue.flatMap { IndexSens(lire: IndexSens.dossier(catalogue: $0, racine: racine)) }
         bloc["photos_indexees"] = .number(Double(index?.nombre ?? 0))
         if let derniere = index?.derniere {
             let format = DateFormatter()

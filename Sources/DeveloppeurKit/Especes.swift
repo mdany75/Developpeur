@@ -208,8 +208,13 @@ public enum Especes {
         public var sens: Sens.Fichiers { Sens.Fichiers(image: image, texte: texte, vocabulaire: vocabulaire, modeles: modeles) }
     }
 
-    /// Les fichiers trouvés dans Developpeur/Modeles ; nil si un manque, avec la liste de ce qui manque.
-    public static func trouver(modeles: URL = Sens.dossierModeles) -> (fichiers: Fichiers?, manquants: [String]) {
+    /// Les fichiers trouvés dans Modeles de la racine des données (le dossier commun s'il est réglé) ;
+    /// nil si un manque, avec la liste de ce qui manque (dossier commun introuvable : son refus).
+    public static func trouver(modeles donne: URL? = nil, donnees: DossierDonnees = DossierDonnees()) -> (fichiers: Fichiers?, manquants: [String]) {
+        let modeles: URL
+        if let donne { modeles = donne } else {
+            do { modeles = try Sens.dossierModeles(donnees) } catch { return (nil, [error.localizedDescription]) }
+        }
         let fm = FileManager.default
         let image = modeles.appendingPathComponent("bioclip2_image.mlmodelc", isDirectory: true)
         let texte = modeles.appendingPathComponent("bioclip2_text.mlmodelc", isDirectory: true)
