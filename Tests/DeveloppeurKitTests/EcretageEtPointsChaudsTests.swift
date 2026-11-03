@@ -83,6 +83,70 @@ final class EcretageEtPointsChaudsTests: XCTestCase {
         XCTAssertTrue(json?["lecture"]?.string?.contains("Rien n'est corrigé d'office") == true)
     }
 
+    /// 1.6.6 (comparaison aslanoov et LrC-AVG, 2 nov. 2026) : une zone plus saturée que le sujet
+    /// vole l'œil autant qu'une zone claire ; elle est donnée après les claires, avec sa sorte.
+    func testUneZonePlusSatureeQueLeSujet() throws {
+        // Un portrait sur fond gris : un parasol rouge vif en haut à gauche, une fenêtre claire en
+        // bas à droite, un visage peu saturé au centre.
+        let portrait = Self.image { x, y in
+            if x < 0.25, y < 0.25 { return (200, 30, 30) }
+            if x > 0.75, y > 0.75 { return (245, 245, 240) }
+            if x > 0.42, x < 0.58, y > 0.35, y < 0.6 { return (200, 160, 140) }
+            return (95, 95, 95)
+        }
+        let visage = CGRect(x: 0.4, y: 0.33, width: 0.2, height: 0.3)
+        let zones = PointsChauds.trouver(portrait, sujet: [visage])
+        XCTAssertEqual(zones.count, 2, "\(zones)")
+        XCTAssertNil(zones[0].chroma, "la zone claire d'abord")
+        XCTAssertEqual(PointsChauds.ou(zones[0].boite), "en bas à droite")
+        let parasol = zones[1]
+        XCTAssertEqual(PointsChauds.ou(parasol.boite), "en haut à gauche")
+        XCTAssertGreaterThan(try XCTUnwrap(parasol.chroma), PointsChauds.cMin)
+        XCTAssertGreaterThan(parasol.ecart, PointsChauds.ecartChroma)
+        let json = try XCTUnwrap(PointsChauds.json(zones)?["zones"]?.array)
+        XCTAssertEqual(json[1]["sorte"]?.string, "saturée")
+        XCTAssertNotNil(json[1]["C_moyen"])
+        XCTAssertEqual(json[0]["sorte"]?.string, "claire")
+        XCTAssertNil(json[0]["C_moyen"])
+
+        // Un sujet aussi saturé que le parasol : le parasol ne le dépasse plus de l'écart voulu.
+        let tousRouges = Self.image { x, y in
+            if x < 0.25, y < 0.25 { return (200, 30, 30) }
+            if visage.contains(CGPoint(x: x, y: y)) { return (190, 40, 40) }
+            return (95, 95, 95)
+        }
+        XCTAssertTrue(PointsChauds.trouver(tousRouges, sujet: [visage]).allSatisfy { $0.chroma == nil })
+        // Sans sujet, l'écart se mesure contre la médiane de l'image, et la clé le dit.
+        let sansSujet = try XCTUnwrap(PointsChauds.json(PointsChauds.trouver(portrait, sujet: []))?["zones"]?.array)
+        let saturee = try XCTUnwrap(sansSujet.first { $0["sorte"]?.string == "saturée" })
+        XCTAssertNil(saturee["au_dessus_du_sujet"])
+        XCTAssertNotNil(saturee["au_dessus_de_la_mediane_C"])
+        // Le relevé des seuils des zones claires (ReleveSeuils) ne compte pas les saturées.
+        let grille = try XCTUnwrap(PointsChauds.lireGrille(portrait))
+        XCTAssertEqual(PointsChauds.zones(grille, sujet: [visage]).count, 1)
+    }
+
+    /// Revue du 2 nov. 2026 : le pull vif d'un portrait serré fait partie du sujet (buste sous le
+    /// visage) ; un ciel bleu vu en morceaux entre des arbres est un fond, pas cinq zones saturées.
+    func testNiLeVetementDuSujetNiUnCielMorceleNeSontDesZonesSaturees() throws {
+        let visage = CGRect(x: 0.4, y: 0.1, width: 0.2, height: 0.25)
+        let portraitSerre = Self.image { x, y in
+            if visage.contains(CGPoint(x: x, y: y)) { return (200, 165, 145) }
+            if x > 0.3, x < 0.7, y > 0.4, y < 0.75 { return (40, 60, 200) }
+            return (95, 95, 95)
+        }
+        XCTAssertTrue(PointsChauds.trouver(portraitSerre, sujet: [visage], visages: [visage]).allSatisfy { $0.chroma == nil },
+                      "le pull est dans le buste")
+        let sansBuste = PointsChauds.trouver(portraitSerre, sujet: [visage]).filter { $0.chroma != nil }
+        XCTAssertFalse(sansBuste.isEmpty, "sans les visages, le pull sortirait : l'essai échoue sans la correction")
+
+        let cielMorcele = Self.image { x, y in
+            if y < 0.5 { return Int(x * 12) % 2 == 0 ? (40, 90, 200) : (30, 40, 25) }
+            return (110, 105, 95)
+        }
+        XCTAssertTrue(PointsChauds.trouver(cielMorcele, sujet: []).allSatisfy { $0.chroma == nil })
+    }
+
     func testUnFondClairOuUnPetitRefletNeSontPasDesPointsChauds() {
         // Un grand ciel clair (plus de 20 % de l'image) et un reflet minuscule.
         let paysage = Self.image { x, y in

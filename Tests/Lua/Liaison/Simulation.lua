@@ -619,8 +619,16 @@ function S.Photo(id, reglages, meta, brut)
         end
         -- Constaté le 18 octobre 2026 : LensProfileSetup = 'LensDefaults' ne remplace pas 'Custom'.
         local objectifPerso = self.reglages.LensProfileSetup == 'Custom'
+        -- Constaté (Reglages.aRemettre, CLAUDE.md du module) : RetouchAreas = {} est ignoré, les
+        -- taches restent, tant que l'ancienne forme RetouchInfo n'est pas vidée aussi.
+        local tachesGardees = type(reglages.RetouchAreas) == 'table' and next(reglages.RetouchAreas) == nil
+            and not (type(reglages.RetouchInfo) == 'table' and next(reglages.RetouchInfo) == nil)
+            and self.reglages.RetouchAreas
         for cle, valeur in pairs(reglages) do
             self.reglages[cle] = valeur
+        end
+        if tachesGardees then
+            self.reglages.RetouchAreas = tachesGardees
         end
         -- Constaté le 21 octobre 2026 (--dump avant et après, mesures de la 1.3) : une liste de
         -- masques vide reste rangée {} là où la clé était absente (retour de view_photo compare,

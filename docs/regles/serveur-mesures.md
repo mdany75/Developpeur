@@ -38,7 +38,9 @@ raison des outils, à `Composition.swift`, `Detail.swift`, `Eclairage.swift`, `B
   manquée avant de les changer.
 - Les seuils de netteté et de bruit (`DetailMeasurements.seuilFlou` 15, `seuilNet` 35,
   `bruitVisible` 0,6, `bruitFort` 1,5, et depuis la 1.3 `textureMin` 18 et `textureDouteuse` 30 :
-  `Detail.swift`), de ressemblance et d'ouverture des yeux (`AnalyseVision.swift`) et de l'éclairage
+  `Detail.swift` ; la marge des ombres de la 1.6.6, `marge_ombres_il` = 2,2 × log2(`bruitVisible` ÷ bruit
+  des ombres) en niveaux sRGB, bornée de −2 à 4 IL, muette sous 0,05 (ombres lissées par le JPEG), s'en dérive sans seuil nouveau de lecture, supposant un bruit qui monte
+  comme le signal : provisoire, à relever), de ressemblance et d'ouverture des yeux (`AnalyseVision.swift`) et de l'éclairage
   mixte (`Eclairage.chromaMax` 12, `seuilMixte` 8) ont été relevés sur de vrais aperçus : les
   mesurer de nouveau avant de les changer. Ceux de la dominante et de la saturation sont nommés
   aussi, sans relevé noté dans le code (`PhotoMeasurements.partNeutreMin` 3, `dominanteLegere` 2,

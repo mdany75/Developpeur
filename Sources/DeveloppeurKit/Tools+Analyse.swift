@@ -227,7 +227,7 @@ extension ToolHandler {
                 // Les points chauds (1.3.4) : sur l'aperçu entier seulement, hors des visages et de la
                 // zone d'intérêt ; dits, jamais corrigés d'office.
                 let sujet = (vision?.faces.map(\.box) ?? []) + [vision?.salientArea].compactMap { $0 }
-                if let points = PointsChauds.json(PointsChauds.trouver(reduite, sujet: sujet)) {
+                if let points = PointsChauds.json(PointsChauds.trouver(reduite, sujet: sujet, visages: vision?.faces.map(\.box) ?? [])) {
                     mesures = Self.merged(mesures, ["points_chauds": points])
                 }
                 info["mesures"] = mesures

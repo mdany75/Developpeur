@@ -484,7 +484,8 @@ cadre.
 - Voir une photo telle qu'elle est développée en ce moment (aperçu rendu par Lightroom), avec ses
   données de prise de vue et des mesures : luminosité (L*, centiles), écrêtage des hautes lumières
   (aussi canal par canal) et des ombres, contraste, saturation, dominante des tons neutres,
-  netteté par zone et bruit.
+  netteté par zone et bruit. Avant de relever les ombres, Claude sait de combien d'IL elles
+  peuvent l'être avant que leur bruit se voie (1.6.6, estimation provisoire).
 - La dominante de toute l'image : quand la photo entière tire nettement vers une couleur (un
   portrait à l'ombre des arbres, bleu sous la lumière du ciel ; une lampe), Claude le voit, avec la
   balance qui la ramène au neutre. Les tons presque neutres seuls la sous-estimaient : sous une
@@ -501,7 +502,8 @@ cadre.
   des visages et de la zone d'intérêt), une fenêtre, une nappe blanche, un panneau, qui peuvent
   voler l'œil, avec leur place (« en haut à droite »). Claude vous les montre ; il ne les assombrit
   que si elles distraient vraiment, et le dit. Ni un grand ciel clair ni un petit reflet n'en sont.
-  Seuils provisoires.
+  Depuis la 1.6.6, aussi les zones nettement plus saturées que le sujet (un parasol rouge derrière
+  un portrait), qui attirent l'œil autant qu'une zone claire. Seuils provisoires.
 - Un bilan chiffré d'une passe à l'autre : à chaque nouvel aperçu entier d'une photo, Claude voit
   ce qui a bougé depuis le précédent à la même taille (exposition en IL, contraste, écrêtage,
   dominante, saturation, netteté, bruit), avant → après, et depuis le premier de la session. Une
@@ -610,7 +612,9 @@ cadre.
   masques et les taches). Avant une série, Claude peut d'abord montrer ce qui changerait, sans rien
   écrire : pour chaque réglage, sur combien de photos il bouge, le détail (avant → après) des
   10 premières photos, et ce que Lightroom recalculera lui-même (masques IA, Upright) ; appliquer un paramètre prédéfini, à l'intensité voulue, ou en créer un
-  d'après une retouche réussie (groupe « Claude », visible au lancement suivant de Lightroom).
+  d'après une retouche réussie (groupe « Claude », visible au lancement suivant de Lightroom). Un
+  paramètre prédéfini du même nom n'est jamais écrasé : le nouveau prend « Nom (2) », sauf si vous
+  demandez de remplacer l'ancien (1.6.6).
 - Passer une photo d'une version de processus 3 à 5 à la version 6 (toujours montré d'abord),
   imposer un profil d'objectif installé (objectif manuel ou adapté), tourner d'un quart de tour,
   prendre un instantané avant une retouche importante.
@@ -668,7 +672,10 @@ cadre.
   vides sont retirés, et Claude le dit. Chaque masque porte un nom « Claude · … » dans le panneau
   Masquage.
 - Effacer des taches (poussières du capteur, petits défauts) en correction, en duplication ou avec
-  l'outil Supprimer sans IA générative ; corriger des yeux rouges.
+  l'outil Supprimer sans IA générative ; corriger des yeux rouges. Depuis la 1.6.6, Claude voit aussi
+  les taches déjà posées (les siennes et les vôtres), numérotées, et peut en retirer une, changer
+  son opacité, ou vider toutes les taches ou tous les yeux rouges, en une étape que « Défaire » de
+  Claude annule.
 - Des positions justes malgré la correction d'objectif, Upright ou la perspective : le connecteur
   mesure le déplacement sur deux rendus de la photo et recale chaque position.
 

@@ -46,7 +46,9 @@ extension ToolHandler {
                  required: []),
             tool("save_preset",
                  "Crée un paramètre prédéfini de développement à partir des réglages actuels d'une photo (par exemple une retouche réussie, pour la réutiliser) : un fichier XMP dans le groupe « Claude » des paramètres prédéfinis de Camera Raw, que Lightroom montre à son prochain lancement. Il contient les réglages des groupes choisis et, au choix, le profil, les courbes et le recadrage ; les masques, les taches et les couleurs ponctuelles n'y vont pas (copy_settings les copie).",
-                 properties: [("name", prop("string", "Nom du paramètre prédéfini.")), ("photo_id", photoIDProperty), ("groups", groupsProperty)]
+                 properties: [("name", prop("string", "Nom du paramètre prédéfini. S'il existe déjà, l'ancien est gardé et le nouveau prend « Nom (2) ».")),
+                              ("photo_id", photoIDProperty), ("groups", groupsProperty),
+                              ("replace", prop("boolean", "Remplacer le paramètre prédéfini du même nom, seulement si l'utilisateur le demande."))]
                     + presetInclusions,
                  required: ["name"]),
             tool("export_journal", Self.descriptionJournal,
@@ -122,20 +124,28 @@ extension ToolHandler {
         guard let settings = result["reglages"]?.object, !settings.isEmpty else {
             throw LightroomError.plugin("Lightroom n'a pas renvoyé de réglages pour ce paramètre prédéfini.")
         }
-        let written: (url: URL, skipped: [String])
+        let written: (url: URL, name: String, skipped: [String], occupe: String?)
+        let wanted = String(name.prefix(80))
         do {
-            written = try PresetXMP.write(name: String(name.prefix(80)), settings: settings, folder: presetFolder)
+            written = try PresetXMP.write(name: wanted, settings: settings, folder: presetFolder, replace: args.bool("replace") ?? false)
         } catch {
             throw LightroomError.invalid("Impossible d'écrire le paramètre prédéfini : \(error.localizedDescription)")
         }
         var response: [String: JSONValue] = [
-            "nom": .string(String(name.prefix(80))),
+            "nom": .string(written.name),
             "fichier": .string(written.url.path),
             "reglages": .number(Double(settings.count - written.skipped.count)),
             "source": result["source"] ?? .null,
             "a_savoir": "Lightroom le montre dans le groupe « Claude » du panneau Paramètres prédéfinis à son prochain lancement.",
         ]
         if !written.skipped.isEmpty { response["laisses_de_cote"] = .array(written.skipped.map(JSONValue.string)) }
+        if let occupe = written.occupe {
+            response["remarque"] = .string(occupe == wanted
+                ? "Un paramètre prédéfini « \(wanted) » existait déjà : il est gardé, le nouveau s'appelle « \(written.name) ». Pour le remplacer, sur demande seulement : replace = true."
+                : "Le fichier de « \(wanted) » est déjà celui du paramètre prédéfini « \(occupe) » : il est gardé, le nouveau s'appelle « \(written.name) ».")
+        } else if written.name != wanted {
+            response["remarque"] = .string("Nom trop long pour un fichier : le paramètre prédéfini s'appelle « \(written.name) ».")
+        }
         return .object(response)
     }
 

@@ -117,6 +117,27 @@ function Geometrie.point(ctx, p, q)
     return ctx.versFichierEntier(u, v)
 end
 
+-- Point du fichier (0 à 1) → point de l'aperçu (0 à 1), à l'inverse de Geometrie.point : de quoi
+-- désigner une retouche déjà posée (retouch_spots avec list). Avec la grille de recalage, elle se
+-- défait par approximations successives (le déplacement est lisse, de quelques dizaines de pixels
+-- au plus, ou de quelques centièmes sous Upright : revue du 2 novembre 2026, sans la grille une
+-- tache voisine pouvait être prise pour une autre). Hors de 0 à 1 : hors du cadre.
+function Geometrie.versApercu(ctx, x, y)
+    if ctx.recalage then
+        local a, b = ctx.versAffichage(x, y)
+        local u, v = a, b
+        for _ = 1, 20 do
+            local gu, gv = Geometrie.interpoler(ctx.recalage, u, v)
+            u, v = u + (a - gu), v + (b - gv)
+        end
+        x, y = ctx.versFichierEntier(u, v)
+    end
+    local dx, dy = x * ctx.lf - ctx.x0, y * ctx.hf - ctx.y0
+    local s = (dx * ctx.cos + dy * ctx.sin) / ctx.w
+    local t = (-dx * ctx.sin + dy * ctx.cos) / ctx.h
+    return ctx.versAffichage(s, t)
+end
+
 -- Plus grand déplacement de la grille de recalage, en pixels de la photo affichée.
 function Geometrie.ecart(ctx)
     local g = ctx.recalage

@@ -54,7 +54,7 @@ Progression.SANS_BARRE = {
 Progression.NOMS = {
     selection = "lecture de la sélection", reglages = "lecture des réglages", apercu = "rendu de la photo",
     geometrie = "rendu de la géométrie", appliquer = "retouche", recadrer = "recadrage", masquer = "masques",
-    retoucher = "taches", copier = "copie des réglages", essayer = "essai d'une retouche",
+    retoucher = "taches", taches = "lecture des taches", copier = "copie des réglages", essayer = "essai d'une retouche",
     presets = "paramètres prédéfinis", creerPreset = "paramètre prédéfini", diagnostic = "diagnostic",
     journal = "journal des retouches", annuler = "annulation", revenir = "retour à l'origine",
     metadonnees = "classement", motsCles = "mots-clés", collections = "collections",

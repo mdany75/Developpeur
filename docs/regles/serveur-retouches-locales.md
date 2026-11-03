@@ -61,6 +61,13 @@ Sorti de `Sources/CLAUDE.md` le 31 octobre 2026 ; à lire avant de toucher à `a
 - Une photo qui porte `RemoveAreas` (outil Supprimer à détection d'objet) est lue par là, et
   `RetouchAreas` en est dérivé : les taches de Claude vont dans les deux (`preparerTaches`). Une
   tache Supprimer de Claude est toujours `fill_method = 'patchmatch'`, jamais générative.
+- Taches déjà posées (1.6.6, `retouch_spots` avec `action`) : `list` lit (commande `taches`, sans
+  recalage ni étape), `remove`, `opacity` et `clear` écrivent une étape (commande `retoucher` avec
+  `gestion`, `Plans.preparerGestionTaches`). Les numéros sont ceux de la liste que Lightroom lit
+  (`tachesLues` : `RemoveAreas` d'abord) ; sur `RemoveAreas`, la liste y est réécrite et
+  `RetouchAreas` dérivé sans les objets détectés ; une liste vide vide aussi `RetouchInfo`
+  (`viderAncienneForme`), sinon Lightroom garde les taches. Les taches de l'utilisateur se
+  retirent comme celles de Claude : seulement sur sa demande, ou numéro désigné par lui.
 - Les positions des masques et des taches se donnent dans l'image que montre `view_photo` ;
   `Geometrie.lua` les ramène dans le repère du fichier. Toute nouvelle position passe par lui. Ce
   repère est celui d'avant la correction d'objectif, Upright et la perspective : le serveur calcule

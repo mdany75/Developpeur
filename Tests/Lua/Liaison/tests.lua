@@ -13,6 +13,7 @@ local Recadrage = require 'Recadrage'
 local Geometrie = require 'Geometrie'
 local Locaux = require 'Locaux'
 local Notation = require 'Notation'
+local Etapes = require 'Etapes'
 
 -- Aides communes des essais de la liaison (Aides.lua) : avant chaque test, la simulation, la
 -- liaison et les registres (Notation, Carnet) repartent de zéro.
@@ -1764,6 +1765,157 @@ test("retoucher : mode Supprimer sans IA générative, calculé par Lightroom, p
     egal(#resultat.resultats[1].changements, 1)
     Commandes.executer('annuler', {})
     egal(next(photo.reglages.RetouchAreas or {}), nil)
+end)
+
+-- 1.6.6 (comparaison Automaat du 2 novembre 2026) : les taches déjà posées se lisent, numérotées,
+-- avec leur position dans l'aperçu, et se retirent, changent d'opacité ou se vident, en une étape.
+local function troisTaches(photo)
+    S.active = photo
+    Commandes.executer('retoucher', { taches = Json.tableau({ { x = 0.2, y = 0.3, rayon = 0.01 }, { x = 0.5, y = 0.5, rayon = 0.02, mode = 'clone' },
+        { x = 0.8, y = 0.7, rayon = 0.015, mode = 'remove' } }), yeux = Json.tableau({ { x = 0.4, y = 0.4, rayon = 0.005 } }), etape = 'taches' })
+end
+
+test("taches : lecture numérotée, positions de l'aperçu, photo tournée et recadrée", function()
+    local photo = photoFuji()
+    photo.reglages.CropLeft, photo.reglages.CropTop, photo.reglages.CropRight, photo.reglages.CropBottom = 0.1, 0.1, 0.9, 0.9
+    photo.reglages.CropAngle = 3
+    troisTaches(photo)
+    local editions = photo.editions
+    local lues = Commandes.executer('taches', {})
+    egal(#lues.taches, 3)
+    egal(lues.yeux_rouges, 1)
+    egal(lues.taches[1].numero, 1)
+    egal(lues.taches[1].sorte, 'corriger')
+    egal(lues.taches[2].sorte, 'cloner')
+    egal(lues.taches[3].sorte, 'supprimer')
+    proche(lues.taches[1].x, 0.2) proche(lues.taches[1].y, 0.3)
+    proche(lues.taches[2].rayon, 0.02)
+    egal(lues.taches[1].opacite, 100, "de 0 à 100, comme l'action opacity")
+    egal(lues.taches[1].hors_cadre, nil)
+    egal(photo.editions, editions, "une lecture n'écrit rien")
+    egal(Etapes.SANS_ATTENTE.taches, true, "ni étape ni capture")
+    -- En pause et en « Proposer d'abord », la lecture reste permise.
+    Liaison.pause = true
+    S.prefs.mode = 'proposer'
+    egal(#Commandes.executer('taches', {}).taches, 3)
+    Liaison.pause = false
+    S.prefs.mode = 'appliquer'
+end)
+
+test("retoucher avec gestion : retirer, opacité, puis undo_last remet tout", function()
+    local photo = photoFuji()
+    troisTaches(photo)
+    local retrait = Commandes.executer('retoucher', { gestion = 'retirer', numeros = Json.tableau({ 2 }), etape = 'tache retirée' })
+    egal(#photo.reglages.RetouchAreas, 2)
+    proche(photo.reglages.RetouchAreas[2].centerX, 0.8)
+    -- Les numéros se décalent : la réponse donne la liste renumérotée (l'ancienne 3 est la 2).
+    egal(#retrait.taches, 2)
+    egal(retrait.taches[2].sorte, 'supprimer')
+    egal(retrait.a_savoir:find("renumérotés", 1, true) ~= nil, true)
+    Commandes.executer('retoucher', { gestion = 'opacite', numeros = Json.tableau({ 1 }), opacite = 0.4, etape = 'tache adoucie' })
+    egal(photo.reglages.RetouchAreas[1].Opacity, 0.4)
+    egal(photo.reglages.RetouchAreas[1].opacity, 0.4)
+    egal(photo.reglages.RetouchAreas[2].Opacity, 1, "les autres taches ne changent pas")
+    Commandes.executer('annuler', {})
+    egal(photo.reglages.RetouchAreas[1].Opacity, 1)
+    Commandes.executer('annuler', {})
+    egal(#photo.reglages.RetouchAreas, 3, "la tache retirée revient")
+    echoue(function() Commandes.executer('retoucher', { gestion = 'retirer', numeros = Json.tableau({ 4 }), etape = 'x' }) end, "Tache n° 4 introuvable")
+    echoue(function() Commandes.executer('retoucher', { gestion = 'retirer', numeros = Json.tableau({}), etape = 'x' }) end, "Aucune tache désignée")
+    echoue(function() Commandes.executer('retoucher', { gestion = 'opacite', numeros = Json.tableau({ 1 }), opacite = 2, etape = 'x' }) end, "Opacité")
+    egal(#photo.reglages.RetouchAreas, 3, "un refus n'écrit rien")
+end)
+
+test("retoucher avec gestion : vider les taches vide aussi RetouchInfo, sinon Lightroom les garde", function()
+    local photo = photoFuji()
+    troisTaches(photo)
+    Commandes.executer('retoucher', { gestion = 'vider', vider = { taches = true, yeux = false }, etape = 'taches vidées' })
+    egal(next(photo.reglages.RetouchAreas), nil, "plus aucune tache")
+    egal(type(photo.reglages.RetouchInfo), 'table')
+    egal(#photo.reglages.RedEyeInfo, 1, "les yeux rouges restent")
+    Commandes.executer('retoucher', { gestion = 'vider', vider = { taches = false, yeux = true }, etape = 'yeux vidés' })
+    egal(next(photo.reglages.RedEyeInfo), nil)
+    Commandes.executer('annuler', {})
+    egal(#photo.reglages.RedEyeInfo, 1)
+    Commandes.executer('annuler', {})
+    egal(#photo.reglages.RetouchAreas, 3, "undo_last remet les trois taches")
+    -- Proposer d'abord : refus sans confirme, rien d'écrit.
+    S.prefs.mode = 'proposer'
+    echoue(function() Commandes.executer('retoucher', { gestion = 'vider', vider = { taches = true }, etape = 'x' }) end)
+    egal(#photo.reglages.RetouchAreas, 3)
+    S.prefs.mode = 'appliquer'
+end)
+
+test("retoucher avec gestion : une photo qui porte RemoveAreas se gère par là, objet détecté compris", function()
+    local objet = { SpotType = 'heal_patchmatch', Method = 'poisson', Opacity = 1, Masks = { { What = 'Mask/Image', ReferencePoint = '0.670502 0.123274' } } }
+    local cercle = { SpotType = 'heal', Opacity = 1, centerX = 0.2, centerY = 0.2, radius = 0.01, Masks = { { What = 'Mask/Ellipse', X = 0.2, Y = 0.2 } } }
+    local photo = S.Photo(7, { RemoveAreas = { objet, cercle }, RetouchAreas = { cercle }, Exposure2012 = 0 },
+        { fileName = 'DSCF0001.RAF', fileFormat = 'RAW' }, { dimensions = { width = 6000, height = 4000 } })
+    S.active = photo
+    local lues = Commandes.executer('taches', {})
+    egal(#lues.taches, 2, "les numéros suivent RemoveAreas, que Lightroom lit d'abord")
+    egal(lues.taches[1].sorte, 'objet détecté')
+    egal(lues.taches[1].x, nil, "un objet détecté n'a pas de centre lu")
+    egal(lues.taches[2].sorte, 'corriger')
+    Commandes.executer('retoucher', { gestion = 'retirer', numeros = Json.tableau({ 2 }), etape = 'cercle retiré' })
+    egal(#photo.reglages.RemoveAreas, 1)
+    egal(photo.reglages.RemoveAreas[1].Masks[1].ReferencePoint, '0.670502 0.123274', "l'objet fait à la main reste")
+    egal(next(photo.reglages.RetouchAreas or {}), nil, "RetouchAreas dérivé, sans l'objet")
+    Commandes.executer('annuler', {})
+    egal(#photo.reglages.RemoveAreas, 2)
+    egal(#photo.reglages.RetouchAreas, 1)
+    Commandes.executer('retoucher', { gestion = 'vider', vider = { taches = true }, etape = 'tout vidé' })
+    egal(next(photo.reglages.RemoveAreas), nil, "une liste vide efface les trois")
+    egal(next(photo.reglages.RetouchAreas), nil)
+end)
+
+test("essayer : retirer une tache se montre sans rien écrire", function()
+    local photo = photoFuji()
+    troisTaches(photo)
+    local appliques = #photo.appliques
+    local resultat = Commandes.executer('essayer', { action = 'retoucher', gestion = 'retirer', numeros = Json.tableau({ 1 }), etape = 'x', taille = 800 })
+    egal(#photo.reglages.RetouchAreas, 3, "rien de gardé")
+    egal(resultat ~= nil, true)
+    egal(#photo.appliques >= appliques, true)
+end)
+
+test("Geometrie : versApercu est l'inverse de point, photo tournée, recadrée et recalée", function()
+    -- Revue du 2 novembre 2026 : sans défaire la grille de recalage, une tache posée sous Upright
+    -- revenait à quelques centièmes de sa place, et une tache voisine pouvait être prise pour elle.
+    local function grilleCourbe()
+        local x, y = Json.tableau(), Json.tableau()
+        for j = 0, 2 do
+            for i = 0, 2 do
+                local u, v = i / 2, j / 2
+                x[#x + 1] = u + 0.04 * math.sin(math.pi * v) * (1 - u)
+                y[#y + 1] = v - 0.03 * u * v
+            end
+        end
+        return { colonnes = 3, lignes = 3, x = x, y = y }
+    end
+    for _, orientation in ipairs({ 'AB', 'BC', 'CD', 'DA' }) do
+        for _, recalage in ipairs({ false, true }) do
+            local ctx = Geometrie.contexte(6240, 4160, orientation, { CropLeft = 0.1, CropTop = 0.05, CropRight = 0.85, CropBottom = 0.95, CropAngle = -4 },
+                recalage and grilleCourbe() or nil)
+            local x, y = Geometrie.point(ctx, 0.3, 0.7)
+            local p, q = Geometrie.versApercu(ctx, x, y)
+            if math.abs(p - 0.3) > 1e-6 or math.abs(q - 0.7) > 1e-6 then
+                error(string.format("%s, recalage %s : (%.6f ; %.6f) au lieu de (0,3 ; 0,7)", orientation, tostring(recalage), p, q))
+            end
+        end
+    end
+end)
+
+test("copier les taches d'une source qui n'en a pas : RetouchInfo vidé aussi, sinon Lightroom les garde", function()
+    local cible = photoFuji()
+    troisTaches(cible)
+    local source = S.Photo(12, { Exposure2012 = 0.2, Temperature = 5000, WhiteBalance = 'As Shot' },
+        { fileName = 'S.RAF', fileFormat = 'RAW' }, { dimensions = { width = 6240, height = 4160 } })
+    Commandes.executer('copier', { source = 12, photos = Json.tableau({ 4 }), cles = Json.tableau({ 'Exposure2012' }),
+        inclure = { taches = true }, etape = 'copie' })
+    egal(next(cible.reglages.RetouchAreas), nil, "plus de taches, comme la source")
+    Commandes.executer('annuler', { photo = 4 })
+    egal(#cible.reglages.RetouchAreas, 3)
 end)
 
 test("Geometrie : recalage par la grille du serveur, photo tournée et recadrée comprise", function()
