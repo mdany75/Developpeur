@@ -45,10 +45,25 @@ CLAUDE.md principal, qui garde les règles communes à tout le projet. Le détai
   met en pause (`Releve.relancer`). Un registre en mémoire se relit quand son fichier change de
   racine (jamais écrit dans l'autre). Un chemin absolu relu d'un fichier de données passe par
   `Chemins.rebaser`, la seule fonction de rebasage.
-- Le réglage copie (copie récursive, `DossierCommun.copierArbre`), met de côté les données de ce
-  Mac (« Avant le dossier commun <date> »), n'efface jamais rien ; « Revenir au dossier de ce Mac »
-  ne retire que le pointeur. `relais.sh` copie `Claude Code/<id>.jsonl` du dossier commun avant
-  `--resume` et vers lui après la fin (`DEVELOPPEUR_DONNEES`), jamais rien d'autre de `~/.claude`.
+- Le dossier commun s'appelle « Développeur IA » (`DossierCommun.NOM`) : la racine d'un volume
+  choisie donne son dossier « Développeur IA », le choix s'ouvre sur `/Volumes/Photos`
+  (`DossierCommun.VOLUMES`, `VOLUME_PHOTOS` : injectés dans les essais, jamais le vrai SSD).
+- Le réglage (un seul à la fois : `DossierCommun.enCours`) ferme la liaison (`Chemins.changement` :
+  toute commande sauf ping refusée), attend le Suivi et la commande en cours ; refuse un dossier
+  vide quand l'ancien dossier commun est introuvable ; copie (copie récursive,
+  `DossierCommun.copierArbre`, qui rend la main à Lightroom ; venant de ce Mac, aussi les
+  `<sessionID>.jsonl` des conversations, par `relais.sh --projet`), recopie un fichier changé
+  pendant la copie, range sous la marque `.rangement-en-cours.json` (un rangement interrompu se
+  termine au choix suivant), écrit le pointeur, **puis** met de côté les données de ce Mac
+  (« Avant le dossier commun <date> ») ; n'efface jamais rien. « Revenir au dossier de ce Mac » ne
+  retire que le pointeur. `DossierCommun.lua` se prend par `pcall(require, …)` dans
+  `PluginInfoProvider.lua` (fichier nouveau : rechargement sans relance). La progression passe par
+  `LrDialogs.showModalProgressDialog` (au premier plan du Gestionnaire), sinon `LrProgressScope`.
+- `relais.sh` copie `Claude Code/<id>.jsonl` du dossier commun avant `--resume` seulement si
+  l'échange local manque ou en est le début, et vers lui après la fin (normale, en erreur, ou par
+  `trap` sur TERM, HUP, INT ; un échange du SSD qui n'est pas le début du local est gardé à côté,
+  `.avant-<date>`) (`DEVELOPPEUR_DONNEES`), jamais rien d'autre de `~/.claude` ; une copie
+  manquée va dans `dossier-commun.erreur`, que `Session.lire` porte au Journal et à la conversation.
   `uninstall.sh` ne touche jamais le dossier commun. Essais : `essais-dossier-commun.lua` des deux
   suites (jamais le vrai `~/.claude` : `CLAUDE_CONFIG_DIR` simulé).
 

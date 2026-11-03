@@ -93,6 +93,13 @@ défait ensuite.
 - Seuil de pertinence (et plancher de score brut) sur ses propres phrases, index rempli — avec Dany (à l'œil) ([sens, point 3](#à-constater-recherche-par-le-sens)).
 - Le Suivi qui remplit l'index ; une recherche dans la fenêtre Claude, `Sens.tranchesMax` — à la main dans Lightroom ([sens, points 4 et 5](#à-constater-recherche-par-le-sens)).
 
+**Dossier commun (deux Mac, un SSD)**
+
+- Choisir… dans le Gestionnaire de modules externes (modal) : `LrDialogs.showModalProgressDialog` existe-t-il (`--module diagnostic`), sa fenêtre de progression est-elle au premier plan du Gestionnaire, et sa croix annule-t-elle la copie ? Sinon, la barre d'activité (`LrProgressScope`) de la fenêtre principale est-elle visible ? Lightroom reste-t-il réactif pendant une copie de plusieurs milliers de fichiers (`DossierCommun.PAS_RENDRE`) — à la main dans Lightroom, sur un dossier d'essai hors du SSD.
+- Le panneau de choix s'ouvre sur `/Volumes/Photos` (`initialDirectory`) ; choisir le SSD règle « /Volumes/Photos/Développeur IA » — à la main dans Lightroom.
+- `DossierCommun.lua` après « Charger de nouveau le module ext. » sans relancer Lightroom : `pcall(require, 'DossierCommun')` rend-il bien la main (« Could not load toolkit script » attrapé), les sections Liaison et Fenêtre Claude restant ? — à la main dans Lightroom.
+- `relais.sh` à l'extinction du Mac (SIGTERM ou SIGHUP de launchd) : l'échange de Claude Code arrive-t-il dans « Claude Code/ » du SSD avant la fin (`trap`) ? — à la main.
+
 **Taches, bruit et points chauds (1.6.6)**
 
 - Points chauds saturés (`PointsChauds.ecartChroma` 25, `cMin` 35, provisoires) : Dany juge la planche du 3 novembre 2026 ([Planche des points chauds](https://claude.ai/artifact/3AMaFfoeL8C56kmx393aiP), 150 zones sur 30 photos, réponses dans sa base `jugements`) ; le couple de seuils qui suit le mieux ses réponses remplace les provisoires — avec Dany (à l'œil) ([relevé](#taches-et-marge-des-ombres-constatées-167)).

@@ -121,4 +121,29 @@ test("dossier commun introuvable : une notation chargée avant reste refusée en
     rienEcrit()
 end)
 
+test("pendant le changement du dossier commun (Chemins.changement) : toute commande sauf ping est refusée, rien n'est écrit ; puis tout reprend", function()
+    S.fichiers[LOCALE .. '/dossier-commun.json'] = nil
+    S.fichiers[LOCALE .. '/carnet.json'] = nil
+    photoRaw()
+    Liaison.prise = { send = function(self, texte) S.envois[#S.envois + 1] = texte end }
+    Liaison.reponsesConnectee = true
+    S.envois = {}
+    Chemins.changement = true
+    Liaison.recevoir(A.ligne({ id = 21, command = 'carnet', params = { action = 'constater', photo = 1, vocabulaire = VOCABULAIRE,
+        vue = { cherches = { 'flou' }, defauts = { { code = 'flou', mesure = 9, texte = "flou : 9" } } } } }))
+    Liaison.recevoir(A.ligne({ id = 22, command = 'ping', params = {} }))
+    Chemins.changement = false
+    local refus = Json.decode(S.envois[1])
+    egal(refus.id, 21)
+    egal(refus.error, Liaison.CHANGEMENT_DOSSIER)
+    egal(S.fichiers[LOCALE .. '/carnet.json'], nil, "rien d'écrit pendant le changement")
+    egal(Json.decode(S.envois[2]).error, nil, "ping répond")
+    -- Le changement fini : la même commande passe.
+    Liaison.recevoir(A.ligne({ id = 23, command = 'carnet', params = { action = 'constater', photo = 1, vocabulaire = VOCABULAIRE,
+        vue = { cherches = { 'flou' }, defauts = { { code = 'flou', mesure = 9, texte = "flou : 9" } } } } }))
+    Liaison.prise = nil
+    egal(Json.decode(S.envois[3]).error, nil)
+    egal(S.fichiers[LOCALE .. '/carnet.json'] ~= nil, true)
+end)
+
 A.bilan()

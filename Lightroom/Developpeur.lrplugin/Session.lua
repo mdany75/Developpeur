@@ -170,7 +170,13 @@ function Session:lire()
             erreurs = erreurs:sub(-600)
         end
         Journal.noter("Claude Code arrêté, code " .. Texte.nettoyer(code), erreurs ~= '' and ("· " .. erreurs) or '')
-        return lignes, true, tonumber(Texte.nettoyer(code)), erreurs
+        -- Dossier commun : l'échange de la session non copié (relais.sh, dossier-commun.erreur),
+        -- dit au Journal avant que Session.menage efface ce dossier.
+        local commun = Texte.nettoyer(Fichiers.lire(fichier(self, 'dossier-commun.erreur')) or '')
+        if commun ~= '' then
+            Journal.noter("Dossier commun : échange de Claude Code non copié ·", commun)
+        end
+        return lignes, true, tonumber(Texte.nettoyer(code)), erreurs, commun ~= '' and commun or nil
     end
     return lignes, false
 end

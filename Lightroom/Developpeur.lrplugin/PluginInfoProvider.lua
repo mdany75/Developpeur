@@ -50,6 +50,29 @@ local function apparence(valeur)
     return string.format("%s (préférence « %s » inconnue)", retenue, tostring(valeur))
 end
 
+-- DossierCommun.lua, nouveau avec le dossier commun : après « Charger de nouveau le module ext. »
+-- sans relancer Lightroom, il ne se charge pas (« Could not load toolkit script », piège de
+-- CLAUDE.md). Pris par pcall : les autres sections et le diagnostic restent, la section du dossier
+-- commun le dit.
+local RELANCER = "Quittez et relancez Lightroom pour régler le dossier commun (un fichier nouveau du module ne se charge qu'au lancement)."
+
+local function moduleDossierCommun()
+    local ok, m = pcall(require, 'DossierCommun')
+    if ok and type(m) == 'table' then
+        return m
+    end
+    return nil
+end
+
+local function texteEtatDossierCommun()
+    local DossierCommun = moduleDossierCommun()
+    if not DossierCommun then
+        return "réglage indisponible : " .. RELANCER
+    end
+    local ok, texte = pcall(DossierCommun.texteEtat)
+    return ok and texte or tostring(texte)
+end
+
 -- Le diagnostic à coller dans la conversation : versions, ports, liaison, dernier échange, dernière
 -- erreur, réglages, chemins de la fenêtre Claude, journal. Les réglages de la 1.3 sont au bout de
 -- leur ligne : les débuts de ligne lus par les essais ne changent pas.
@@ -73,7 +96,7 @@ local function diagnostic()
             tostring(prefs.nouvelleParPhoto)) .. " ; avant/après des étapes : " .. tostring(prefs.avantApresEtapes)
             .. " ; apparence : " .. apparence(prefs.apparence),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
-        "Dossier commun : " .. require('DossierCommun').texteEtat(),
+        "Dossier commun : " .. texteEtatDossierCommun(),
         "",
         "Derniers événements :",
     }
@@ -327,8 +350,12 @@ local function fenetresOuvertes()
     return ouvertes
 end
 
--- Le refus d'un changement de dossier pendant que Claude travaille ou qu'une fenêtre est ouverte.
-local function refusChangement()
+-- Le refus d'un changement de dossier pendant qu'un autre est en cours, que Claude travaille ou
+-- qu'une fenêtre est ouverte.
+local function refusChangement(DossierCommun)
+    if DossierCommun.enCours then
+        return DossierCommun.EN_COURS
+    end
     local okM, Moteur = pcall(require, 'Moteur')
     if okM and Moteur.travaille then
         return "Claude travaille : réessayez quand il a fini."
@@ -340,34 +367,57 @@ local function refusChangement()
     return nil
 end
 
--- Choisir… : le dossier, puis la copie avec sa progression (une tâche à part, comme choisirDossier).
+-- La progression de la copie, au premier plan (le Gestionnaire, modal, cacherait la barre de la
+-- fenêtre principale et sa croix) : LrDialogs.showModalProgressDialog, sinon la barre d'activité
+-- (LrProgressScope). Les deux ont setPortionComplete, setCaption, isCanceled et done.
+local function progressionDeLaCopie(context)
+    local titre = "Dossier commun : copie des données"
+    if type(LrDialogs.showModalProgressDialog) == 'function' then
+        local ok, d = pcall(LrDialogs.showModalProgressDialog, { title = titre, caption = "Préparation de la copie…",
+            cannotCancel = false, functionContext = context })
+        if ok and d then
+            return d
+        end
+    end
+    local barre = LrProgressScope { title = titre, functionContext = context }
+    barre:setCancelable(true)
+    return barre
+end
+
+-- Choisir… : le dossier (le choix s'ouvre sur le SSD Photos ; sa racine donne son dossier
+-- « Développeur IA »), puis la copie avec sa progression (une tâche à part, comme choisirDossier).
 local function choisirDossierCommun(propertyTable)
-    local refus = refusChangement()
+    local DossierCommun = moduleDossierCommun()
+    if not DossierCommun then
+        LrDialogs.message("Dossier commun", RELANCER, 'info')
+        return
+    end
+    local refus = refusChangement(DossierCommun)
     if refus then
         LrDialogs.message("Dossier commun", refus, 'info')
         return
     end
     local choix = LrDialogs.runOpenPanel {
-        title = "Choisir le dossier commun (sur le SSD Photos, par exemple)",
+        title = "Choisir le dossier commun : le SSD Photos (« " .. DossierCommun.NOM .. " » y sera créé), ou un dossier",
         prompt = "Choisir",
         canChooseFiles = false,
         canChooseDirectories = true,
         canCreateDirectories = true,
         allowsMultipleSelection = false,
+        initialDirectory = DossierCommun.dossierInitial(),
     }
     local dossier = choix and choix[1]
     if not dossier then
         return
     end
-    local DossierCommun = require 'DossierCommun'
+    dossier = DossierCommun.preparer(dossier)
     local invalide = DossierCommun.refus(dossier)
     if invalide then
         LrDialogs.message("Dossier commun", invalide, 'warning')
         return
     end
     LrFunctionContext.postAsyncTaskWithContext('Développeur · dossier commun', function(context)
-        local barre = LrProgressScope { title = "Dossier commun : copie des données", functionContext = context }
-        barre:setCancelable(true)
+        local barre = progressionDeLaCopie(context)
         local ok, r = LrTasks.pcall(DossierCommun.choisir, dossier, {
             debut = function(total) barre:setCaption(string.format("%d fichier%s à copier", total, total > 1 and "s" or "")) end,
             avancer = function(fait, total)
@@ -386,13 +436,17 @@ local function choisirDossierCommun(propertyTable)
 end
 
 local function revenirAuDossierDuMac(propertyTable)
-    local refus = refusChangement()
+    local DossierCommun = moduleDossierCommun()
+    if not DossierCommun then
+        LrDialogs.message("Dossier commun", RELANCER, 'info')
+        return
+    end
+    local refus = refusChangement(DossierCommun)
     if refus then
         LrDialogs.message("Dossier commun", refus, 'info')
         return
     end
     LrTasks.startAsyncTask(function()
-        local DossierCommun = require 'DossierCommun'
         local ok, quitte = LrTasks.pcall(DossierCommun.revenir)
         propertyTable.dossierCommun = DossierCommun.texteEtat()
         if not ok then
@@ -410,8 +464,9 @@ end
 
 local function sectionDossierCommun(f, propertyTable, ligne)
     local bind = LrView.bind
-    propertyTable.dossierCommun = require('DossierCommun').texteEtat()
-    return {
+    propertyTable.dossierCommun = texteEtatDossierCommun()
+    local DossierCommun = moduleDossierCommun()
+    local section = {
         title = "Dossier commun",
         synopsis = bind { key = 'dossierCommun', bind_to_object = propertyTable },
 
@@ -423,14 +478,21 @@ local function sectionDossierCommun(f, propertyTable, ligne)
             title = bind { key = 'dossierCommun', bind_to_object = propertyTable },
             fill_horizontal = 1,
         }),
-        ligne("",
-            f:push_button { title = "Choisir…", action = function() choisirDossierCommun(propertyTable) end },
-            f:push_button { title = "Revenir au dossier de ce Mac", action = function() revenirAuDossierDuMac(propertyTable) end }),
-        ligne("", f:static_text {
-            title = "Choisir un dossier vide y copie les données de ce Mac ; un dossier qui en a déjà (l'autre Mac) est pris tel quel. Les données de ce Mac sont ensuite mises de côté, jamais effacées.",
-            width_in_chars = 60, height_in_lines = 2,
-        }),
     }
+    if not DossierCommun then
+        -- DossierCommun.lua ajouté depuis le lancement de Lightroom (« Charger de nouveau » ne le
+        -- charge pas) : les autres sections restent, celle-ci le dit.
+        section[#section + 1] = ligne("", f:static_text { title = RELANCER, width_in_chars = 60, height_in_lines = 2 })
+        return section
+    end
+    section[#section + 1] = ligne("",
+        f:push_button { title = "Choisir…", action = function() choisirDossierCommun(propertyTable) end },
+        f:push_button { title = "Revenir au dossier de ce Mac", action = function() revenirAuDossierDuMac(propertyTable) end })
+    section[#section + 1] = ligne("", f:static_text {
+        title = "Choisissez le SSD Photos : le dossier « " .. DossierCommun.NOM .. " » y est créé. Vide, les données de ce Mac y sont copiées ; s'il en a déjà (l'autre Mac), il est pris tel quel. Les données de ce Mac sont ensuite mises de côté, jamais effacées. La copie se suit dans une fenêtre de progression, qui permet de l'annuler (à défaut, dans la barre d'activité de la fenêtre principale).",
+        width_in_chars = 60, height_in_lines = 6,
+    })
+    return section
 end
 
 local function sectionsForTopOfDialog(f, propertyTable)

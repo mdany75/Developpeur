@@ -84,6 +84,8 @@ local Liaison = {
     -- Début du refus d'une écriture qui attend l'accord dans la fenêtre de la liaison : la proposition
     -- y est déjà notée, le journal ne la redit pas comme un refus.
     EN_ATTENTE = "« Confirmer dans Lightroom » est actif",
+    -- Le refus de toute commande pendant le changement du dossier commun (Chemins.changement).
+    CHANGEMENT_DOSSIER = "Le dossier commun de Développeur change (Gestionnaire de modules externes) : rien n'est fait pour l'instant. Réessayez dans un moment.",
 
     -- Photo active signalée au serveur avec la dernière réponse (identifiant), pour ne signaler que
     -- les vrais changements : un aperçu ou un débruitage qui affiche une autre photo puis remet la
@@ -610,6 +612,14 @@ function Liaison.recevoir(message)
             else
                 Liaison.repondre({ id = requete.id, error = Liaison.messageErreur(resultat) })
             end
+            return
+        end
+        -- Le dossier commun change (DossierCommun.choisir ou revenir : Chemins.changement) : toute
+        -- commande sauf ping est refusée, sans rien écrire, jusqu'au pointeur écrit (une étape, un
+        -- constat ou une note écrits pendant la copie iraient dans l'ancienne racine).
+        local okC, Chemins = pcall(require, 'Chemins')
+        if okC and type(Chemins) == 'table' and Chemins.changement and requete.command ~= 'ping' then
+            Liaison.repondre({ id = requete.id, error = Liaison.CHANGEMENT_DOSSIER })
             return
         end
         local cle = Liaison.cleValide(requete.commande_id) and requete.commande_id or nil

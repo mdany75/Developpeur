@@ -1164,6 +1164,14 @@ modules.LrDialogs = {
         end
     end,
     runOpenPanel = function() return S.fichiersChoisis end,
+    -- Progression au premier plan (DossierCommun : la copie lancée depuis le Gestionnaire, modal) :
+    -- la même barre que LrProgressScope, marquée modale, gardée dans S.barres.
+    showModalProgressDialog = function(args)
+        local barre = modules.LrProgressScope({ title = args.title })
+        barre.modale = true
+        barre.annulable = args.cannotCancel ~= true
+        return barre
+    end,
     showBezel = function(texte) S.bezels = S.bezels or {}; S.bezels[#S.bezels + 1] = texte end,
 }
 

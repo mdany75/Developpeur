@@ -1,5 +1,17 @@
 # Changements
 
+## Non publié
+
+### Ajouté
+- Dossier commun « Développeur IA » pour deux Mac et un SSD : Fichier › Gestionnaire de modules
+  externes › Développeur IA pour Lightroom, section Dossier commun, Choisir… s'ouvre sur le SSD
+  Photos ; le choisir lui-même règle « /Volumes/Photos/Développeur IA », créé au besoin. Les
+  conversations, le carnet, le Suivi, les notes et les échanges de Claude Code y sont copiés ; sur
+  l'autre Mac, choisir le même dossier reprend le travail où il avait été laissé.
+- Après l'installation de cette version, **quittez et relancez Lightroom** : un fichier nouveau du
+  module ne se charge pas par « Charger de nouveau le module ext. » (la section Dossier commun le
+  dit alors, les autres restent).
+
 ## 1.6.7 — 2026-11-03
 
 La 1.6.7 vient des essais de la 1.6.6 faits dans Lightroom pendant la nuit : trois petits défauts

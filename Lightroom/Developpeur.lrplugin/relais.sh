@@ -19,11 +19,37 @@
 # module pose DEVELOPPEUR_DONNEES (la racine des données) seulement quand un dossier commun est
 # réglé. Claude Code range l'échange d'une session dans
 # ${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<dossier de travail encodé>/<id>.jsonl ; avant de lancer
-# Claude Code avec --resume, « <racine>/Claude Code/<id>.jsonl » y est copié s'il est plus récent ou
-# absent ; après sa fin (normale ou non), l'échange de la session (l'id repris, ou celui que Claude
-# Code a donné dans sa sortie, champ session_id) est copié vers « <racine>/Claude Code/ ». Seulement
-# ces .jsonl : jamais les fichiers de connexion de Claude Code, ni ~/.claude.json. Ce qui est copié
-# est noté dans dossier-commun.log (dans <dossier>). Sans DEVELOPPEUR_DONNEES, rien ne change.
+# Claude Code avec --resume, « <racine>/Claude Code/<id>.jsonl » y est copié s'il manque, ou si
+# l'échange local en est le début (jamais un échange local qui a des tours de plus : il est gardé,
+# et le journal le dit) ; après sa fin (normale, en erreur, ou par un signal TERM, HUP ou INT :
+# `trap`), l'échange de la session (l'id repris, ou celui que Claude Code a donné dans sa sortie,
+# champ session_id) est copié vers « <racine>/Claude Code/ » ; si l'échange du dossier commun n'en
+# était pas le début (l'autre Mac y a ajouté des tours), il est d'abord gardé à côté,
+# « <id>.jsonl.avant-<date> » : rien n'est perdu. Seulement ces .jsonl : jamais les fichiers de
+# connexion de Claude Code, ni ~/.claude.json. Ce qui est copié est noté dans dossier-commun.log
+# (dans <dossier>) ; une copie manquée, ou le dossier commun disparu à la fin, est écrite dans
+# dossier-commun.erreur, que la fenêtre lit avec fin.code (Journal et note de la conversation).
+# Sans DEVELOPPEUR_DONNEES, rien ne change.
+#
+# relais.sh --projet <dossier de travail> écrit le dossier du projet de Claude Code de ce dossier
+# de travail (le même encodage) : le réglage du dossier commun y prend les échanges des
+# conversations à copier.
+
+# Le dossier du projet de Claude Code pour un dossier de travail : son chemin physique (celui que
+# Claude Code voit), chaque caractère qui n'est ni une lettre ASCII ni un chiffre remplacé par « - »
+# (un caractère accentué compte pour un, d'où la locale UTF-8 : « Le Développeur » donne
+# « Le-D-veloppeur », constaté dans ~/.claude/projects). Rien si le dossier est introuvable.
+dossierProjet() {
+    physique=$(cd "$1" 2>/dev/null && pwd -P)
+    [ -n "$physique" ] || return 1
+    encode=$(printf '%s' "$physique" | LC_ALL=en_US.UTF-8 sed 's/[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789]/-/g')
+    printf '%s\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/$encode"
+}
+
+if [ "$1" = "--projet" ]; then
+    dossierProjet "$2"
+    exit $?
+fi
 
 dossier=$1
 claude=$2
@@ -58,23 +84,22 @@ export MAX_MCP_OUTPUT_TOKENS=100000
 
 donnees=${DEVELOPPEUR_DONNEES:-}
 echanges="$donnees/Claude Code"
-# Le dossier du projet de Claude Code pour ce dossier de travail : son chemin physique (celui que
-# Claude Code voit), chaque caractère qui n'est ni une lettre ASCII ni un chiffre remplacé par « - »
-# (un caractère accentué compte pour un, d'où la locale UTF-8 : « Le Développeur » donne
-# « Le-D-veloppeur », constaté dans ~/.claude/projects).
 projet=""
 if [ -n "$donnees" ]; then
-    physique=$(cd "$travail" 2>/dev/null && pwd -P)
-    if [ -n "$physique" ]; then
-        encode=$(printf '%s' "$physique" | LC_ALL=en_US.UTF-8 sed 's/[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789]/-/g')
-        projet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/$encode"
-    fi
+    projet=$(dossierProjet "$travail")
 fi
 
 # Vrai si le dossier commun est réglé et présent (le module refuse de lancer sinon ; ici, jamais de
 # copie vers un dossier local à sa place).
 commun() {
     [ -n "$donnees" ] && [ -d "$donnees" ] && [ -n "$projet" ]
+}
+
+# Une copie manquée : dans le journal de la session, et dans dossier-commun.erreur (lu par la
+# fenêtre avec fin.code : Session.menage efface ensuite ce dossier).
+manque() {
+    printf '%s\n' "$1" >> dossier-commun.log
+    printf '%s\n' "$1" >> dossier-commun.erreur
 }
 
 # Un identifiant de session sûr pour un nom de fichier (lettres, chiffres, « - », « _ »).
@@ -85,27 +110,66 @@ identifiant() {
     return 0
 }
 
-# Copie $1 vers $2 si $1 existe et que $2 manque, ou n'est pas plus récent et diffère (la date se
-# compte à la seconde : un échange changé dans la même seconde que sa copie se copie aussi), date
-# gardée (cp -p), par un fichier provisoire renommé ensuite (jamais un échange à moitié copié).
-copierSiPlusRecent() {
+# Vrai si le fichier $1 est le début du fichier $2 (ou lui est égal).
+debutDe() {
+    taille1=$(wc -c < "$1" | tr -d ' ')
+    taille2=$(wc -c < "$2" | tr -d ' ')
+    # (cmp -n de macOS dit « EOF » quand le premier fichier finit pile au compte : head -c.)
+    [ "$taille1" -le "$taille2" ] && head -c "$taille1" "$2" | cmp -s - "$1"
+}
+
+# Copie $1 vers $2, date gardée (cp -p), par un fichier provisoire renommé ensuite (jamais un
+# échange à moitié copié).
+copier() {
+    mkdir -p "$(dirname "$2")" || { manque "non copié : $1 -> $2"; return 1; }
+    if cp -p "$1" "$2.copie" && mv -f "$2.copie" "$2"; then
+        printf 'copié : %s -> %s\n' "$1" "$2" >> dossier-commun.log
+        return 0
+    fi
+    rm -f "$2.copie"
+    manque "non copié : $1 -> $2"
+    return 1
+}
+
+# Avant --resume : l'échange du dossier commun ($1) vers l'échange local ($2), s'il manque en local
+# ou si l'échange local en est le début. Un échange local qui a des tours que le dossier commun n'a
+# pas n'est jamais remplacé : il est gardé, et le journal le dit.
+reprendre() {
     [ -f "$1" ] || return 0
-    if [ ! -f "$2" ] || { [ ! "$2" -nt "$1" ] && ! cmp -s "$1" "$2"; }; then
-        mkdir -p "$(dirname "$2")" || return 1
-        if cp -p "$1" "$2.copie" && mv -f "$2.copie" "$2"; then
-            printf 'copié : %s -> %s\n' "$1" "$2" >> dossier-commun.log
-        else
-            rm -f "$2.copie"
-            printf 'non copié : %s -> %s\n' "$1" "$2" >> dossier-commun.log
-            return 1
+    if [ ! -f "$2" ]; then
+        copier "$1" "$2"
+    elif cmp -s "$1" "$2"; then
+        return 0
+    elif debutDe "$2" "$1"; then
+        copier "$1" "$2"
+    else
+        printf "gardé : l'échange local %s a des tours que %s n'a pas\n" "$2" "$1" >> dossier-commun.log
+    fi
+}
+
+# Après la fin : l'échange local ($1) vers le dossier commun ($2). Si l'échange du dossier commun
+# n'est pas le début de l'échange local (l'autre Mac y a ajouté des tours), il est d'abord gardé à
+# côté, « <id>.jsonl.avant-<date> » : jamais écrasé sans copie.
+ranger() {
+    [ -f "$1" ] || return 0
+    if [ -f "$2" ]; then
+        cmp -s "$1" "$2" && return 0
+        if ! debutDe "$2" "$1"; then
+            garde="$2.avant-$(date '+%Y-%m-%d-%H%M%S')"
+            if cp -p "$2" "$garde"; then
+                printf 'gardé à côté : %s -> %s\n' "$2" "$garde" >> dossier-commun.log
+            else
+                manque "non copié : $1 -> $2 (l'échange du dossier commun n'a pas pu être gardé à côté)"
+                return 1
+            fi
         fi
     fi
-    return 0
+    copier "$1" "$2"
 }
 
 # Avant le lancement : l'échange de la session reprise, depuis le dossier commun.
 if commun && identifiant "$reprise"; then
-    copierSiPlusRecent "$echanges/$reprise.jsonl" "$projet/$reprise.jsonl"
+    reprendre "$echanges/$reprise.jsonl" "$projet/$reprise.jsonl"
 fi
 
 touch entree.jsonl
@@ -148,6 +212,34 @@ fermer() {
     kill $processus 2>/dev/null
 }
 
+# Après la fin de Claude Code (normale, en erreur ou par un signal) : l'échange de la session vers
+# le dossier commun, avant fin.code (la fenêtre peut relancer dès qu'elle le lit). Une seule fois.
+fini=""
+finir() {
+    [ -z "$fini" ] || return 0
+    fini=1
+    kill $lecteur 2>/dev/null
+    rm -f tuyau
+    if [ -n "$donnees" ]; then
+        if commun; then
+            session=$(sed -n 's/.*"session_id":"\([A-Za-z0-9_-]*\)".*/\1/p' sortie.jsonl 2>/dev/null | tail -n 1)
+            [ -n "$session" ] || session=$reprise
+            if identifiant "$session"; then
+                ranger "$projet/$session.jsonl" "$echanges/$session.jsonl"
+            fi
+        else
+            manque "non copié : le dossier commun $donnees est introuvable à la fin de Claude Code (SSD éjecté ?)"
+        fi
+    fi
+    echo "$1" > fin.code
+}
+
+# Arrêté par un signal (fermeture de session, extinction du Mac) : Claude Code fermé, l'échange
+# rangé quand même, puis la fin.
+trap 'fermer; wait $processus 2>/dev/null; finir 143; exit 143' TERM
+trap 'fermer; wait $processus 2>/dev/null; finir 129; exit 129' HUP
+trap 'fermer; wait $processus 2>/dev/null; finir 130; exit 130' INT
+
 while kill -0 $processus 2>/dev/null; do
     if [ -e arreter ]; then
         fermer
@@ -162,17 +254,4 @@ done
 
 wait $processus
 code=$?
-kill $lecteur 2>/dev/null
-rm -f tuyau
-
-# Après la fin de Claude Code (normale ou non) : l'échange de la session vers le dossier commun,
-# avant fin.code (la fenêtre peut relancer dès qu'elle le lit).
-if commun; then
-    session=$(sed -n 's/.*"session_id":"\([A-Za-z0-9_-]*\)".*/\1/p' sortie.jsonl 2>/dev/null | tail -n 1)
-    [ -n "$session" ] || session=$reprise
-    if identifiant "$session"; then
-        copierSiPlusRecent "$projet/$session.jsonl" "$echanges/$session.jsonl"
-    fi
-fi
-
-echo $code > fin.code
+finir $code

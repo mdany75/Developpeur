@@ -880,10 +880,19 @@ end
 -- la demande redevient à envoyer si la reprise de la session a échoué ou si Claude n'y a pas répondu ;
 -- une session perdue fera joindre l'historique actuel de la photo à la demande renvoyée
 -- (rejoindreHistorique).
-function Moteur.processusFini(s, code, erreurs)
+function Moteur.processusFini(s, code, erreurs, erreurCommun)
     local c = s.conversation
     if Moteur.session == s then
         Moteur.session = nil
+    end
+    -- Dossier commun : l'échange de Claude Code n'a pas pu être rangé (relais.sh) ; la conversation
+    -- le dit (l'autre Mac reprendrait un échange en retard), que Claude ait travaillé ou non.
+    if erreurCommun and c then
+        Conversation.ajouterNote(c, "L'échange de Claude Code n'a pas été copié dans le dossier commun : sur l'autre Mac, "
+            .. "Claude pourrait ne pas se souvenir des derniers échanges. (" .. erreurCommun .. ")")
+        if not (Moteur.travaille and c == Moteur.enCours) then
+            enregistrer(c)
+        end
     end
     if Moteur.travaille and c and c == Moteur.enCours then
         Moteur.travaille = false
@@ -926,7 +935,7 @@ function Moteur.tic()
         return
     end
     local c = s.conversation
-    local lignes, fini, code, erreurs = s:lire()
+    local lignes, fini, code, erreurs, erreurCommun = s:lire()
     local change = false
     for _, ligne in ipairs(lignes) do
         local ev = Evenements.lire(ligne)
@@ -936,7 +945,7 @@ function Moteur.tic()
         end
     end
     if fini then
-        Moteur.processusFini(s, code, erreurs or '')
+        Moteur.processusFini(s, code, erreurs or '', erreurCommun)
         change = true
     end
     local maintenant = os.time()

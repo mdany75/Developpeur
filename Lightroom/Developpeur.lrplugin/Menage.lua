@@ -53,9 +53,9 @@ Menage.GARDES = {
 -- Les débuts de nom des fichiers de passage écrits à la racine de Temporaire, chacun effacé juste
 -- après sa lecture : sortie de sips (Images.dimensions), de --version (Composants.connecteur), de
 -- `claude auth status` (Lightroom.etatClaude), du presse-papiers (Images.coller) et de --focus sans
--- vignette (Images.lireFocus). Une commande interrompue (Lightroom quitté, module rechargé) les
--- laisse : ils s'effacent au chargement.
-Menage.FICHIERS = { 'dimensions-', 'version-', 'auth-', 'presse-papiers-', 'focus-' }
+-- vignette (Images.lireFocus), et de relais.sh --projet (DossierCommun.projetClaude). Une commande
+-- interrompue (Lightroom quitté, module rechargé) les laisse : ils s'effacent au chargement.
+Menage.FICHIERS = { 'dimensions-', 'version-', 'auth-', 'presse-papiers-', 'focus-', 'projet-claude-' }
 
 -- Les fenêtres du module se signalent ici à leur premier chargement (Fenetre.lua, FenetreRapide.lua) :
 -- chacune donne une fonction, vraie tant qu'elle est ouverte ou que son Claude travaille. Au

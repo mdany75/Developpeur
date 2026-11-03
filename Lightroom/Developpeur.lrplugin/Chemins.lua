@@ -102,6 +102,10 @@ function Chemins.estDonnee(nom)
     return false
 end
 
+-- Vrai pendant un changement du dossier commun (posé par DossierCommun.lua, en mémoire seulement) :
+-- la liaison refuse alors toute commande sauf ping (Liaison.CHANGEMENT_DOSSIER).
+Chemins.changement = false
+
 -- Le pointeur, toujours local ; seul DossierCommun.lua l'écrit.
 function Chemins.pointeur() return LrPathUtils.child(Chemins.locale(), 'dossier-commun.json') end
 
