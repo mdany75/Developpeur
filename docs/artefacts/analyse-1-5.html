@@ -59,7 +59,7 @@
 <body>
 <div class="page">
 <h1>Analyse du connecteur et du module Développeur</h1>
-<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée dans le code de la 1.6.5, le 2 novembre 2026, puis mise à jour pour la 1.6.6 le même soir. Il ne reste ici que ce qui est encore à faire : ce qui est corrigé est retiré (il reste dans le CHANGELOG et l'historique git de cette page).</p>
+<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée dans le code de la 1.6.5, le 2 novembre 2026, puis mise à jour pour la 1.6.6 le même soir et pour la 1.6.7 le 3 novembre 2026. Il ne reste ici que ce qui est encore à faire : ce qui est corrigé est retiré (il reste dans le CHANGELOG et l'historique git de cette page).</p>
 
 <div class="encadre"><b>Verdict.</b> La base est solide : 585 tests Swift, des tests Lua sur un SDK simulé, un jeton de liaison bien conçu, une couverture très large des réglages du module Développeur. Les gains viennent maintenant de trois endroits : <b>alléger ce que le modèle lit</b> (26 610 caractères de descriptions), <b>fiabiliser le pont</b> avec Lightroom, et <b>protéger la photo de l'empilement</b> de réglages.</div>
 
@@ -125,7 +125,7 @@
 <p><b>À faire :</b> un « style en chiffres » proposé comme point de départ (profil par genre de scène, courbe signature) et appliqué tel quel, au lieu d'être relu comme du texte.</p>
 <p class="preuve">Tools+Style.swift:17, 31 · Habitudes.swift:380-392 · Consignes.lua:129-132, 143-163</p></div>
 <div class="carte"><h3>Seuils provisoires : pas de jeu de photos pour les rejouer <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
-<p><b>À faire :</b> un jeu fixe d'environ 40 photos annotées, que les tests rejouent à chaque version. Beaucoup d'autres seuils restent provisoires : ceux des habitudes, et ceux de la netteté et du bruit dans le bilan.</p>
+<p><b>À faire :</b> un jeu fixe d'environ 40 photos annotées, que les tests rejouent à chaque version. Un premier pas en 1.6.7 : 40 de tes photos mesurées pour les points chauds saturés, et une planche de 150 zones que tu juges ; mais elle reste hors des tests (tes photos ne vont pas dans le dépôt public). La marge des ombres est vérifiée sur sept copies. Beaucoup d'autres seuils restent provisoires : ceux des habitudes, et ceux de la netteté et du bruit dans le bilan.</p>
 <p class="preuve">ReleveSeuils.swift:6-25 · Carnet.swift:44 · Mesures.swift:60 · Habitudes.swift:13 · Bilan.swift:126</p></div>
 
 <h2>4. Le parcours du photographe</h2>

@@ -1,0 +1,64 @@
+<title>Nuit du 3 novembre</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root{--bg:#f7f6f3;--fg:#1e1d1b;--muted:#6a655d;--card:#fff;--line:#e3dfd8;--ok:#2f7a4a;--okFond:#e4f1e8;--att:#b0581a;--attFond:#fbeadd;--lien:#1d5fb8;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#181715;--fg:#ebe7e0;--muted:#a39d93;--card:#22201d;--line:#37332e;--ok:#79c495;--okFond:#1c3224;--att:#f0a066;--attFond:#3a2617;--lien:#7fb0f0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#181715;--fg:#ebe7e0;--muted:#a39d93;--card:#22201d;--line:#37332e;--ok:#79c495;--okFond:#1c3224;--att:#f0a066;--attFond:#3a2617;--lien:#7fb0f0;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.page{max-width:760px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:1.7rem;margin:0 0 .2rem;text-wrap:balance}
+h2{font-size:1.15rem;margin:2rem 0 .5rem;text-wrap:balance}
+.sous{color:var(--muted);margin:0 0 1.2rem}
+a{color:var(--lien)}
+.carte{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
+.a-faire{background:var(--attFond);border-color:var(--att)}
+.etat{font-size:.78rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:2px}
+.ok{background:var(--okFond);color:var(--ok)} .att{background:var(--attFond);color:var(--att)}
+.tab{overflow-x:auto} table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)} th{color:var(--muted);font-weight:600}
+code{font:.86em Menlo,ui-monospace,monospace;background:var(--line);padding:1px 4px;border-radius:4px}
+ul{padding-left:1.2rem} li{margin:.25rem 0}
+</style>
+<div class="page">
+<h1>Ce que j'ai fait cette nuit</h1>
+<p class="sous">Nuit du 2 au 3 novembre 2026 · vos trois points de la 1.6.6 vérifiés dans Lightroom, puis la 1.6.7 publiée.</p>
+
+<div class="carte a-faire"><b>Pour vous, au réveil (environ 10 minutes) :</b> ouvrez la <a href="https://claude.ai/artifact/3AMaFfoeL8C56kmx393aiP">Planche des points chauds</a>. Pour chaque cadre numéroté, répondez « Attire l'œil » ou « Non ». Vos réponses m'arrivent directement, et j'en tirerai les deux seuils. Ensuite, relancez Claude Desktop pour qu'il prenne le connecteur 1.6.7.</div>
+
+<h2>1. Les taches <span class="etat ok">vérifié, 3 défauts corrigés</span></h2>
+<p>Sur une copie d'essai, j'ai fait une tache à la main avec l'outil Supprimer (objet détecté, sans IA générative), puis Claude en a posé deux. J'ai ensuite essayé lister, retirer, changer l'opacité et tout vider. Chaque fois, j'ai défait et vérifié que les réglages revenaient exactement à l'avant. À l'écran, une tache retirée réapparaît et les autres restent effacées, y compris la vôtre.</p>
+<p>Trois défauts trouvés, corrigés en 1.6.7 :</p>
+<ul>
+<li>votre tache faite à la main était listée sans position : Claude sait maintenant où elle est, et quelle taille elle a ;</li>
+<li>après un retrait, la liste renumérotée était décalée de quelques pixels par la correction d'objectif ;</li>
+<li>le résumé disait « (table) » au lieu du nombre de taches.</li>
+</ul>
+
+<h2>2. La marge des ombres <span class="etat ok">vérifiée sur 7 photos</span></h2>
+<p>Sur sept nouvelles copies, d'ISO 160 à 6 400, j'ai relevé l'exposition, puis remesuré le bruit des ombres. Tout a été défait ensuite.</p>
+<div class="tab"><table>
+<tr><th>Ce qu'on voulait savoir</th><th>Résultat</th></tr>
+<tr><td>La marge promet-elle trop ?</td><td>Jamais : relevées de la marge annoncée, aucune photo n'arrive au bruit visible.</td></tr>
+<tr><td>Est-elle juste ?</td><td>Prudente sur une photo propre : environ 0,4 IL de réserve.</td></tr>
+<tr><td>Et le curseur Ombres ?</td><td>Ombres +30 ≈ 0,4 IL, +60 ≈ 0,8 IL. Claude le lit maintenant avec la marge.</td></tr>
+</table></div>
+
+<h2>3. Les points chauds saturés <span class="etat att">attend votre œil</span></h2>
+<p>J'ai cherché 40 de vos photos avec un objet vif derrière une personne : jouets, murs colorés, fleurs, festivals… J'ai mesuré leurs zones de couleur vive à 25 réglages de seuils, du plus large au plus strict. La planche montre 150 zones sur 30 photos. Le réglage qui suit le mieux vos réponses remplacera les seuils provisoires. Vos photos ne vont pas dans le dépôt GitHub, qui est public : seul le gabarit vide de la page y est.</p>
+
+<h2>La 1.6.7 <span class="etat ok">publiée</span></h2>
+<ul>
+<li>Essais : 862 essais du serveur et tous ceux du module réussis. Une revue indépendante par plusieurs agents a trouvé cinq points de plus, tous corrigés.</li>
+<li>Archive signée et notarisée par Apple, vérifiée.</li>
+<li>Recette : 88 étapes sur 88, dont une nouvelle pour le retrait d'une tache.</li>
+<li>Essai réel dans la fenêtre Claude (« Développeur IA v1.6.7 ») : Vibrance +10 sur une copie d'essai, puis défaite.</li>
+<li><a href="https://github.com/mdany75/Developpeur/releases/tag/v1.6.7">Release GitHub</a> · <a href="https://claude.ai/artifact/9kQ7kKQk5VuXrrAWFrvVKS">page Analyse</a> mise à jour.</li>
+</ul>
+
+<h2>À savoir</h2>
+<ul>
+<li>J'ai créé huit nouvelles copies d'essai, toutes remises à l'origine et rangées dans « Développeur › Essais » : « Essai taches 1.6.6 » et sept « Essai ombres 1.6.6 ». Vous pouvez les supprimer quand vous voulez.</li>
+<li>Pour faire la tache à la main, j'ai décoché « IA générative » dans l'outil Supprimer de Lightroom. Ce choix reste décoché ; recochez-le si vous l'utilisiez.</li>
+<li>Rappel d'hier : la copie « XH2S0244.RAF (Claude) », créée par erreur, est toujours à supprimer.</li>
+</ul>
+</div>
