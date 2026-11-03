@@ -63,6 +63,17 @@ public enum Reference {
     static let saturationMax = 25.0, saturationMaxForte = 40.0
     /// Vibrance changée au plus par passe.
     static let vibranceMaxPasse = 20.0
+    /// Exposition changée au plus EN TOUT par un appel (passes 1 et 2 comprises), mesurée depuis la
+    /// valeur de départ de la photo. PROVISOIRE. Constaté le 2 novembre 2026 dans Lightroom (copies
+    /// d'Essais) : d'après une dune de sable claire, une remise de diplôme sur rideau noir a reçu
+    /// Exposure2012 +1,8 (écart plafonné à 3 IL × pente, borné à ±2 par passe) et Contrast2012 −30 :
+    /// photo délavée, brûlée ; les scènes (34 %) restaient sous `seuilScenes`. L'écart de clarté vient
+    /// aussi de la scène : l'exposition se demande à part.
+    static let expositionMax = 0.5
+    /// Contraste changé au plus EN TOUT par un appel (passes 1 et 2 comprises), depuis la valeur de
+    /// départ : la borne d'une passe de match_series. Constaté le 2 novembre 2026 (relecture) : borné
+    /// par passe seulement, deux passes pouvaient le changer de 60.
+    static let contrasteMax = ToolHandler.maxContrastePasse
     /// Part de l'écart à combler, par défaut et bornes.
     static let forceDefaut = 0.6, forces = 0.25...1.0
 
@@ -346,6 +357,12 @@ public enum Reference {
         init() {}
     }
 
+    /// « 0,5 » : un nombre d'IL écrit en français.
+    static func texteIL(_ v: Double) -> String {
+        let r = (v * 100).rounded() / 100
+        return (r == r.rounded() ? String(Int(r)) : String(r)).replacingOccurrences(of: ".", with: ",")
+    }
+
     /// La photo telle qu'elle est : réglages actuels, balance (RAW en kelvins ou relative).
     struct Etat {
         var reglages: [String: Double]
@@ -354,21 +371,33 @@ public enum Reference {
     }
 
     /// Les valeurs finales (absolues) pour un écart, seulement celles qui changent, et les limites dites.
-    static func traduire(_ ecart: Ecart, etat: Etat, options: Options, pentes: Pentes) -> (reglages: [String: Double], limites: [String]) {
+    /// `depart` : les réglages de la photo avant la passe 1 (la passe 2 le donne) ; exposition et
+    /// contraste ne s'en écartent pas de plus de `expositionMax` et `contrasteMax` en tout.
+    static func traduire(_ ecart: Ecart, etat: Etat, options: Options, pentes: Pentes, depart: Etat? = nil) -> (reglages: [String: Double], limites: [String]) {
         var finales: [String: Double] = [:], limites: [String] = []
         let k = options.force
+        let origine = depart ?? etat
         if options.tons {
             if abs(ecart.exposition) >= ToolHandler.seuilExposition {
                 let delta = min(max(ecart.exposition * pentes.serie.expositionParIL * k, -2), 2)
-                finales["Exposure2012"] = (min(max(etat.valeur("Exposure2012") + delta, -5), 5) * 20).rounded() / 20
+                let voulue = (min(max(etat.valeur("Exposure2012") + delta, -5), 5) * 20).rounded() / 20
+                let base = origine.valeur("Exposure2012")
+                let bornee = min(max(voulue, base - expositionMax), base + expositionMax)
+                if abs(voulue - bornee) > 0.001 {
+                    limites.append("Exposition changée de \(texteIL(expositionMax)) IL au plus : l'écart de clarté vient aussi de la scène ; demander l'exposition à part si voulu.")
+                }
+                finales["Exposure2012"] = bornee
             }
             if abs(ecart.contraste) >= ToolHandler.seuilContraste {
                 let voulu = pentes.serie.contrasteParL * ecart.contraste * k
                 let delta = min(max(voulu, -ToolHandler.maxContrastePasse), ToolHandler.maxContrastePasse)
-                if abs(voulu) > ToolHandler.maxContrastePasse {
-                    limites.append("Contraste changé de \(Int(ToolHandler.maxContrastePasse)) au plus par passe : l'écart de tons vient aussi de la scène.")
+                let base = origine.valeur("Contrast2012")
+                let vise = etat.valeur("Contrast2012") + voulu
+                let bornee = min(max(etat.valeur("Contrast2012") + delta, base - contrasteMax), base + contrasteMax)
+                if abs(vise - bornee) > 0.5 {
+                    limites.append("Contraste changé de \(Int(contrasteMax)) au plus en tout (les deux passes comprises) : l'écart de tons vient aussi de la scène.")
                 }
-                finales["Contrast2012"] = min(max(etat.valeur("Contrast2012") + delta, -100), 100).rounded()
+                finales["Contrast2012"] = min(max(bornee, -100), 100).rounded()
             }
         }
         if options.etalonnage {
