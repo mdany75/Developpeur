@@ -1,0 +1,237 @@
+<title>Installer l'autre Mac</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Mise en page : une colonne de lecture, étapes numérotées (c'est une vraie suite), une invite à copier mise à part. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --fg: #1d2320;
+  --muted: #5b6660;
+  --line: #d9dfdb;
+  --accent: #2f6b55;
+  --accent-soft: #e3efe9;
+  --code-bg: #eef1ef;
+  --warn: #8a5a12;
+  --warn-soft: #f7eedc;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --body: "Source Sans 3", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141816; --surface: #1c211f; --fg: #e6ebe8; --muted: #9aa6a0; --line: #2e3633;
+    --accent: #7cc3a6; --accent-soft: #1f3129; --code-bg: #232a27; --warn: #e3b469; --warn-soft: #33291a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141816; --surface: #1c211f; --fg: #e6ebe8; --muted: #9aa6a0; --line: #2e3633;
+  --accent: #7cc3a6; --accent-soft: #1f3129; --code-bg: #232a27; --warn: #e3b469; --warn-soft: #33291a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 64px;
+}
+main { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+h1, h2 { font-family: var(--display); font-weight: 650; text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: 2.3rem; }
+h2 { font-size: 1.45rem; }
+h3 { font-size: 1.05rem; margin: 0; font-weight: 600; }
+p { margin: 0; }
+.lead { color: var(--muted); font-size: 1.08rem; max-width: 62ch; }
+section { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+header { display: flex; flex-direction: column; gap: 12px; }
+code, .path { font-family: var(--mono); font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+ol.steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; counter-reset: s; }
+ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 2.2rem 1fr; gap: 12px; align-items: start; }
+ol.steps > li::before {
+  content: counter(s); font-family: var(--display); font-weight: 650; font-size: 1.1rem; color: var(--accent);
+  border: 1.5px solid var(--accent); border-radius: 50%; width: 2rem; height: 2rem; display: grid; place-items: center;
+}
+ol.steps > li > div { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.who { font-size: .78rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.who.claude { color: var(--accent); }
+.prompt { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.prompt-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.prompt-bar span { font-weight: 600; }
+button.copy {
+  font: 600 .92rem var(--body); color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 7px 14px; cursor: pointer;
+}
+button.copy:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+pre { margin: 0; padding: 16px; overflow-x: auto; font-family: var(--mono); font-size: .8rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { background: var(--warn-soft); color: var(--fg); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.note strong { color: var(--warn); }
+ul.plain { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 6px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.two > div { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+footer { color: var(--muted); font-size: .88rem; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+<header>
+  <p class="eyebrow">Développeur IA 1.7 · deux Mac, un SSD</p>
+  <h1>Installer l'autre Mac</h1>
+  <p class="lead">Le SSD Photos porte le catalogue, les photos, tes données de Développeur et tout ce qu'il faut installer. L'autre Mac s'installe depuis lui, sans rien télécharger : le réseau cellulaire ne sert qu'à Claude.</p>
+</header>
+
+<section>
+  <h2>Avant de commencer</h2>
+  <ul class="plain">
+    <li>Le SSD Photos est branché sur l'autre Mac, et Lightroom Classic y est installé (13.3 ou plus récent). Lightroom est le seul programme que le SSD ne peut pas porter.</li>
+    <li>Claude Code est installé sur l'autre Mac et connecté à ton compte claude.ai. C'est lui qui fera l'installation.</li>
+    <li>Lightroom et Fibo 2 Studio sont fermés sur l'autre Mac.</li>
+    <li>Le premier Mac n'utilise pas le SSD en même temps.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Les étapes</h2>
+  <ol class="steps">
+    <li><div>
+      <p class="who">Toi</p>
+      <p>Ouvre Claude Code sur l'autre Mac : dans le Terminal, tape <code>claude</code>. Colle-lui l'invite ci-dessous, en entier.</p>
+    </div></li>
+    <li><div>
+      <p class="who claude">Claude de l'autre Mac</p>
+      <p>Il vérifie le SSD, installe Développeur IA depuis le SSD, puis s'arrête et te demande de régler le dossier commun.</p>
+    </div></li>
+    <li><div>
+      <p class="who">Toi</p>
+      <p>Ouvre Lightroom, puis Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom › Dossier commun › <strong>Choisir…</strong>. Le panneau s'ouvre sur le SSD Photos : clique sur <strong>Choisir</strong>. Développeur prend les données du SSD telles quelles, sans rien copier. Dis ensuite à Claude « c'est fait ».</p>
+    </div></li>
+    <li><div>
+      <p class="who claude">Claude de l'autre Mac</p>
+      <p>Il installe depuis le SSD uv, mflux, les modèles de Fibo, SAM 2, Fibo 2 Studio et Claude Code, vérifie que tout est « à jour », puis te dit quoi relancer.</p>
+    </div></li>
+    <li><div>
+      <p class="who">Toi</p>
+      <p>Quitte et relance Lightroom. Si Claude Desktop est ouvert, quitte-le (⌘Q) et lance la commande que Claude t'aura donnée (<code>mcp-developpeur --install</code>), puis rouvre-le. Pose les raccourcis : Gestionnaire › Fenêtre Claude › Poser le raccourci, puis relance Lightroom.</p>
+    </div></li>
+  </ol>
+</section>
+
+<section>
+  <div class="prompt">
+    <div class="prompt-bar"><span>Invite à coller dans Claude Code, sur l'autre Mac</span><button class="copy" id="copier" type="button">Copier l'invite</button></div>
+<pre id="invite">Installe Développeur IA sur ce Mac depuis le SSD Photos, sans rien télécharger. Réponds-moi en français. Suis ces étapes dans l'ordre, et arrête-toi en me disant pourquoi si une étape échoue.
+
+Règles :
+- Ne télécharge rien (ce Mac peut être sur le réseau cellulaire). Tout vient de « /Volumes/Photos/Développeur IA/Installation ».
+- N'efface jamais rien, ne touche jamais au catalogue Lightroom ni aux photos, n'écris rien sur le SSD hors de ce que la commande mcp-developpeur fait elle-même.
+- Ne réponds jamais à une demande d'autorisation de macOS : dis-moi de le faire.
+- Ne touche jamais à ~/.claude ni à mes connexions.
+
+1. Vérifie :
+   - que le fichier « /Volumes/Photos/Développeur IA/Installation/manifeste.json » existe, et montre-moi ce qu'il annonce (version de chaque élément) ;
+   - que Lightroom Classic est installé (/Applications/Adobe Lightroom Classic) et qu'il est fermé (pgrep -f "Adobe Lightroom Classic") ;
+   - que Fibo 2 Studio est fermé (pgrep -f "Fibo 2 Studio").
+   Si Lightroom ou Fibo 2 Studio est ouvert, demande-moi de les quitter.
+
+2. Installe Développeur IA depuis le SSD :
+   D="$(mktemp -d)"
+   ditto -x -k "/Volumes/Photos/Développeur IA/Installation/developpeur/Developpeur.zip" "$D"
+   DEVELOPPEUR_DEPUIS_SSD=1 bash "$D/Developpeur/install.sh"
+   Montre-moi la fin de sa sortie. S'il dit que Claude Desktop est ouvert, note la commande « mcp-developpeur --install » qu'il donne : je la lancerai à la fin.
+
+3. Arrête-toi et demande-moi : « Ouvre Lightroom, puis Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom › Dossier commun › Choisir…, choisis le SSD Photos, puis dis-moi c'est fait. » Attends ma réponse.
+
+4. Quand je dis que c'est fait, vérifie le réglage :
+   cat "$HOME/Library/Application Support/Developpeur/dossier-commun.json"
+   Il doit viser « /Volumes/Photos/Développeur IA ». Puis compare ce Mac et le SSD :
+   "$HOME/Library/Application Support/Developpeur/mcp-developpeur" --mises-a-jour
+
+5. Installe depuis le SSD tout ce qui y est plus récent ou manque sur ce Mac :
+   "$HOME/Library/Application Support/Developpeur/mcp-developpeur" --mises-a-jour --installer
+   Lance-le en arrière-plan, sa sortie dans un fichier ; les modèles de Fibo font environ 68 Go. Montre-moi le résultat.
+
+6. Vérifie :
+   "$HOME/Library/Application Support/Developpeur/mcp-developpeur" --mises-a-jour   (tout doit être « à jour »)
+   "$HOME/Library/Application Support/Developpeur/mcp-developpeur" --status          (la ligne « Dossier commun : /Volumes/Photos/Développeur IA (présent) »)
+   ~/.local/bin/mflux-generate-fibo2-edit --help   (il doit répondre « usage: … »)
+
+7. Dis-moi en quelques lignes ce qui est installé, avec les versions, et ce qu'il me reste à faire : quitter et relancer Lightroom ; si Claude Desktop était ouvert, le quitter, lancer « mcp-developpeur --install », puis le rouvrir ; poser les raccourcis dans le Gestionnaire (Fenêtre Claude › Poser le raccourci), puis relancer Lightroom ; ouvrir une nouvelle session de Claude Code.</pre>
+  </div>
+</section>
+
+<section>
+  <h2>Ce que le SSD porte</h2>
+  <p>Dans <span class="path">/Volumes/Photos/Développeur IA</span> : tes données, partagées par les deux Mac, et le dossier <span class="path">Installation</span>.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Élément</th><th>Version</th><th>Taille</th></tr></thead>
+    <tbody>
+      <tr><td>Développeur IA (module et connecteur)</td><td class="num">1.7</td><td class="num">4 Mo</td></tr>
+      <tr><td>Fibo 2 Studio</td><td class="num">2.8.1</td><td class="num">2 Mo</td></tr>
+      <tr><td>uv</td><td class="num">0.13.5</td><td class="num">30 Mo</td></tr>
+      <tr><td>mflux, avec Python 3.13, installable hors ligne</td><td class="num">0.24.0</td><td class="num">1,2 Go</td></tr>
+      <tr><td>Modèles de Fibo 2 : FIBO 2 edit, FIBO 2 dev, FIBO-vlm, SeedVR2</td><td class="num">5 instantanés</td><td class="num">67,6 Go</td></tr>
+      <tr><td>SAM 2 de Fibo 2 Studio</td><td class="num">9 fichiers</td><td class="num">0,2 Go</td></tr>
+      <tr><td>Claude Code</td><td class="num">2.1.303</td><td class="num">0,3 Go</td></tr>
+      <tr><td>Tes données : conversations, échanges de Claude Code, Suivi, carnet, notes, avant/après, guide de style, index et modèles du sens et des espèces</td><td class="num">—</td><td class="num">1,6 Go</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>Ensuite, au quotidien</h2>
+  <div class="two">
+    <div>
+      <h3>Changer de Mac</h3>
+      <p>Quitte Lightroom, éjecte le SSD, branche-le sur l'autre Mac, ouvre Lightroom. Tu reprends où tu t'étais arrêté, conversations avec Claude comprises.</p>
+    </div>
+    <div>
+      <h3>Les mises à jour</h3>
+      <p>Au lancement de Lightroom, le module compare le Mac et le SSD. Le Mac a plus récent : il le dépose sur le SSD. Le SSD a plus récent : il te propose « Mettre à jour depuis le SSD ».</p>
+    </div>
+    <div>
+      <h3>SSD débranché</h3>
+      <p>Développeur le dit et n'écrit rien sur le Mac. Le Suivi se met en pause et reprend quand le SSD revient.</p>
+    </div>
+    <div>
+      <h3>Ce qui reste sur chaque Mac</h3>
+      <p>Lightroom, Claude Code, le connecteur, Fibo 2 et ses modèles, le jeton de la liaison et les journaux.</p>
+    </div>
+  </div>
+  <div class="note">
+    <p><strong>À ne pas faire</strong></p>
+    <p>Ne débranche pas le SSD pendant que Lightroom est ouvert : le catalogue peut s'abîmer. Ne synchronise pas le dossier « Développeur IA » par iCloud ou Dropbox.</p>
+  </div>
+</section>
+
+<footer>
+  <p>Essai fait le 3 novembre 2026 sur le Mac Studio : dossier commun réglé, tout déposé sur le SSD, puis installation complète d'un « autre Mac » simulé, Internet coupé.</p>
+</footer>
+</main>
+
+<script>
+(function () {
+  var bouton = document.getElementById('copier');
+  var invite = document.getElementById('invite');
+  bouton.addEventListener('click', function () {
+    var texte = invite.textContent;
+    var fini = function () { bouton.textContent = 'Copiée'; setTimeout(function () { bouton.textContent = "Copier l'invite"; }, 2000); };
+    var choisir = function () {
+      var r = document.createRange(); r.selectNodeContents(invite);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      bouton.textContent = 'Texte sélectionné : ⌘C';
+    };
+    try {
+      navigator.clipboard.writeText(texte).then(fini, choisir);
+    } catch (e) { choisir(); }
+  });
+})();
+</script>

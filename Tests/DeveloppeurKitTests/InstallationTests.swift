@@ -227,6 +227,17 @@ final class InstallationTests: XCTestCase {
         XCTAssertEqual(f2.first?.action, "refuse")
         XCTAssertTrue(f2[0].texte.contains("Fibo 2 Studio est ouvert"))
         XCTAssertEqual(Installation.versionApplication(m2.env.applicationFibo), "2.7", "l'application ouverte n'est jamais touchée")
+
+        // Fermée, elle est remplacée et l'ancienne va à la Corbeille ; sur un Mac qui ne l'avait pas,
+        // il n'y a pas d'ancienne version à annoncer.
+        fiboOuvert = false
+        let (_, f3) = try m2.executer(deposer: false, elements: [.fibo2studio])
+        XCTAssertEqual(f3.first?.action, "installe", f3.map(\.texte).joined(separator: "\n"))
+        XCTAssertTrue(f3[0].texte.contains("dans la Corbeille"), f3[0].texte)
+        let m3 = mac("trois")
+        let (_, f4) = try m3.executer(deposer: false, elements: [.fibo2studio])
+        XCTAssertEqual(f4.first?.action, "installe", f4.map(\.texte).joined(separator: "\n"))
+        XCTAssertFalse(f4[0].texte.contains("Corbeille"), f4[0].texte)
     }
 
     func testPlaceInsuffisanteRefuseeAvantToute() throws {
@@ -341,12 +352,22 @@ final class InstallationTests: XCTestCase {
         let (_, sans) = try m1.executer(deposer: true, elements: [.developpeur])
         XCTAssertEqual(sans.first?.action, "refuse")
 
-        let (_, faits) = try m1.executer(deposer: true, elements: nil, archive: archive(version: "1.6.10"))
+        let premiere = archive(version: "1.6.10")
+        let (_, faits) = try m1.executer(deposer: true, elements: nil, archive: premiere)
         XCTAssertEqual(faits.first { $0.element == .developpeur }?.action, "depose", faits.map(\.texte).joined(separator: "\n"))
         XCTAssertEqual(manifeste()["developpeur"]?["version"]?.string, "1.6.10")
         // La même : rien ; une plus ancienne (1.6.9 < 1.6.10) : refusée.
-        let (_, meme) = try m1.executer(deposer: true, elements: [.developpeur], archive: archive(version: "1.6.10"))
+        let (_, meme) = try m1.executer(deposer: true, elements: [.developpeur], archive: premiere)
         XCTAssertEqual(meme.first?.action, "rien")
+        // Le même numéro refait avant la publication (une autre empreinte) remplace celle du SSD.
+        let shaAvant = manifeste()["developpeur"]?["fichiers"]?.array?.first?["sha256"]?.string
+        let refaite = base.appendingPathComponent("refaite.zip")
+        try Data(contentsOf: premiere).write(to: refaite)
+        let ajout = try FileHandle(forWritingTo: refaite)
+        ajout.seekToEndOfFile(); ajout.write(Data([0])); try ajout.close()
+        let (_, refait) = try m1.executer(deposer: true, elements: [.developpeur], archive: refaite)
+        XCTAssertEqual(refait.first?.action, "depose", refait.first?.texte ?? "")
+        XCTAssertNotEqual(manifeste()["developpeur"]?["fichiers"]?.array?.first?["sha256"]?.string, shaAvant)
         let (_, vieille) = try m1.executer(deposer: true, elements: [.developpeur], archive: archive(version: "1.6.9"))
         XCTAssertEqual(vieille.first?.action, "refuse")
         XCTAssertEqual(manifeste()["developpeur"]?["version"]?.string, "1.6.10")

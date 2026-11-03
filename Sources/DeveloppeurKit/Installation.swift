@@ -663,7 +663,11 @@ public final class Installation {
             guard let v = versionArchive(zip) else { throw Refus("\(zip.path) n'est pas une archive de Développeur lisible.") }
             if archiveDEssai(zip) { throw Refus(Self.texteArchiveEssai) }
             if let ssd = ligne.ssd?.version {
-                if ssd == v { return "=Développeur IA \(v) est déjà sur le SSD." }
+                // Même numéro : rien, sauf une archive refaite (une autre empreinte) avant la
+                // publication, qui remplace celle du SSD.
+                let surSSD = (manifeste[element.rawValue]?["fichiers"]?.array ?? [])
+                    .first { $0["chemin"]?.string == "developpeur/Developpeur.zip" }?["sha256"]?.string
+                if ssd == v, surSSD == nil || surSSD == (try? Self.sha256(zip)) { return "=Développeur IA \(v) est déjà sur le SSD." }
                 if MiseAJour.plusRecente(ssd, que: v) { throw Refus("le SSD a déjà la \(ssd), plus récente que cette archive (\(v)).") }
             }
             try verifierPlace(Self.taille(zip), sur: installation)
@@ -876,10 +880,12 @@ public final class Installation {
             let r = env.lancer(URL(fileURLWithPath: "/usr/bin/ditto"), ["-x", "-k", zip.path, partiel.path], nil, 600)
             let nouvelle = partiel.appendingPathComponent(Self.nomApplicationFibo, isDirectory: true)
             guard r.code == 0, Self.versionApplication(nouvelle) != nil else { throw Refus("ditto n'a pas pu décompresser l'application : \(Self.fin(r.sortie))") }
-            if fm.fileExists(atPath: env.applicationFibo.path) { try env.corbeille(env.applicationFibo) }
+            let remplacee = fm.fileExists(atPath: env.applicationFibo.path)
+            if remplacee { try env.corbeille(env.applicationFibo) }
             try fm.moveItem(at: nouvelle, to: env.applicationFibo)
             avancer(element, 1, 1, "Fibo 2 Studio \(ssd.version) installé")
-            return "Fibo 2 Studio \(ssd.version) installé dans \(env.applications.path) (l'ancienne version est dans la Corbeille)."
+            return "Fibo 2 Studio \(ssd.version) installé dans \(env.applications.path)"
+                + (remplacee ? " (l'ancienne version est dans la Corbeille)." : ".")
 
         case .claudeCode:
             guard let fichier = ssd.version.isEmpty ? nil : installation.appendingPathComponent("claude_code/claude-\(ssd.version)"),

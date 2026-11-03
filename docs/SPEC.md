@@ -10792,6 +10792,8 @@ côté (`.partiel`) puis remplace l'ancien.
 | `claude_code` | `claude_code/claude-<v>` | lien `~/.local/bin/claude` → `~/.local/share/claude/versions/<v>` | le binaire dans `versions/<v>`, puis le lien ; jamais `~/.claude` |
 | `developpeur` | `developpeur/Developpeur.zip` | la plus ancienne de `mcp-developpeur --version` (connecteur installé) et de l'`Info.lua` du module installé ; dans l'archive, son `Info.lua` (`unzip -p`) | `install.sh` de l'archive décompressée dans `Temporaire/Mises a jour` (`DEVELOPPEUR_DEPUIS_SSD=1`) ; il dit lui-même si Claude Desktop est ouvert |
 
+**Archive au même numéro.** Une archive de Développeur au numéro déjà sur le SSD n'est déposée que si son empreinte diffère (archive refaite avant la publication) ; l'autre Mac la voit « à jour » par le numéro (constaté le 3 novembre 2026 : la 1.7 reconstruite après la recette).
+
 **Les modèles retenus** (`Installation.depotsHF`) : `briaai/Fibo-2.0-dev` et
 `briaai/Fibo-2.0-edit-turbo` (Développeur et Fibo 2 Studio), `briaai/FIBO-vlm` (la fiche, aux
 deux), `numz/SeedVR2_comfyUI` (`mflux-upscale-seedvr2`, Développeur). Pas Whisper ni rien d'autre du
