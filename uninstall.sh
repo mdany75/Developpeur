@@ -14,8 +14,8 @@
 #                  mes demandes de la fenêtre Claude (mes-demandes.json), profils de
 #                  publication, registre de consommation, notes proposées (notation.json),
 #                  carnet de progrès et leçons des photos (carnet.json), suivi des photos
-#                  ouvertes (suivi.json, et suivi-illisible-*.json, un relevé illisible mis de
-#                  côté), avant/après des étapes de Claude (Etapes/), et les journaux
+#                  ouvertes (suivi.json, son journal suivi.journal et suivi-illisible-*.json,
+#                  un relevé illisible mis de côté), avant/après des étapes de Claude (Etapes/), et les journaux
 #                  (~/Library/Logs/Developpeur) ; « Fibo non importées » (les photos de Fibo 2
 #                  que Lightroom n'a pas pu importer) reste toujours s'il n'est pas vide
 #
@@ -89,7 +89,7 @@ if [[ -d "${PRESETS_DIR}" ]]; then
 fi
 
 if [[ "${TOUT}" == 1 ]]; then
-    # Tout le dossier : carnet.json, suivi.json (et ses copies mises de côté), Etapes/ et
+    # Tout le dossier : carnet.json, suivi.json (son journal et ses copies mises de côté), Etapes/ et
     # mes-demandes.json compris ; sauf les photos de Fibo 2 jamais importées, des photos à vous.
     NON_IMPORTEES="${DEST_DIR}/Fibo non importées"
     if [[ -d "${NON_IMPORTEES}" && -n "$(ls -A "${NON_IMPORTEES}" 2>/dev/null)" ]]; then

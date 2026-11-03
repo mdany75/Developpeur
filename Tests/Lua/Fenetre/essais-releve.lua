@@ -459,7 +459,8 @@ S.catalogue.getChildCollectionSets = function() return { S.ensembleDeveloppeur, 
 -- Aides ------------------------------------------------------------------------------------------
 
 local function supprimerSuivi()
-    S.executer('rm -f ' .. S.q(Chemins.racine()) .. '/suivi*.json ' .. S.q(RECUS) .. ' ' .. S.q(GENERATION) .. '*')
+    S.executer('rm -f ' .. S.q(Chemins.racine()) .. '/suivi*.json ' .. S.q(Chemins.racine()) .. '/suivi.journal* ' .. S.q(RECUS) .. ' '
+        .. S.q(GENERATION) .. '*')
     S.executer('rm -rf ' .. S.q(Chemins.temporaire() .. '/Suivi'))
 end
 
@@ -523,9 +524,31 @@ local function vider()
     egal(nil, Releve.derniereErreur, 'erreur de la tâche du Suivi')
 end
 
--- Le fichier tel que --graphiques le lirait.
+-- Le relevé tel que --graphiques le lit (demandé par Dany le 2 novembre 2026) : suivi.json (vide s'il
+-- manque), puis chaque ligne du journal, dans l'ordre (la dernière gagne ; une ligne illisible
+-- ignorée), relu ici sans Releve.lua.
 local function fichier()
-    return Json.decode(assert(Fichiers.lire(Releve.fichier()), 'suivi.json'))
+    local texte, journal = Fichiers.lire(Releve.fichier()), Fichiers.lire(Releve.fichierJournal())
+    assert(texte or journal, 'suivi.json')
+    local r = texte and Json.decode(texte) or { format = 1, catalogues = {} }
+    for ligne in (journal or ''):gmatch('[^\n]+') do
+        local ok, l = pcall(Json.decode, ligne)
+        if ok and type(l) == 'table' and type(l.catalogue) == 'string' and type(l.id) == 'string' then
+            r.catalogues[l.catalogue] = r.catalogues[l.catalogue] or { photos = {} }
+            if l.retiree == true then
+                r.catalogues[l.catalogue].photos[l.id] = nil
+            elseif type(l.entree) == 'table' then
+                r.catalogues[l.catalogue].photos[l.id] = l.entree
+            end
+        end
+    end
+    return r
+end
+
+-- Un relevé posé par un essai : suivi.json seul, sans journal.
+local function ecrireReleve(r)
+    Fichiers.ecrire(Releve.fichier(), Json.encode(r))
+    Fichiers.supprimer(Releve.fichierJournal())
 end
 
 local function entree(id)
@@ -706,7 +729,7 @@ essai("La photo active nouvellement vue passe en tête de la file, même dans un
     local photos = f.catalogues[CATALOGUE].photos
     -- Les trois vues à la même heure : seule la tête les départage de l'ordre de la sélection.
     photos['1201'].vu, photos['1202'].vu, photos['1203'].vu = 500, 500, 500
-    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    ecrireReleve(f)
     Releve.oublier()
     Releve.tete, Releve.rangs = '1203', { ['1201'] = 1, ['1202'] = 2, ['1203'] = 1 }
     prefs.cheminConnecteur = CONNECTEUR
@@ -819,7 +842,7 @@ essai("Pendant que Claude travaille, et pendant que la liaison sert (Claude Desk
         local sommeils, vus = 0, {}
         LrTasks.sleep = function(s)
             sommeils = sommeils + 1
-            local f = Fichiers.existe(Releve.fichier()) and fichier().catalogues[CATALOGUE].photos or {}
+            local f = (Fichiers.existe(Releve.fichier()) or Fichiers.existe(Releve.fichierJournal())) and fichier().catalogues[CATALOGUE].photos or {}
             vus[sommeils] = { duree = s, ranges = (f['601'] and 1 or 0) + (f['602'] and 1 or 0) + (f['603'] and 1 or 0), analyses = #recus() }
             if sommeils == 1 then
                 voir(603)
@@ -1105,7 +1128,7 @@ essai("Bornes : les originaux vus le moins récemment sortent au-delà de max_or
     local f = fichier()
     local photos = f.catalogues[CATALOGUE].photos
     photos['801'].vu, photos['802'].vu, photos['803'].vu = 300, 100, 200
-    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    ecrireReleve(f)
     Releve.oublier()
     Releve.MAX_ORIGINAUX = 3
     voir(804)
@@ -1125,7 +1148,7 @@ essai("Bornes : les originaux vus le moins récemment sortent au-delà de max_or
     local vuAvant = entree(810).vu
     photos = fichier()
     photos.catalogues[CATALOGUE].photos['810'].vu = vuAvant - 50
-    Fichiers.ecrire(Releve.fichier(), Json.encode(photos))
+    ecrireReleve(photos)
     Releve.oublier()
     voir(812)
     vider()
@@ -1152,7 +1175,7 @@ end)
 essai("Le relevé du contrat se relit tel quel (les _note oubliées) et se réécrit sans rien perdre, listes en tableaux et prise de vue vide en objet", function()
     depart()
     -- Le relevé d'exemple tel quel, ses commentaires compris.
-    Fichiers.ecrire(Releve.fichier(), Json.encode(Json.decode(assert(Fichiers.lire(CONTRAT_CHEMIN))).exemples.registre.fichier))
+    ecrireReleve(Json.decode(assert(Fichiers.lire(CONTRAT_CHEMIN))).exemples.registre.fichier)
     Releve.oublier()
     local entrees = Releve.entrees()
     local attendues = REGISTRE.catalogues[CATALOGUE].photos
@@ -1178,11 +1201,14 @@ essai("Le relevé du contrat se relit tel quel (les _note oubliées) et se réé
         end
         memes(sansMarques(attendue), e, 'entrée ' .. e.original)
     end
-    -- Réécrit (une vue d'une autre photo) : les 17 restent identiques, en JSON.
+    -- Réécrit (une vue d'une autre photo, au journal, puis le relevé compacté : suivi.json en entier,
+    -- le journal effacé) : les 17 restent identiques, en JSON.
     photo(9001)
     prefs.cheminConnecteur = S.home .. '/absent'
     voir(9001)
     vider()
+    egal(true, (Releve.compacter()), 'compacté')
+    egal(false, Fichiers.existe(Releve.fichierJournal()), 'le journal effacé')
     local relu = fichier().catalogues[CATALOGUE].photos
     for cle, attendue in pairs(attendues) do
         memes(sansNotes(attendue), relu[cle], 'réécrit : ' .. cle)
@@ -1206,7 +1232,7 @@ essai("La file : une analyse manquée se réessaie après son délai, abandonné
     vider()
     local f = fichier()
     f.catalogues[CATALOGUE].photos['901'].analyse = { le = os.time() - Releve.DELAI_REESSAI - 1, erreur = 'vignette_petite', essais = 2 }
-    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    ecrireReleve(f)
     Releve.oublier()
     prefs.cheminConnecteur = CONNECTEUR
     PHOTOS[901].v.sansVignette = true
@@ -1459,6 +1485,7 @@ essai("uninstall.sh : --tout retire suivi.json et ses copies mises de côté (to
     local entete = script:match('^(.-)\nset %-euo pipefail')
     contient(entete, '(suivi.json', 'en-tête')
     contient(entete, 'suivi-illisible-*.json', 'en-tête : les copies mises de côté')
+    contient(entete, 'suivi.journal', 'en-tête : le journal du relevé (demandé par Dany le 2 novembre 2026)')
     local travail = script:match('TRAVAIL=%((.-)\n%)')
     vrai(not travail:find('suivi', 1, true), "suivi.json n'est pas un fichier de travail")
     contient(script, 'retirer "${DEST_DIR}"', '--tout retire tout le dossier')
@@ -1518,15 +1545,17 @@ essai("Toute la bibliothèque, pas réduits : une grande sélection, la relectur
     r = rendreLaMainPendant(function() egal(1001, (Releve.nombre())) end)
     vrai(r.n >= 20, 'la relecture rend la main : ' .. r.n)
     egal(0, r.traversees)
-    -- L'écriture : par morceaux, entrée par entrée ; le fichier relu dit la même chose.
-    local avant = Fichiers.lire(Releve.fichier())
+    -- L'écriture : par morceaux, entrée par entrée ; le fichier relu dit la même chose. (La première
+    -- après une relecture qui a trouvé un journal : le relevé entier, compacté.)
+    local avant = fichier()
     Releve.aEcrire = true
-    local version = Releve.version
+    local version, compactions = Releve.version, Releve.compactions
     r = rendreLaMainPendant(function() egal(true, Releve.ecrire()) end)
     vrai(r.n >= 1000 / Releve.PAS_ECRITURE, "l'écriture rend la main : " .. r.n)
     egal(0, r.traversees)
     egal(version + 1, Releve.version)
-    memes(Json.decode(avant), fichier(), 'le même relevé')
+    egal(compactions + 1, Releve.compactions, 'le relevé entier, après une relecture avec journal')
+    memes(avant, fichier(), 'le même relevé')
     -- Sans pouvoir rendre la main (hors d'une tâche) : jamais de yield, le fichier s'écrit quand même.
     Releve.aEcrire = true
     r = rendreLaMainPendant(function() egal(true, Releve.ecrire()) end, { canYield = false })
@@ -1570,7 +1599,7 @@ essai("Écriture par morceaux : `aEcrire` remis à faux dès le début (ce qui s
     local version = Releve.version
     Releve.aEcrire = true
     local vu = {}
-    rendreLaMainPendant(function() egal(true, Releve.ecrire()) end, { pendant = function(n)
+    rendreLaMainPendant(function() egal(true, (Releve.compacter())) end, { pendant = function(n)
         if n == 1 then
             vu.remis = Releve.aEcrire
             -- Une vue rangée par la tâche du Suivi pendant que la fenêtre Suivi écrit.
@@ -1592,7 +1621,7 @@ essai("Écriture par morceaux : `aEcrire` remis à faux dès le début (ce qui s
     local texte = Fichiers.lire(Releve.fichier())
     version = Releve.version
     Releve.aEcrire = true
-    rendreLaMainPendant(function() egal(false, Releve.ecrire()) end, { pendant = function(n)
+    rendreLaMainPendant(function() egal(false, (Releve.compacter())) end, { pendant = function(n)
         if n == 2 then
             Releve.eteindre()
         end
@@ -1619,7 +1648,7 @@ essai("La file se garde d'une vue à l'autre : les originaux d'une vue passent d
     for _, e in pairs(f.catalogues[CATALOGUE].photos) do
         e.vu = e.vu - 60
     end
-    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    ecrireReleve(f)
     Releve.oublier()
     egal(30, Releve.refaireFile())
     local avant = {}
@@ -1710,7 +1739,7 @@ essai("Un grand relevé s'écrit moins souvent : l'écart entre deux écritures 
         egal(20, Releve.delaiEcriture(), "le temps des autres tâches ne compte pas")
         -- L'écriture elle-même dure 4 s (l'horloge avance pendant qu'elle écrit) : 40 s.
         local function dureePropre(secondes)
-            Fichiers.ecrireParMorceaux = function(chemin, produire)
+            Fichiers.ecrireParMorceaux = function(chemin, produire, ...)
                 return ecrireParMorceaux(chemin, function(ecrire)
                     local premier = true
                     return produire(function(texte)
@@ -1720,10 +1749,10 @@ essai("Un grand relevé s'écrit moins souvent : l'écart entre deux écritures 
                         end
                         ecrire(texte)
                     end)
-                end)
+                end, ...)
             end
             Releve.aEcrire = true
-            rendreLaMainPendant(function() egal(true, Releve.ecrire()) end, { pendant = function() decalage = decalage + 30 end })
+            rendreLaMainPendant(function() egal(true, (Releve.compacter())) end, { pendant = function() decalage = decalage + 30 end })
             Fichiers.ecrireParMorceaux = ecrireParMorceaux
         end
         dureePropre(4)
@@ -1737,7 +1766,7 @@ essai("Un grand relevé s'écrit moins souvent : l'écart entre deux écritures 
     -- La taille du fichier : SECONDES_PAR_MO par Mo, écrit ou relu (ici, une seconde pour un
     -- millième du fichier : 45 s).
     Releve.aEcrire = true
-    egal(true, Releve.ecrire())
+    egal(true, (Releve.compacter()))
     egal(20, Releve.delaiEcriture(), 'un petit fichier')
     local taille = #Fichiers.lire(Releve.fichier())
     Releve.SECONDES_PAR_MO = 45.5 * 1000000 / taille
@@ -1865,7 +1894,7 @@ essai("Tâches entremêlées : une entrée revue pendant le tri de l'élagage (u
     for cle, e in pairs(f.catalogues[CATALOGUE].photos) do
         e.vu = e.vu - (cle == '30001' and 600 or cle == '30002' and 300 or 60)
     end
-    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    ecrireReleve(f)
     Releve.oublier()
     egal(300, (Releve.nombre()))
     Releve.MAX_ORIGINAUX = 299
@@ -1952,6 +1981,7 @@ essai("Releve.ecrire (avant un dessin demandé) pendant qu'une autre tâche écr
     end
     voir(unpack(ids))
     vider()
+    egal(true, (Releve.compacter()))
     local ancien = Fichiers.lire(Releve.fichier())
     for i = 21, 50 do
         ids[i] = 35000 + i
@@ -1961,6 +1991,7 @@ essai("Releve.ecrire (avant un dessin demandé) pendant qu'une autre tâche écr
     vider()
     -- Le fichier d'avant remis : les 30 de plus sont rangées en mémoire, pas encore écrites.
     Fichiers.ecrire(Releve.fichier(), ancien)
+    Fichiers.supprimer(Releve.fichierJournal())
     egal(20, compter(fichier().catalogues[CATALOGUE].photos), 'pas encore écrites')
     Releve.PAS_ECRITURE = 1
     local dessin
@@ -1968,7 +1999,7 @@ essai("Releve.ecrire (avant un dessin demandé) pendant qu'une autre tâche écr
         -- La tâche du Suivi écrit ; la fenêtre Suivi demande un dessin pendant ce temps.
         Planificateur.lancer('suivi', function()
             Releve.aEcrire = true
-            Releve.ecrire()
+            Releve.compacter()
         end)
         Planificateur.tourner(function(pas)
             if pas == 3 then
@@ -2090,7 +2121,7 @@ essai("Des règles plus récentes (une réponse de --analyser dont regles monte,
     local f = fichier()
     f.catalogues[CATALOGUE].photos['36030'].analyse = { le = os.time(), regles = 0, cherches = Json.tableau({ 'flou' }), defauts = Json.tableau({}),
         genre = 'paysage', regles_genre = 1 }
-    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    ecrireReleve(f)
     Releve.oublier()
     egal(29, Releve.refaireFile(), 'la file gardée : les 29 sans analyse (règles encore inconnues)')
     Releve.LOT_ANALYSE = 2
@@ -2123,7 +2154,7 @@ essai("Le genre (correctif 1.3.8) : rangé avec l'analyse ; une analyse d'avant 
     local photos = f.catalogues[CATALOGUE].photos
     photos['38001'].analyse = { le = 1000, regles = REGLES, cherches = Json.tableau({ 'sous_exposition', 'flou' }), defauts = Json.tableau({ 'flou' }) }
     photos['38002'].analyse = { le = 1000, regles = REGLES, cherches = Json.tableau({ 'flou' }), defauts = Json.tableau({}) }
-    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    ecrireReleve(f)
     Releve.oublier()
     -- Les règles ne sont pas encore connues (aucune réponse de la séance) : les analyses sans genre
     -- entrent quand même dans la file (toute la bibliothèque déjà analysée n'attendrait aucune vue).
@@ -2376,7 +2407,7 @@ essai("Releve.reclasser sans rien de changé dans le catalogue : aucune entrée 
     end
     voir(unpack(ids))
     vider()
-    local avant = Fichiers.lire(Releve.fichier())
+    local avant = fichier()
     local version = Releve.version
     egal(0, Releve.reclasser(), 'rien de changé')
     egal(version, Releve.version, 'rien écrit')
@@ -2392,7 +2423,7 @@ essai("Releve.reclasser sans rien de changé dans le catalogue : aucune entrée 
         Releve.aEcrire = true
         egal(true, Releve.ecrire())
         egal(0, encodees, 'aucune entrée réencodée')
-        memes(Json.decode(avant), fichier(), 'le même relevé')
+        memes(avant, fichier(), 'le même relevé')
         PHOTOS[37005].brut.rating = 3
         egal(1, Releve.reclasser(), 'une note changée')
         egal(1, encodees, 'cette entrée seule réencodée')
@@ -2430,6 +2461,290 @@ essai("La fenêtre Suivi pose une sélection (Releve.poserSelection) : pendant q
     egal(0, Releve.selectionPosee)
 end)
 
+-- Le journal (demandé par Dany le 2 novembre 2026) -------------------------------------------------
+-- Pendant une analyse, suivi.json (65 Mo chez Dany) se réécrivait en entier au plus toutes les 60 s :
+-- une écriture ordinaire n'ajoute plus que les entrées changées à suivi.journal, rejoué à la
+-- relecture ; le relevé ne se compacte qu'au chargement, au-delà d'une taille ou à la fin de la file.
+
+-- Les écritures du relevé entier (Fichiers.ecrireParMorceaux sur suivi.json) pendant fn(), comptées
+-- ici, sans le module (xpcall : le pcall global est compté par rendreLaMainPendant).
+local function ecrituresCompletes(fn)
+    local ecrireParMorceaux, n = Fichiers.ecrireParMorceaux, 0
+    Fichiers.ecrireParMorceaux = function(chemin, ...)
+        if chemin == Releve.fichier() then
+            n = n + 1
+        end
+        return ecrireParMorceaux(chemin, ...)
+    end
+    local ok, erreur = xpcall(fn, debug.traceback)
+    Fichiers.ecrireParMorceaux = ecrireParMorceaux
+    assert(ok, erreur)
+    return n
+end
+
+-- Les lignes du journal, décodées (nil : une ligne illisible).
+local function lignesDuJournal()
+    local lignes = {}
+    for l in (Fichiers.lire(Releve.fichierJournal()) or ''):gmatch('[^\n]+') do
+        local ok, d = pcall(Json.decode, l)
+        lignes[#lignes + 1] = ok and d or false
+    end
+    return lignes
+end
+
+essai("Le journal : pendant l'analyse, une vue et un lot analysé n'ajoutent que leurs entrées changées à suivi.journal, une ligne chacune ; suivi.json n'est pas réécrit ; relu (suivi.json puis le journal), le même relevé, puis compacté à la première écriture", function()
+    depart()
+    local ids = {}
+    for i = 1, 30 do
+        ids[i] = 39000 + i
+        photo(ids[i])
+    end
+    voir(unpack(ids))
+    vider()
+    egal(true, (Releve.compacter()), 'un relevé déjà là, compacté')
+    egal(false, Fichiers.existe(Releve.fichierJournal()), 'aucun journal après la compaction')
+    local avant = Fichiers.lire(Releve.fichier())
+    egal(30, compter(Json.decode(avant).catalogues[CATALOGUE].photos))
+    -- Deux photos nouvelles et une déjà analysée, vues ; les deux nouvelles analysées ensuite.
+    photo(39031)
+    photo(39032)
+    local version, ajouts = Releve.version, Releve.ajoutsJournal
+    local completes = ecrituresCompletes(function()
+        voir(39031, 39032, 39005)
+        vider()
+    end)
+    egal(0, completes, 'suivi.json pas réécrit pendant la vue ni l\'analyse')
+    egal(avant, Fichiers.lire(Releve.fichier()), 'suivi.json tel quel')
+    egal(ajouts + 2, Releve.ajoutsJournal, 'deux ajouts : la vue, puis le lot analysé')
+    egal(version + 2, Releve.version, 'chaque ajout fait redessiner la fenêtre Suivi')
+    local lignes = lignesDuJournal()
+    egal(5, #lignes, 'trois entrées vues, puis deux analysées : une ligne chacune')
+    local vues, analysees = {}, {}
+    for i, l in ipairs(lignes) do
+        vrai(l, 'ligne ' .. i .. ' lisible')
+        egal(CATALOGUE, l.catalogue, 'ligne ' .. i .. ' : le catalogue')
+        egal('string', type(l.id), "ligne " .. i .. " : l'id en texte")
+        egal(tonumber(l.id), l.entree.original, 'ligne ' .. i .. " : l'entrée de cet original")
+        if i <= 3 then
+            vues[l.id] = true
+        else
+            analysees[l.id] = l.entree.analyse ~= nil
+        end
+    end
+    vrai(vues['39031'] and vues['39032'] and vues['39005'], 'les trois vues')
+    vrai(analysees['39031'] and analysees['39032'], 'les deux analyses')
+    -- Relu comme --graphiques le lit, puis par le module : le même relevé.
+    local attendu = fichier()
+    egal(32, compter(attendu.catalogues[CATALOGUE].photos))
+    vrai(attendu.catalogues[CATALOGUE].photos['39031'].analyse.cherches, '39031 analysée, dans le relevé rejoué')
+    Releve.oublier()
+    egal(32, (Releve.nombre()), 'relu par le module, le journal rejoué')
+    for _, id in ipairs({ 39005, 39031, 39032 }) do
+        local e, a = Releve.entree(id), attendu.catalogues[CATALOGUE].photos[tostring(id)]
+        egal(a.vu, e.vu, id .. ' : vu, du journal')
+        vrai(e.analyse and e.analyse.cherches, id .. ' : analysée')
+    end
+    -- La première écriture après une relecture qui a trouvé un journal : le relevé entier (le
+    -- chargement), le journal effacé, rien de perdu.
+    Releve.aEcrire = true
+    egal(1, ecrituresCompletes(function() egal(true, Releve.ecrire()) end), 'compacté au chargement')
+    egal(false, Fichiers.existe(Releve.fichierJournal()), 'le journal effacé')
+    memes(attendu, fichier(), 'le même relevé, compacté')
+    -- Ensuite, de nouveau au journal.
+    photo(39033)
+    egal(0, ecrituresCompletes(function()
+        voir(39033)
+        vider()
+    end), 'ensuite, au journal')
+    vrai(#lignesDuJournal() >= 1)
+end)
+
+essai("Une coupure de courant : une ligne du journal coupée ou illisible est ignorée, jamais tout le relevé ; un journal sans suivi.json se rejoue ; un ajout manqué revient à la suivante, sur sa propre ligne", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    for i = 1, 6 do
+        photo(39100 + i)
+    end
+    voir(39101, 39102, 39103)
+    vider()
+    egal(false, Fichiers.existe(Releve.fichier()), 'aucun suivi.json : le journal seul')
+    egal(3, #lignesDuJournal())
+    -- Une ligne illisible, une entrée retirée (MAX_ORIGINAUX), puis Lightroom coupé au milieu d'une
+    -- ligne (une photo de plus, à moitié écrite).
+    local texte = Fichiers.lire(Releve.fichierJournal())
+    local coupee = '{"catalogue":' .. Json.encode(CATALOGUE) .. ',"id":"39104","entree":{"original":39104,"uuid":"39104-U","fich'
+    Fichiers.ecrire(Releve.fichierJournal(), texte .. 'pas du JSON\n{"catalogue":' .. Json.encode(CATALOGUE)
+        .. ',"id":"39102","retiree":true}\n' .. coupee)
+    Releve.oublier()
+    journal = {}
+    egal(2, (Releve.nombre()), 'les lignes entières rejouées, les autres ignorées')
+    vrai(Releve.entree(39101) and Releve.entree(39103), 'les deux restées')
+    egal(nil, Releve.entree(39102), 'la retirée')
+    egal(nil, Releve.entree(39104), 'la ligne coupée ignorée')
+    vrai(journalContient('4 ligne(s), 2 illisible(s) ignorée(s)'), 'dit au journal')
+    local graphiques = fichier().catalogues[CATALOGUE].photos
+    egal(2, compter(graphiques), '--graphiques lit de même')
+    -- La première écriture compacte (le chargement) : plus de ligne coupée.
+    voir(39105)
+    vider()
+    egal(false, Fichiers.existe(Releve.fichierJournal()), 'compacté au chargement')
+    egal(3, compter(Json.decode(Fichiers.lire(Releve.fichier())).catalogues[CATALOGUE].photos))
+    -- Un ajout coupé par une erreur (le disque plein au milieu d'une ligne) : ce qui n'est pas écrit
+    -- revient à la suivante, qui commence sur sa propre ligne.
+    local ajouter = Fichiers.ajouterParMorceaux
+    Fichiers.ajouterParMorceaux = function(chemin, produire)
+        return ajouter(chemin, function(ecrire)
+            return produire(function(t)
+                ecrire(t:sub(1, 20))
+                error('disque plein')
+            end)
+        end)
+    end
+    local ok, erreur = pcall(function()
+        voir(39106)
+        vider()
+    end)
+    Fichiers.ajouterParMorceaux = ajouter
+    assert(ok, erreur)
+    egal(true, Releve.aEcrire, 'à écrire encore')
+    vrai(journalContient('disque plein'), "l'erreur dite au journal")
+    egal(nil, fichier().catalogues[CATALOGUE].photos['39106'], 'pas encore écrite')
+    egal(true, Releve.ecrire(), 'la suivante')
+    vrai(fichier().catalogues[CATALOGUE].photos['39106'], 'rejouée par --graphiques : sur sa propre ligne')
+    Releve.oublier()
+    vrai(Releve.entree(39106), 'relue par le module')
+    egal(4, (Releve.nombre()))
+end)
+
+essai("Le relevé se compacte (suivi.json en entier, le journal effacé) au-delà de SEUIL_JOURNAL, et à la fin de la file au-delà de SEUIL_JOURNAL_FIN : jamais pendant l'analyse ; un journal qui ne s'efface pas : la compaction abandonnée, suivi.json d'avant et le journal tels quels", function()
+    depart()
+    egal(5000000, Releve.SEUIL_JOURNAL, '5 Mo')
+    egal(1000000, Releve.SEUIL_JOURNAL_FIN, '1 Mo à la fin de la file')
+    local seuil, seuilFin = Releve.SEUIL_JOURNAL, Releve.SEUIL_JOURNAL_FIN
+    local ok, erreur = pcall(function()
+        prefs.cheminConnecteur = S.home .. '/absent'
+        -- Au-delà de SEUIL_JOURNAL : une photo vue à la fois, au journal, jusqu'au seuil.
+        Releve.SEUIL_JOURNAL, Releve.SEUIL_JOURNAL_FIN = 3000, 1e12
+        local compactee
+        for i = 1, 40 do
+            photo(39200 + i)
+            local avant = Releve.tailleJournal()
+            local n = ecrituresCompletes(function()
+                voir(39200 + i)
+                vider()
+            end)
+            if n > 0 then
+                egal(1, n)
+                vrai(avant >= 3000, 'compacté au-delà du seuil seulement : ' .. avant)
+                egal(0, Releve.tailleJournal())
+                egal(false, Fichiers.existe(Releve.fichierJournal()), 'le journal effacé')
+                compactee = i
+                break
+            end
+            vrai(Releve.tailleJournal() > avant, 'au journal : ' .. i)
+        end
+        vrai(compactee and compactee > 2, 'compacté une fois le seuil passé : ' .. tostring(compactee))
+        egal(compactee, compter(Json.decode(Fichiers.lire(Releve.fichier())).catalogues[CATALOGUE].photos), 'toutes dans suivi.json')
+        -- Une analyse de trois lots : au journal pendant, le relevé entier une fois, à la fin de la
+        -- file (SEUIL_JOURNAL_FIN atteint).
+        Releve.SEUIL_JOURNAL, Releve.SEUIL_JOURNAL_FIN = 1e12, 1
+        prefs.cheminConnecteur = CONNECTEUR
+        local ids = {}
+        for i = 1, 25 do
+            ids[i] = 39300 + i
+            photo(ids[i])
+        end
+        local ajouts, compactions = Releve.ajoutsJournal, Releve.compactions
+        local fin
+        local LrTasks = S.modules.LrTasks
+        local executer = LrTasks.execute
+        local pendantAnalyse = 0
+        LrTasks.execute = function(commande)
+            if commande:find('--analyser', 1, true) then
+                pendantAnalyse = pendantAnalyse + (Releve.compactions - compactions)
+            end
+            return executer(commande)
+        end
+        local okA, erreurA = pcall(function()
+            fin = ecrituresCompletes(function()
+                voir(unpack(ids))
+                vider()
+            end)
+        end)
+        LrTasks.execute = executer
+        assert(okA, erreurA)
+        egal(0, pendantAnalyse, 'jamais pendant l\'analyse')
+        vrai(Releve.ajoutsJournal - ajouts >= 4, 'la vue et les trois lots, au journal : ' .. (Releve.ajoutsJournal - ajouts))
+        egal(1, fin, 'une seule fois, à la fin de la file')
+        egal(false, Fichiers.existe(Releve.fichierJournal()))
+        for _, id in ipairs(ids) do
+            vrai(entree(id).analyse, id .. ' analysée, dans suivi.json')
+        end
+        -- Sous le seuil de la fin : rien de compacté à la fin de la file.
+        Releve.SEUIL_JOURNAL_FIN = 1e12
+        prefs.cheminConnecteur = S.home .. '/absent'
+        photo(39400)
+        egal(0, ecrituresCompletes(function()
+            voir(39400)
+            vider()
+        end), 'sous SEUIL_JOURNAL_FIN : au journal')
+        -- Un journal qui ne s'efface pas : la compaction abandonnée (sinon un journal ancien serait
+        -- rejoué sur un relevé plus récent).
+        local avantS, avantJ = Fichiers.lire(Releve.fichier()), Fichiers.lire(Releve.fichierJournal())
+        local supprimer = Fichiers.supprimer
+        Fichiers.supprimer = function(chemin)
+            if chemin == Releve.fichierJournal() then
+                return false
+            end
+            return supprimer(chemin)
+        end
+        local fait, raison = Releve.compacter()
+        Fichiers.supprimer = supprimer
+        egal(false, fait, 'compaction abandonnée')
+        contient(raison, 'journal du Suivi non effacé')
+        egal(avantS, Fichiers.lire(Releve.fichier()), "suivi.json d'avant tel quel")
+        egal(avantJ, Fichiers.lire(Releve.fichierJournal()), 'le journal tel quel')
+        egal(false, Fichiers.existe(Releve.fichier() .. '.provisoire'), 'aucun provisoire')
+        egal(true, (Releve.compacter()), 'la suivante')
+        vrai(Json.decode(Fichiers.lire(Releve.fichier())).catalogues[CATALOGUE].photos['39400'], '39400 dans suivi.json')
+    end)
+    Releve.SEUIL_JOURNAL, Releve.SEUIL_JOURNAL_FIN = seuil, seuilFin
+    assert(ok, erreur)
+end)
+
+essai("Éteint pendant un ajout au journal (un rechargement du module) : il s'arrête au morceau suivant, rien après ; ce qui n'est pas écrit revient à la suivante, rallumé", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    local ids = {}
+    for i = 1, 10 do
+        ids[i] = 39500 + i
+        photo(ids[i], { note = 1 })
+    end
+    voir(unpack(ids))
+    vider()
+    egal(true, (Releve.compacter()))
+    for _, id in ipairs(ids) do
+        PHOTOS[id].brut.rating = 4
+    end
+    Releve.PAS_ECRITURE = 2
+    local version = Releve.version
+    rendreLaMainPendant(function() egal(10, Releve.reclasser()) end, { pendant = function()
+        if Fichiers.existe(Releve.fichierJournal()) and Releve.allume then
+            Releve.eteindre()
+        end
+    end })
+    egal(2, #lignesDuJournal(), 'le premier morceau seul')
+    egal(version, Releve.version, 'pas une écriture faite')
+    voir(39501)
+    egal(2, #lignesDuJournal(), 'rien après')
+    Releve.allumer()
+    egal(true, Releve.ecrire(), 'rallumé')
+    Releve.oublier()
+    for _, id in ipairs(ids) do
+        egal(4, Releve.entree(id).note, id .. ' : la note relue')
+    end
+end)
+
 -- Un relevé de N originaux (de la forme de ceux du contrat), écrit dans suivi.json : la moitié
 -- analysés, une copie virtuelle vue sur cent.
 local function grandReleve(n)
@@ -2453,7 +2768,7 @@ local function grandReleve(n)
         end
         photos[tostring(id)] = e
     end
-    Fichiers.ecrire(Releve.fichier(), Json.encode({ format = 1, catalogues = { [CATALOGUE] = { photos = photos } } }))
+    ecrireReleve({ format = 1, catalogues = { [CATALOGUE] = { photos = photos } } })
     return analyse
 end
 
@@ -2461,7 +2776,7 @@ end
 -- (250 000, la borne : plus long).
 local ORIGINAUX = tonumber(os.getenv('DEVELOPPEUR_SUIVI_ORIGINAUX') or '') or 85000
 
-essai(string.format("Taille réelle, %d originaux : la relecture, l'écriture (la première, puis pendant l'analyse), la file refaite et une vue de mille photos ne gardent jamais la main plus de 0,3 s ; l'écriture pendant l'analyse ne refait que les entrées changées", ORIGINAUX), function()
+essai(string.format("Taille réelle, %d originaux : la relecture, le relevé compacté, une vue de mille photos (au journal : suivi.json pas réécrit), la relecture avec le journal rejoué et la file refaite ne gardent jamais la main plus de 0,3 s ; l'écriture pendant l'analyse n'écrit que les entrées changées, au journal", ORIGINAUX), function()
     depart()
     prefs.cheminConnecteur = S.home .. '/absent'
     local t0 = os.clock()
@@ -2469,45 +2784,59 @@ essai(string.format("Taille réelle, %d originaux : la relecture, l'écriture (l
     -- Le relevé fabriqué ici n'est pas celui que Lightroom aurait en mémoire : rendu au ramasse-miettes.
     collectgarbage('collect')
     Releve.oublier()
-    local morceaux = {}
-    local r = rendreLaMainPendant(function() egal(ORIGINAUX, (Releve.nombre())) end)
-    morceaux.relecture = r
-    Releve.aEcrire = true
-    r = rendreLaMainPendant(function() egal(true, Releve.ecrire()) end)
-    morceaux.premiere = r
-    local premiere = os.clock()
+    local morceaux, temps = {}, {}
+    local function mesurer(nom, fn)
+        local t = os.clock()
+        morceaux[nom] = rendreLaMainPendant(fn)
+        temps[nom] = os.clock() - t
+    end
+    mesurer('relecture', function() egal(ORIGINAUX, (Releve.nombre())) end)
+    -- Le relevé entier (une compaction : au chargement, ou au-delà du seuil).
+    mesurer('compaction', function() egal(true, (Releve.compacter())) end)
+    local avant = Fichiers.lire(Releve.fichier())
+    local taille = #avant
     -- Mille photos du relevé revues (une sélection), rangées : mille entrées changées, écrites
-    -- ensuite (une écriture pendant l'analyse).
+    -- ensuite au journal, sans réécrire suivi.json.
     local ids = {}
     for k = 1, 1000 do
         local id = 1000000 + k * 3
         ids[k] = id
         photo(id, { uuid = string.format('%08X-0000-4000-8000-%012d', k, k) })
     end
-    local version = Releve.version
-    r = rendreLaMainPendant(function()
-        voir(unpack(ids))
-        vider()
+    local version, completes = Releve.version, nil
+    mesurer('vue', function()
+        completes = ecrituresCompletes(function()
+            voir(unpack(ids))
+            vider()
+        end)
     end)
-    morceaux.vue = r
-    egal(version + 1, Releve.version, 'la vue écrite')
-    -- Rien de changé depuis : une écriture de plus ne refait aucune entrée.
-    local t1 = os.clock()
+    egal(0, completes, 'suivi.json pas réécrit')
+    vrai(avant == Fichiers.lire(Releve.fichier()), 'suivi.json tel quel')
+    avant = nil
+    egal(version + 1, Releve.version, 'la vue écrite, au journal')
+    local journal = Releve.tailleJournal()
+    vrai(journal > 0 and journal < taille / 20, string.format('le journal : %d octets pour %d', journal, taille))
+    -- Rien de changé depuis : une écriture de plus n'écrit rien.
     Releve.aEcrire = true
-    r = rendreLaMainPendant(function() egal(true, Releve.ecrire()) end)
-    morceaux.suivante = r
-    local suivante = os.clock() - t1
-    r = rendreLaMainPendant(function() vrai(Releve.refaireFile() >= ORIGINAUX / 2) end)
-    morceaux.file = r
-    for _, nom in ipairs({ 'relecture', 'premiere', 'vue', 'suivante', 'file' }) do
+    mesurer('suivante', function() egal(true, Releve.ecrire()) end)
+    egal(journal, Releve.tailleJournal(), 'rien ajouté')
+    -- Relu : suivi.json, puis le journal rejoué.
+    collectgarbage('collect')
+    Releve.oublier()
+    mesurer('rejeu', function() egal(ORIGINAUX, (Releve.nombre())) end)
+    egal('DSCF1000003.RAF', Releve.entree(1000003).fichier, 'la vue rejouée')
+    mesurer('file', function() vrai(Releve.refaireFile() >= ORIGINAUX / 2) end)
+    for _, nom in ipairs({ 'relecture', 'compaction', 'vue', 'suivante', 'rejeu', 'file' }) do
         local m = morceaux[nom]
-        print(string.format('       %-10s plus long morceau %.3f s (%d yields)', nom, m.plusLong, m.n))
+        print(string.format('       %-10s %6.2f s, plus long morceau %.3f s (%d yields)', nom, temps[nom], m.plusLong, m.n))
         vrai(m.plusLong < 0.3, nom .. ' : un morceau de ' .. string.format('%.3f', m.plusLong) .. ' s sans rendre la main')
         egal(0, m.traversees, nom .. ' : à travers un pcall simple')
     end
-    vrai(suivante < (premiere - t0) / 4, string.format("l'écriture suivante ne refait que les entrées changées : %.3f s", suivante))
+    print(string.format('       suivi.json %.1f Mo, journal de la vue %.0f Ko (%.2f %%)', taille / 1e6, journal / 1e3, 100 * journal / taille))
+    vrai(temps.vue < temps.compaction, string.format("la vue n'écrit que ses entrées : %.2f s, contre %.2f s pour tout le relevé", temps.vue,
+        temps.compaction))
     local relu = fichier().catalogues[CATALOGUE].photos
-    egal('DSCF1000003.RAF', relu['1000003'].fichier, 'la vue écrite, relue')
+    egal('DSCF1000003.RAF', relu['1000003'].fichier, 'la vue écrite, relue comme --graphiques')
     egal(1, #relu['1000003'].vues)
     print(string.format('       en tout %.1f s', os.clock() - t0))
 end)

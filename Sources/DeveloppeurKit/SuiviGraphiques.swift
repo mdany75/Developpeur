@@ -329,13 +329,52 @@ extension Suivi {
         return (tables[catalogue] as? [String: Any])?["photos"] as? [String: Any] ?? [:]
     }
 
-    /// Les originaux du relevé pour le catalogue : vide sans fichier (rien n'est refusé), refus
-    /// `suivi_illisible` pour un fichier qui ne se lit pas ou d'un autre format.
-    static func lireReleve(_ chemin: String, catalogue: String) throws -> [PhotoSuivie] {
-        guard FileManager.default.fileExists(atPath: chemin) else { return [] }
-        guard let table = photosDuCatalogue(chemin, catalogue: catalogue) else {
-            throw Refus(raison: "suivi_illisible", texte: "suivi.json illisible (JSON invalide, ou format autre que 1) : rien n'est dessiné.")
+    /// Le journal du relevé, à côté de lui : `suivi.journal` pour `suivi.json` (Releve.fichierJournal).
+    static func cheminJournal(_ chemin: String) -> String {
+        URL(fileURLWithPath: chemin).deletingPathExtension().appendingPathExtension("journal").path
+    }
+
+    /// Rejoue le journal du relevé (demandé par Dany le 2 novembre 2026 : Releve.lua n'écrit plus tout
+    /// suivi.json pendant l'analyse, seulement les entrées changées, une ligne JSON chacune à la fin
+    /// de `suivi.journal`) sur la table du catalogue : chaque ligne, dans l'ordre, remplace
+    /// (`entree`) ou retire (`retiree`) l'entrée de son `id` (la dernière gagne) ; une ligne d'un
+    /// autre catalogue ne change rien, une ligne qui ne se lit pas (la dernière, coupée par une
+    /// coupure de courant) est ignorée. Comme Releve.lua le rejoue (essais-releve.lua).
+    static func rejouerJournal(_ chemin: String, catalogue: String, dans table: inout [String: Any]) {
+        guard let donnees = FileManager.default.contents(atPath: chemin) else { return }
+        for ligne in donnees.split(separator: UInt8(ascii: "\n")) {
+            guard let objet = (try? JSONSerialization.jsonObject(with: Data(ligne))) as? [String: Any],
+                  objet["catalogue"] as? String == catalogue else { continue }
+            let id: String
+            if let texte = objet["id"] as? String {
+                id = texte
+            } else if let nombre = identifiant(nombre(objet["id"])) {
+                id = String(nombre)
+            } else {
+                continue
+            }
+            if booleen(objet["retiree"]) == true {
+                table.removeValue(forKey: id)
+            } else if let entree = objet["entree"] as? [String: Any] {
+                table[id] = entree
+            }
         }
+    }
+
+    /// Les originaux du relevé pour le catalogue : suivi.json, puis son journal rejoué
+    /// (rejouerJournal) ; vide sans l'un ni l'autre (rien n'est refusé), refus `suivi_illisible` pour
+    /// un suivi.json qui ne se lit pas ou d'un autre format. suivi.json se lit avant le journal :
+    /// Releve.lua efface le journal juste avant de remplacer suivi.json (une compaction), un journal
+    /// lu après n'est jamais plus ancien que le suivi.json lu.
+    static func lireReleve(_ chemin: String, catalogue: String) throws -> [PhotoSuivie] {
+        var table: [String: Any] = [:]
+        if FileManager.default.fileExists(atPath: chemin) {
+            guard let lue = photosDuCatalogue(chemin, catalogue: catalogue) else {
+                throw Refus(raison: "suivi_illisible", texte: "suivi.json illisible (JSON invalide, ou format autre que 1) : rien n'est dessiné.")
+            }
+            table = lue
+        }
+        rejouerJournal(cheminJournal(chemin), catalogue: catalogue, dans: &table)
         let comptes = Set(codes)
         let genres = Set(Genre.codes)
         return table.compactMap { cle, valeur -> PhotoSuivie? in

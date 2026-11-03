@@ -179,6 +179,43 @@ final class SuiviTests: XCTestCase {
         XCTAssertEqual(creneaux(sortie, "objectifs"), [Int](repeating: 0, count: 8))
     }
 
+    /// Le journal du relevé (demandé par Dany le 2 novembre 2026 : Releve.lua n'écrit plus tout
+    /// suivi.json pendant l'analyse, seulement les entrées changées à la fin de suivi.journal) :
+    /// --graphiques le rejoue après suivi.json, dans l'ordre (la dernière ligne gagne) ; une entrée
+    /// retirée sort, une ligne d'un autre catalogue ne change rien, une ligne illisible ou coupée (une
+    /// coupure de courant) est ignorée ; un journal sans suivi.json se rejoue sur un relevé vide.
+    func testJournalRejoue() throws {
+        let suivi = try ecrire([photo(1), photo(2, note: 1), photo(3)])
+        let journal = dossier.appendingPathComponent("suivi.journal").path
+        XCTAssertEqual(Suivi.cheminJournal(suivi), journal)
+        func ligne(_ objet: [String: JSONValue]) -> String { JSONCoding.line(.object(objet)) }
+        let cat = JSONValue.string(Self.catalogue)
+        let lignes = [
+            ligne(["catalogue": cat, "id": "2", "entree": photo(2, note: 3).1]),
+            ligne(["catalogue": cat, "id": "4", "entree": photo(4, note: 2).1]),
+            "pas du JSON",
+            ligne(["catalogue": cat, "id": "3", "retiree": true]),
+            ligne(["catalogue": "/autre/Catalogue.lrcat", "id": "1", "retiree": true]),
+            ligne(["catalogue": cat, "id": "2", "entree": photo(2, note: 5).1]),
+        ]
+        let coupee = String(ligne(["catalogue": cat, "id": "5", "entree": photo(5).1]).prefix(60))
+        try (lignes.joined(separator: "\n") + "\n" + coupee).write(toFile: journal, atomically: true, encoding: .utf8)
+        let lus = try Suivi.lireReleve(suivi, catalogue: Self.catalogue)
+        XCTAssertEqual(lus.map(\.id).sorted(), [1, 2, 4], "3 retirée, 5 coupée")
+        XCTAssertEqual(lus.first { $0.id == 2 }?.note, 5, "la dernière ligne gagne")
+        XCTAssertEqual(lus.first { $0.id == 4 }?.note, 2)
+        // Les graphiques comptent le relevé rejoué.
+        let reponse = Suivi.graphiques(entree(suivi: suivi), dossier: dossier.appendingPathComponent("png-journal").path)
+        XCTAssertEqual(reponse.code, 0, JSONCoding.line(reponse.ligne))
+        XCTAssertEqual(reponse.ligne["photos"]?.int, 3)
+        // Sans suivi.json : le journal seul.
+        try FileManager.default.removeItem(atPath: suivi)
+        XCTAssertEqual(try Suivi.lireReleve(suivi, catalogue: Self.catalogue).map(\.id).sorted(), [2, 4])
+        // Un suivi.json illisible reste refusé, journal ou non.
+        try "pas du JSON".write(toFile: suivi, atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try Suivi.lireReleve(suivi, catalogue: Self.catalogue))
+    }
+
     /// Une date d'après le jour de fin (horloge de l'appareil fausse, ou une fin choisie) : hors de la
     /// période, comme une date d'avant le jour de début ; le jour de début et celui de fin sont
     /// compris, à toute heure ; une photo sans date du tout n'est d'aucune période.

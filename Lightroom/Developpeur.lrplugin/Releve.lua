@@ -66,6 +66,23 @@
 -- Le connecteur le lit (--graphiques), jamais ne l'écrit ; Fichiers.ecrireParMorceaux l'écrit
 -- (jamais à moitié écrit). Tout ce qui sort vers une vue est une copie neuve, sans métatable.
 --
+-- Le journal (demandé par Dany le 2 novembre 2026 : pendant une analyse, suivi.json, 65 Mo chez lui,
+-- se réécrivait en entier au plus toutes les 60 s, des Go écrits par heure sur le SSD) : une écriture
+-- ordinaire n'ajoute plus que les entrées changées depuis la précédente, une ligne JSON chacune, à la
+-- fin de suivi.journal (à côté de suivi.json, Releve.fichierJournal) :
+--   { "catalogue": chemin, "id": "<id de l'original>", "entree": entrée }   (ajoutée ou changée)
+--   { "catalogue": chemin, "id": "<id de l'original>", "retiree": true }    (sortie : MAX_ORIGINAUX)
+-- Le format de suivi.json ne change pas. À la relecture, suivi.json d'abord, puis chaque ligne du
+-- journal dans l'ordre (la dernière gagne) ; une ligne qui ne se lit pas (la dernière, coupée par
+-- une coupure de courant) est ignorée, jamais tout le relevé ; un journal sans suivi.json se rejoue
+-- sur un relevé vide. --graphiques rejoue le journal de même (SuiviGraphiques.lireReleve). Le relevé
+-- se compacte (suivi.json réécrit en entier, comme avant, puis le journal effacé juste avant que le
+-- nouveau suivi.json remplace l'ancien : Fichiers.ecrireParMorceaux, avantDeRemplacer) seulement :
+-- à la première écriture après une relecture qui a trouvé un journal (le chargement), quand le
+-- journal dépasse SEUIL_JOURNAL octets, à la fin de la file (Releve.vider) quand il dépasse
+-- SEUIL_JOURNAL_FIN, et pour mettre de côté un relevé illisible. Une coupure entre l'effacement et
+-- le remplacement perd au plus le journal (jamais une entrée remise à un état plus ancien).
+--
 -- Toute la bibliothèque d'un coup (correctif 1.3.8, demandé par Dany le 26 octobre 2026 : son
 -- catalogue a 88 071 photos, il veut les ouvrir toutes, Toutes les photographies, tout
 -- sélectionner) : MAX_SELECTION et MAX_ORIGINAUX à 250 000. À cette taille (85 000 originaux font
@@ -126,6 +143,10 @@ local Releve = {
     arrete = false,
     -- +1 à chaque écriture du relevé : la fenêtre Suivi compare pour savoir s'il faut redessiner.
     version = 0,
+    -- Les écritures faites, en tout : le fichier entier (compactions) ou des lignes au journal
+    -- (ajoutsJournal ; demandé par Dany le 2 novembre 2026 : diagnostic et essais).
+    compactions = 0,
+    ajoutsJournal = 0,
     -- La tâche qui vide la file tourne (une seule à la fois).
     enCours = false,
     -- Les vues à ranger, dans leur ordre : { photos (de Lightroom, la photo active d'abord), le }.
@@ -207,6 +228,12 @@ Releve.DELAI_ECRITURE = 20
 Releve.FACTEUR_ECRITURE = 10
 Releve.SECONDES_PAR_MO = 1
 Releve.DELAI_ECRITURE_MAX = 60
+-- Le journal (demandé par Dany le 2 novembre 2026) : depuis, une écriture ordinaire n'ajoute que les
+-- entrées changées à suivi.journal (SECONDES_PAR_MO compte alors les octets ajoutés) ; suivi.json se
+-- réécrit en entier (compaction) quand le journal dépasse SEUIL_JOURNAL octets (environ 7 000 entrées
+-- changées), ou SEUIL_JOURNAL_FIN à la fin de la file (Releve.vider).
+Releve.SEUIL_JOURNAL = 5000000
+Releve.SEUIL_JOURNAL_FIN = 1000000
 -- Analyses manquées gardées pour passer devant la file à leur heure (Releve.reessais) ; au-delà,
 -- elles attendent que la file se refasse.
 Releve.MAX_REESSAIS = 1000
@@ -252,10 +279,21 @@ local enEcriture = false
 -- Le texte JSON de chaque entrée, gardé jusqu'à ce qu'elle change (changee) : une écriture ne refait
 -- que les entrées changées depuis la précédente. Clés faibles : une entrée retirée l'emporte.
 local jsonDe = setmetatable({}, { __mode = 'k' })
--- La durée propre (secondes) de la dernière écriture et la taille du fichier (octets, écrit ou relu),
--- pour espacer les suivantes (Releve.delaiEcriture).
+-- La durée propre (secondes) de la dernière écriture et sa taille (octets écrits : le fichier entier,
+-- ou les lignes ajoutées au journal ; après une relecture, le fichier relu), pour espacer les
+-- suivantes (Releve.delaiEcriture).
 local dureeEcriture = 0
 local tailleFichier = 0
+-- Le journal (demandé par Dany le 2 novembre 2026) : les entrées changées depuis la dernière
+-- écriture (changee ; clés fortes, une entrée remplacée entre-temps n'est plus au registre et ne
+-- s'écrit pas), les entrées sorties ({ chemin, cle }, elaguer), la taille du journal (octets),
+-- `compacterAuProchain` (la relecture a trouvé un journal : la prochaine écriture compacte) et
+-- `journalCoupe` (sa dernière ligne peut être coupée : la prochaine ligne commence par un saut).
+local sales = {}
+local retirees = {}
+local tailleJournal = 0
+local compacterAuProchain = false
+local journalCoupe = false
 -- Défini avec la file d'analyse (plus bas) : les originaux d'une vue mis en tête de la file gardée.
 local mettreDevant
 
@@ -270,11 +308,17 @@ Releve.rendreLaMain = rendreLaMain
 local function changee(e)
     if e then
         jsonDe[e] = nil
+        sales[e] = true
     end
 end
 
 function Releve.fichier()
     return LrPathUtils.child(Chemins.racine(), 'suivi.json')
+end
+
+-- Le journal des changements, à côté de suivi.json (demandé par Dany le 2 novembre 2026).
+function Releve.fichierJournal()
+    return LrPathUtils.child(Chemins.racine(), 'suivi.journal')
 end
 
 -- Copie neuve, sans métatable ni Json.null.
@@ -452,7 +496,52 @@ local function normaliser(r)
     return propre
 end
 
--- Relit le fichier (une tâche à la fois), par morceaux.
+-- Rejoue le journal sur le registre relu (demandé par Dany le 2 novembre 2026) : chaque ligne, dans
+-- l'ordre, remplace ou retire une entrée (la dernière gagne). Une ligne qui ne se lit pas (la
+-- dernière, coupée par une coupure de courant), ou d'une entrée invalide, est ignorée : jamais tout
+-- le relevé. La main rendue toutes les PAS lignes (jamais sous le pcall simple d'une ligne, qui ne
+-- rend pas la main). Rend le nombre de lignes rejouées et ignorées.
+local function rejouer(propre, contenu)
+    local rejouees, ignorees, k = 0, 0, 0
+    for ligne in contenu:gmatch('[^\n]+') do
+        if ligne:find('%S') then
+            local ok, l = pcall(Json.decode, ligne)
+            local chemin = ok and type(l) == 'table' and texte(l.catalogue) or nil
+            local cle = chemin and (type(l.id) == 'string' or type(l.id) == 'number') and cleDe(l.id) or nil
+            local fait = false
+            if cle and l.retiree == true then
+                local c = propre.catalogues[chemin]
+                if c then
+                    c.photos[cle] = nil
+                end
+                fait = true
+            elseif cle then
+                local entree = normaliserEntree(l.entree, cle)
+                if entree and cleDe(entree.original) == cle then
+                    local c = propre.catalogues[chemin]
+                    if not c then
+                        c = { photos = {} }
+                        propre.catalogues[chemin] = c
+                    end
+                    c.photos[cle] = entree
+                    fait = true
+                end
+            end
+            if fait then
+                rejouees = rejouees + 1
+            else
+                ignorees = ignorees + 1
+            end
+        end
+        k = k + 1
+        if k % Releve.PAS == 0 then
+            rendreLaMain()
+        end
+    end
+    return rejouees, ignorees
+end
+
+-- Relit le fichier (une tâche à la fois), par morceaux, puis rejoue le journal.
 local function relire()
     local fichier = Releve.fichier()
     local contenu = Fichiers.lire(fichier)
@@ -462,18 +551,37 @@ local function relire()
     -- LrTasks.pcall : Json.decode rend la main (un pcall simple l'en empêcherait, Lua 5.1).
     local ok, r = LrTasks.pcall(function() return contenu and Json.decode(contenu, rendreLaMain, Releve.PAS_JSON) end)
     contenu = nil
+    local relu
     if ok and type(r) == 'table' and tonumber(r.format) == Releve.FORMAT then
         local okN, propre = LrTasks.pcall(normaliser, r)
         if okN then
-            return propre
+            relu = propre
+        else
+            Journal.noter("Suivi : relevé non relu :", tostring(propre))
         end
-        Journal.noter("Suivi : relevé non relu :", tostring(propre))
     end
-    local nouveau = vide()
-    -- Un fichier présent mais illisible, ou d'un autre format : mis de côté avant d'écrire (un
-    -- fichier vide ne garde rien).
-    nouveau.illisible = present
-    return nouveau
+    r = nil
+    if not relu then
+        relu = vide()
+        -- Un fichier présent mais illisible, ou d'un autre format : mis de côté avant d'écrire (un
+        -- fichier vide ne garde rien).
+        relu.illisible = present
+    end
+    -- Le journal, par-dessus (même sans suivi.json, ou après un suivi.json illisible : ce qu'il
+    -- garde n'est pas perdu). La prochaine écriture compacte (le chargement).
+    local journal = Fichiers.lire(Releve.fichierJournal())
+    tailleJournal = journal and #journal or 0
+    journalCoupe = tailleJournal > 0 and journal:sub(-1) ~= '\n'
+    compacterAuProchain = tailleJournal > 0
+    if tailleJournal > 0 then
+        local okJ, rejouees, ignorees = LrTasks.pcall(rejouer, relu, journal)
+        if not okJ then
+            Journal.noter("Suivi : journal non rejoué :", tostring(rejouees))
+        elseif ignorees > 0 then
+            Journal.noter(string.format("Suivi : journal rejoué, %d ligne(s), %d illisible(s) ignorée(s)", rejouees, ignorees))
+        end
+    end
+    return relu
 end
 
 local function charger()
@@ -509,6 +617,7 @@ function Releve.oublier()
     registre = nil
     enChargement, enEcriture, dureeEcriture, tailleFichier = false, false, 0, 0
     jsonDe = setmetatable({}, { __mode = 'k' })
+    sales, retirees, tailleJournal, compacterAuProchain, journalCoupe = {}, {}, 0, false, false
     Releve.aVoir = {}
     Releve.cleVue, Releve.groupeVu, Releve.groupeVuLe, Releve.aRevoir, Releve.tete = nil, nil, nil, false, nil
     Releve.file, Releve.rangs, Releve.sansRefaire, Releve.reclassement, Releve.revues = nil, nil, nil, false, nil
@@ -599,8 +708,9 @@ end
 -- Au-delà de MAX_ORIGINAUX, les entrées vues le moins récemment (vu, puis l'id) sortent. Compter ne
 -- coûte qu'un parcours ; trier n'a lieu qu'au-delà de la borne (trierParVu, la main rendue par
 -- `rendre`). L'heure de vue de chaque entrée est lue d'abord, en nombre : une entrée revue (son `vu`
--- changé) ou remplacée pendant le tri (une vue rangée par une autre tâche) reste.
-local function elaguer(c, rendre)
+-- changé) ou remplacée pendant le tri (une vue rangée par une autre tâche) reste. Chaque entrée
+-- sortie est notée pour le journal (retirees, sous `chemin`).
+local function elaguer(c, rendre, chemin)
     local n = 0
     for _ in pairs(c.photos) do
         n = n + 1
@@ -623,6 +733,8 @@ local function elaguer(c, rendre)
         local e = c.photos[cle]
         if e ~= nil and e == avant[cle] and math.floor(tonumber(e.vu) or 0) == vuLu[cle] then
             c.photos[cle] = nil
+            sales[e] = nil
+            retirees[#retirees + 1] = { chemin, cle }
             sorties = sorties + 1
         end
     end
@@ -648,6 +760,18 @@ local function jsonDeLEntree(e)
         jsonDe[e] = t
     end
     return t
+end
+
+-- Les catalogues bornés à MAX_ORIGINAUX (elaguer), avant chaque écriture, au fichier entier comme
+-- au journal (les entrées sorties y sont dites).
+local function elaguerTout(r, chemins, rendre)
+    for _, chemin in ipairs(chemins) do
+        local sorties = elaguer(r.catalogues[chemin], rendre, chemin)
+        if sorties > 0 then
+            Journal.noter(string.format("Suivi : %d original(aux) vu(s) le moins récemment retiré(s) du relevé de %s (%d au plus)",
+                sorties, chemin, Releve.MAX_ORIGINAUX))
+        end
+    end
 end
 
 -- Écrit le registre entier (tous les catalogues), par morceaux (sous le verrou d'enregistrer) : le
@@ -684,11 +808,27 @@ local function ecrireLeRegistre()
         chemins[#chemins + 1] = chemin
     end
     table.sort(chemins)
-    for _, chemin in ipairs(chemins) do
-        local sorties = elaguer(r.catalogues[chemin], rendre)
-        if sorties > 0 then
-            Journal.noter(string.format("Suivi : %d original(aux) vu(s) le moins récemment retiré(s) du relevé de %s (%d au plus)",
-                sorties, chemin, Releve.MAX_ORIGINAUX))
+    elaguerTout(r, chemins, rendre)
+    -- Le fichier entier dit tout ce qui a changé : le journal n'a plus à l'écrire (ce qui change
+    -- pendant l'écriture s'écrit à la suivante ; une écriture manquée le rend, reprendre).
+    local prises, prisesRetirees = sales, retirees
+    sales, retirees = {}, {}
+    local function reprendre()
+        for e in pairs(prises) do
+            sales[e] = true
+        end
+        for _, ret in ipairs(retirees) do
+            prisesRetirees[#prisesRetirees + 1] = ret
+        end
+        retirees = prisesRetirees
+    end
+    -- Le journal effacé juste avant que le nouveau suivi.json remplace l'ancien : une coupure entre
+    -- les deux perd au plus le journal, jamais une entrée remise à un état plus ancien.
+    local journal = Releve.fichierJournal()
+    local function effacerJournal()
+        Fichiers.supprimer(journal)
+        if Fichiers.existe(journal) then
+            error("journal du Suivi non effacé : " .. journal, 0)
         end
     end
     local octets = 0
@@ -732,30 +872,160 @@ local function ecrireLeRegistre()
         w.valeur(Releve.FORMAT)
         w.fermer()
         return not Releve.arrete
-    end)
+    end, effacerJournal)
     propre = propre + math.max(0, LrDate.currentTime() - depuis)
     dureeEcriture = propre
     Releve.ecritLe = os.time()
     if not ok then
         Releve.aEcrire = true
+        reprendre()
         Journal.noter("Suivi non enregistré :", tostring(ecrit))
         return false, tostring(ecrit)
     end
     if ecrit ~= true then
         -- Éteint pendant l'écriture : le fichier est à la nouvelle instance (un rechargement).
         Releve.aEcrire = true
+        reprendre()
         return false, "Suivi éteint"
     end
     tailleFichier = octets
+    tailleJournal, compacterAuProchain, journalCoupe = 0, false, false
+    Releve.compactions = Releve.compactions + 1
     Releve.version = Releve.version + 1
     return true
 end
 
--- Écrit le registre (ecrireLeRegistre), une écriture à la fois : une autre en cours, elle s'attend
--- (hors d'une tâche, rien n'est écrit : à la suivante). Rend vrai, ou faux et la raison. Jamais après
--- Releve.eteindre : le fichier est alors à la nouvelle instance du module (un rechargement) ; ce qui
--- n'est pas écrit se refait (une analyse revient en file, la vue suivante se range).
-local function enregistrer()
+-- Le catalogue de chemin qui tient cette entrée (sous l'id de son original), nil si elle n'est plus
+-- au registre (remplacée ou sortie entre-temps : sa remplaçante s'écrit à sa place).
+local function catalogueDe(r, e)
+    local cle = cleDe(e.original)
+    for chemin, c in pairs(r.catalogues) do
+        if c.photos[cle] == e then
+            return chemin, cle
+        end
+    end
+    return nil
+end
+
+-- Une ligne du journal (demandé par Dany le 2 novembre 2026), fin de ligne comprise.
+local function ligneDuJournal(chemin, cle, e)
+    if e then
+        return '{"catalogue":' .. Json.encode(chemin) .. ',"id":' .. Json.encode(cle) .. ',"entree":' .. jsonDeLEntree(e) .. '}\n'
+    end
+    return '{"catalogue":' .. Json.encode(chemin) .. ',"id":' .. Json.encode(cle) .. ',"retiree":true}\n'
+end
+
+-- Écrit ce qui a changé depuis la dernière écriture à la fin du journal (demandé par Dany le
+-- 2 novembre 2026 : plus tout suivi.json pendant l'analyse), sous le verrou d'enregistrer : les
+-- entrées sorties (elaguer) puis les entrées changées (changee), une ligne chacune, par morceaux de
+-- PAS_ECRITURE lignes, la main rendue entre deux. Comme ecrireLeRegistre : `aEcrire` remis à faux dès
+-- le début (ce qui change pendant s'écrit à la suivante), abandonnée si le Suivi s'éteint (ce qui
+-- est déjà ajouté reste : des lignes entières, écrites avant), sa durée propre et ses octets pour
+-- espacer les suivantes. Une erreur rend ce qui n'est pas sûr d'être écrit à la suivante, et la
+-- ligne suivante commencera par un saut (une ligne coupée ne gâte qu'elle-même).
+local function ecrireLeJournal()
+    local r = charger()
+    Releve.aEcrire = false
+    local propre, depuis = 0, LrDate.currentTime()
+    local function rendre()
+        propre = propre + math.max(0, LrDate.currentTime() - depuis)
+        rendreLaMain()
+        depuis = LrDate.currentTime()
+    end
+    local chemins = {}
+    for chemin in pairs(r.catalogues) do
+        chemins[#chemins + 1] = chemin
+    end
+    table.sort(chemins)
+    elaguerTout(r, chemins, rendre)
+    local prises, prisesRetirees = sales, retirees
+    sales, retirees = {}, {}
+    local liste = {}
+    for e in pairs(prises) do
+        liste[#liste + 1] = e
+    end
+    local octets = 0
+    local ok, ecrit = true, true
+    if #liste > 0 or #prisesRetirees > 0 then
+        ok, ecrit = LrTasks.pcall(Fichiers.ajouterParMorceaux, Releve.fichierJournal(), function(ecrireTexte)
+            local morceau = {}
+            if journalCoupe then
+                morceau[1] = '\n'
+            end
+            local function ajouter()
+                if #morceau > 0 then
+                    local texte = table.concat(morceau)
+                    morceau = {}
+                    ecrireTexte(texte)
+                    octets = octets + #texte
+                    journalCoupe = false
+                end
+            end
+            for _, ret in ipairs(prisesRetirees) do
+                morceau[#morceau + 1] = ligneDuJournal(ret[1], ret[2], nil)
+            end
+            for i, e in ipairs(liste) do
+                local chemin, cle = catalogueDe(r, e)
+                if chemin then
+                    morceau[#morceau + 1] = ligneDuJournal(chemin, cle, e)
+                end
+                if i % Releve.PAS_ECRITURE == 0 then
+                    ajouter()
+                    rendre()
+                    if Releve.arrete then
+                        return false
+                    end
+                end
+            end
+            ajouter()
+            return not Releve.arrete
+        end)
+    end
+    propre = propre + math.max(0, LrDate.currentTime() - depuis)
+    dureeEcriture = propre
+    Releve.ecritLe = os.time()
+    tailleJournal = tailleJournal + octets
+    if not ok or ecrit ~= true then
+        -- Une erreur, ou le Suivi éteint : ce qui n'est pas sûr d'être écrit revient à la suivante
+        -- (deux fois la même ligne ne change rien au rejeu).
+        Releve.aEcrire = true
+        for _, e in ipairs(liste) do
+            sales[e] = true
+        end
+        for _, ret in ipairs(retirees) do
+            prisesRetirees[#prisesRetirees + 1] = ret
+        end
+        retirees = prisesRetirees
+        if ok then
+            return false, "Suivi éteint"
+        end
+        journalCoupe = true
+        Journal.noter("Suivi non enregistré (journal) :", tostring(ecrit))
+        return false, tostring(ecrit)
+    end
+    tailleFichier = octets
+    Releve.ajoutsJournal = Releve.ajoutsJournal + 1
+    Releve.version = Releve.version + 1
+    return true
+end
+
+-- Écrit maintenant (sous le verrou d'enregistrer) : le fichier entier (compaction) si `compacter`, à
+-- la première écriture après une relecture qui a trouvé un journal, pour un relevé illisible à mettre
+-- de côté ou un journal de SEUIL_JOURNAL octets ; sinon le journal seul.
+local function ecrireMaintenant(compacter)
+    local r = charger()
+    if compacter or compacterAuProchain or r.illisible or tailleJournal >= Releve.SEUIL_JOURNAL then
+        return ecrireLeRegistre()
+    end
+    return ecrireLeJournal()
+end
+
+-- Écrit le registre (ecrireMaintenant : le journal, ou le fichier entier si `compacter` ou à son
+-- heure), une écriture à la fois : une autre en cours, elle s'attend (hors d'une tâche, rien n'est
+-- écrit : à la suivante). Rend vrai, ou faux et la raison. Jamais après Releve.eteindre : le fichier
+-- est alors à la nouvelle instance du module (un rechargement) ; ce qui n'est pas écrit se refait
+-- (une analyse revient en file, la vue suivante se range).
+local function enregistrer(compacter)
     if Releve.arrete then
         return false, "Suivi éteint"
     end
@@ -770,7 +1040,7 @@ local function enregistrer()
         end
     end
     enEcriture = true
-    local ok, fait, raison = LrTasks.pcall(ecrireLeRegistre)
+    local ok, fait, raison = LrTasks.pcall(ecrireMaintenant, compacter)
     enEcriture = false
     if not ok then
         Releve.aEcrire = true
@@ -781,7 +1051,8 @@ local function enregistrer()
 end
 
 -- L'écart entre deux écritures : DELAI_ECRITURE secondes au moins, FACTEUR_ECRITURE fois la durée
--- propre de la dernière et SECONDES_PAR_MO par Mo du fichier (un grand relevé s'écrit moins souvent),
+-- propre de la dernière et SECONDES_PAR_MO par Mo écrit la dernière fois (le fichier entier, ou les
+-- lignes ajoutées au journal depuis le 2 novembre 2026 ; après une relecture, le fichier relu),
 -- DELAI_ECRITURE_MAX au plus (ce qui n'est pas écrit se perd si Lightroom quitte).
 function Releve.delaiEcriture()
     local delai = math.max(Releve.DELAI_ECRITURE, math.floor(Releve.FACTEUR_ECRITURE * dureeEcriture),
@@ -804,9 +1075,10 @@ local function ecrireBientot()
 end
 
 -- Écrit tout de suite ce qui attend son tour : la fenêtre Suivi, avant un dessin demandé
--- (--graphiques lit le fichier). Une écriture en cours (une autre tâche, qui rend la main) s'attend
--- d'abord : le fichier n'est remplacé qu'à sa fin, et ce qui s'est rangé pendant s'écrit ensuite.
--- Rend vrai si le fichier est écrit (par cet appel ou par celle qu'il a attendue).
+-- (--graphiques lit le fichier et rejoue le journal : le journal suffit). Une écriture en cours (une
+-- autre tâche, qui rend la main) s'attend d'abord : le fichier n'est remplacé qu'à sa fin, et ce qui
+-- s'est rangé pendant s'écrit ensuite. Rend vrai si le fichier est écrit (par cet appel ou par celle
+-- qu'il a attendue).
 function Releve.ecrire()
     local attendue = false
     if enEcriture and LrTasks.canYield() then
@@ -820,6 +1092,22 @@ function Releve.ecrire()
         return attendue
     end
     return (enregistrer()) == true
+end
+
+-- Compacte tout de suite (demandé par Dany le 2 novembre 2026) : suivi.json réécrit en entier, le
+-- journal effacé, une écriture en cours attendue d'abord. Rend vrai, ou faux et la raison.
+function Releve.compacter()
+    if enEcriture and LrTasks.canYield() then
+        while enEcriture and not Releve.arrete do
+            LrTasks.sleep(0.05)
+        end
+    end
+    return enregistrer(true)
+end
+
+-- La taille du journal (octets) : diagnostic et essais.
+function Releve.tailleJournal()
+    return tailleJournal
 end
 
 -- Lectures (copies neuves) --------------------------------------------------------------------
@@ -2005,9 +2293,12 @@ end
 -- Releve.eteindre). Une tâche à la fois (Releve.relancer).
 function Releve.vider()
     local ok, erreur = LrTasks.pcall(viderFile)
-    -- Ce qui n'est pas encore écrit (DELAI_ECRITURE), même après une erreur.
-    if Releve.aEcrire then
-        enregistrer()
+    -- Ce qui n'est pas encore écrit (DELAI_ECRITURE), même après une erreur ; à la fin de la file, un
+    -- journal de SEUIL_JOURNAL_FIN octets se compacte (demandé par Dany le 2 novembre 2026 : à la fin
+    -- d'une analyse, pas pendant).
+    local compacter = tailleJournal >= Releve.SEUIL_JOURNAL_FIN
+    if Releve.aEcrire or compacter then
+        enregistrer(compacter)
     end
     if not ok then
         error(erreur, 0)
