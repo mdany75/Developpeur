@@ -1,5 +1,32 @@
 # Changements
 
+## 1.6.6 — 2026-11-02
+
+La 1.6.6 reprend quatre idées vues chez les autres MCP Lightroom : Claude gère les taches déjà
+posées, sait jusqu'où relever les ombres, repère une couleur vive qui vole l'œil, et n'écrase plus
+un paramètre prédéfini.
+
+### Ajouté
+- Taches déjà posées : Claude les voit, les vôtres comme les siennes, numérotées, avec leur place
+  sur la photo et leur opacité. Il peut en retirer une, changer son opacité, ou vider toutes les
+  taches ou tous les yeux rouges, en une étape que « Défaire » de Claude annule. Après un retrait,
+  il reçoit la liste renumérotée, pour ne pas viser une autre tache. Sous Upright ou la perspective,
+  les places restent justes. En mode « Proposer d'abord », il demande votre accord comme pour toute
+  retouche.
+- Avant de relever les ombres, Claude sait de combien d'IL elles peuvent l'être avant que leur
+  bruit se voie. Des ombres déjà bruitées, il ne les relève pas ; très bruitées, il propose d'abord
+  la réduction du bruit. C'est une estimation provisoire, à vérifier sur vos photos.
+- Points chauds : en plus des zones claires, Claude repère les zones nettement plus saturées que le
+  sujet (un parasol rouge derrière un portrait), qui attirent l'œil autant qu'une fenêtre. Le
+  vêtement de la personne photographiée n'en est pas, ni un ciel bleu vu entre des arbres. Seuils
+  provisoires.
+
+### Corrigé
+- Créer un paramètre prédéfini du même nom qu'un autre n'écrase plus l'ancien : le nouveau
+  s'appelle « Nom (2) », et Claude vous le dit. Il ne remplace l'ancien que si vous le demandez.
+- Copier une retouche avec les taches depuis une photo qui n'en a pas retire maintenant vraiment les
+  taches de la photo visée : Lightroom les gardait, alors que Claude annonçait « 0 tache ».
+
 ## 1.6.5 — 2026-11-02
 
 La 1.6.5 rend la proposition la plus complète possible, ajoute à la Demande rapide 12 lignes de
