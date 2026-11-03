@@ -179,6 +179,91 @@ final class SuiviTests: XCTestCase {
         XCTAssertEqual(creneaux(sortie, "objectifs"), [Int](repeating: 0, count: 8))
     }
 
+    /// Le journal du relevé (demandé par Dany le 2 novembre 2026 : Releve.lua n'écrit plus tout
+    /// suivi.json pendant l'analyse, seulement les entrées changées à la fin de suivi.journal) :
+    /// --graphiques le rejoue après suivi.json, dans l'ordre (la dernière ligne gagne) ; une entrée
+    /// retirée sort, une ligne d'un autre catalogue ne change rien, une ligne illisible ou coupée (une
+    /// coupure de courant) est ignorée ; un journal sans suivi.json se rejoue sur un relevé vide.
+    func testJournalRejoue() throws {
+        let suivi = try ecrire([photo(1), photo(2, note: 1), photo(3)])
+        let journal = dossier.appendingPathComponent("suivi.journal").path
+        XCTAssertEqual(Suivi.cheminJournal(suivi), journal)
+        func ligne(_ objet: [String: JSONValue]) -> String { JSONCoding.line(.object(objet)) }
+        let cat = JSONValue.string(Self.catalogue)
+        let lignes = [
+            ligne(["catalogue": cat, "id": "2", "entree": photo(2, note: 3).1]),
+            ligne(["catalogue": cat, "id": "4", "entree": photo(4, note: 2).1]),
+            "pas du JSON",
+            ligne(["catalogue": cat, "id": "3", "retiree": true]),
+            ligne(["catalogue": "/autre/Catalogue.lrcat", "id": "1", "retiree": true]),
+            ligne(["catalogue": cat, "id": "2", "entree": photo(2, note: 5).1]),
+        ]
+        let coupee = String(ligne(["catalogue": cat, "id": "5", "entree": photo(5).1]).prefix(60))
+        try (lignes.joined(separator: "\n") + "\n" + coupee).write(toFile: journal, atomically: true, encoding: .utf8)
+        let lus = try Suivi.lireReleve(suivi, catalogue: Self.catalogue)
+        XCTAssertEqual(lus.map(\.id).sorted(), [1, 2, 4], "3 retirée, 5 coupée")
+        XCTAssertEqual(lus.first { $0.id == 2 }?.note, 5, "la dernière ligne gagne")
+        XCTAssertEqual(lus.first { $0.id == 4 }?.note, 2)
+        // Les graphiques comptent le relevé rejoué.
+        let reponse = Suivi.graphiques(entree(suivi: suivi), dossier: dossier.appendingPathComponent("png-journal").path)
+        XCTAssertEqual(reponse.code, 0, JSONCoding.line(reponse.ligne))
+        XCTAssertEqual(reponse.ligne["photos"]?.int, 3)
+        // Sans suivi.json : le journal seul.
+        try FileManager.default.removeItem(atPath: suivi)
+        XCTAssertEqual(try Suivi.lireReleve(suivi, catalogue: Self.catalogue).map(\.id).sorted(), [2, 4])
+        // Un suivi.json illisible reste refusé, journal ou non.
+        try "pas du JSON".write(toFile: suivi, atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try Suivi.lireReleve(suivi, catalogue: Self.catalogue))
+    }
+
+    /// Une compaction entre deux lectures (constaté par la revue le 2 novembre 2026 : --graphiques est
+    /// un autre processus, la tâche du Suivi peut compacter pendant qu'il lit). Le module efface le
+    /// journal puis remplace suivi.json par le relevé entier ; une lecture prise entre les deux ne
+    /// doit jamais rendre l'ancien suivi.json sans son journal, ni avec le journal suivant : elle se
+    /// refait et rend le nouveau relevé.
+    func testCompactionEntreLesLectures() throws {
+        // Avant : suivi.json (1 à 0 étoile, 2) et le journal (1 à 4 étoiles).
+        let suivi = try ecrire([photo(1), photo(2)])
+        let journal = Suivi.cheminJournal(suivi)
+        func ligne(_ objet: [String: JSONValue]) -> String { JSONCoding.line(.object(objet)) + "\n" }
+        let cat = JSONValue.string(Self.catalogue)
+        try ligne(["catalogue": cat, "id": "1", "entree": photo(1, note: 4).1]).write(toFile: journal, atomically: true, encoding: .utf8)
+        // La compaction, faite comme Fichiers.ecrireParMorceaux : le provisoire écrit, le journal
+        // effacé, le provisoire renommé ; puis un ajout au journal nouveau (2 à 5 étoiles).
+        let compacte = try ecrire([photo(1, note: 4), photo(2)], nom: "compacte.json")
+        func compacter(nouveauJournal: Bool) throws {
+            try FileManager.default.moveItem(atPath: compacte, toPath: suivi + ".provisoire")
+            try FileManager.default.removeItem(atPath: journal)
+            _ = rename(suivi + ".provisoire", suivi)
+            if nouveauJournal {
+                try ligne(["catalogue": cat, "id": "2", "entree": photo(2, note: 5).1]).write(toFile: journal, atomically: true, encoding: .utf8)
+            }
+        }
+        var fois = 0
+        let lus = try Suivi.lireReleve(suivi, catalogue: Self.catalogue) {
+            fois += 1
+            if fois == 1 { try? compacter(nouveauJournal: true) }
+        }
+        XCTAssertEqual(fois, 2, "relu une fois, suivi.json remplacé entre les deux lectures")
+        XCTAssertEqual(lus.first { $0.id == 1 }?.note, 4, "rien de l'ancien journal perdu")
+        XCTAssertEqual(lus.first { $0.id == 2 }?.note, 5, "le journal nouveau rejoué")
+
+        // Entre l'effacement et le renommage : le journal manque, le provisoire attend ; la lecture
+        // attend le renommage.
+        _ = try ecrire([photo(1), photo(2)])
+        try ligne(["catalogue": cat, "id": "1", "entree": photo(1, note: 4).1]).write(toFile: journal, atomically: true, encoding: .utf8)
+        _ = try ecrire([photo(1, note: 4), photo(2)], nom: "compacte.json")
+        try FileManager.default.moveItem(atPath: compacte, toPath: suivi + ".provisoire")
+        try FileManager.default.removeItem(atPath: journal)
+        fois = 0
+        let attendus = try Suivi.lireReleve(suivi, catalogue: Self.catalogue) {
+            fois += 1
+            if fois == 2 { _ = rename(suivi + ".provisoire", suivi) }
+        }
+        XCTAssertGreaterThanOrEqual(fois, 2, "relu tant que le provisoire attend")
+        XCTAssertEqual(attendus.first { $0.id == 1 }?.note, 4, "jamais l'ancien suivi.json sans son journal")
+    }
+
     /// Une date d'après le jour de fin (horloge de l'appareil fausse, ou une fin choisie) : hors de la
     /// période, comme une date d'avant le jour de début ; le jour de début et celui de fin sont
     /// compris, à toute heure ; une photo sans date du tout n'est d'aucune période.

@@ -162,7 +162,9 @@ Les pièges :
 - Le Suivi (avant de toucher à `Releve.lua`, `suivi.json`, `FenetreSuivi.lua`, `Suivi.swift`,
   `Genre.swift`, `--analyser` ou `--graphiques` : `docs/regles/module-suivi.md`) : contrat figé dans
   `Tests/Contrats/suivi.json` (un changement voulu se fait des deux côtés). `suivi.json` n'est tenu
-  que par `Releve.lua` (`Suivi.lua` est la fenêtre de la liaison) ; rien n'est écrit au catalogue ;
+  que par `Releve.lua` (`Suivi.lua` est la fenêtre de la liaison), avec son journal
+  `suivi.journal` (entrées changées, rejouées par `Releve.lua` et `--graphiques` ; suivi.json
+  réécrit en entier seulement à la compaction) ; rien n'est écrit au catalogue ;
   ni vidéos ni photos d'Essais ; pas de rattrapage à l'installation ; un relevé illisible est mis de
   côté, jamais écrasé ; une analyse n'est jamais refaite après une édition, seulement pour des
   `regles` plus récentes ; aucun calcul de plus de quelques centièmes de seconde sans rendre la main

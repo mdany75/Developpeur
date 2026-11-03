@@ -100,6 +100,35 @@ final class ReleveSeuilsTests: XCTestCase {
         XCTAssertTrue(texte.contains("moins de 30 : le seuil resterait provisoire"), texte)
     }
 
+    /// Le journal du Suivi (constaté par la revue le 2 novembre 2026) : --echantillons rejoue
+    /// suivi.journal sur suivi.json, comme --graphiques ; un journal qui ajoute, change et retire une
+    /// entrée change les lots tirés.
+    func testLesEchantillonsRejouentLeJournal() throws {
+        let dossier = TestSupport.temporaryDirectory()
+        let fichier = dossier.appendingPathComponent("suivi.json")
+        try Data(JSONCoding.line(Self.suivi([Self.entree(1, "X-H2S", iso: 3200), Self.entree(2, "X-H2S", iso: 3200),
+                                              Self.entree(3, "X-H2S", iso: 3200)])).utf8).write(to: fichier)
+        let catalogue = JSONValue.string("/Volumes/Photos/Catalogue.lrcat")
+        let lignes: [JSONValue] = [
+            ["catalogue": catalogue, "id": "4", "entree": Self.entree(4, "X-H2S", iso: 3200).1],
+            ["catalogue": catalogue, "id": "2", "entree": Self.entree(2, "X-H2S", iso: 3200, retouchee: true).1],
+            ["catalogue": catalogue, "id": "3", "retiree": true],
+            ["catalogue": "/autre/Catalogue.lrcat", "id": "1", "retiree": true],
+        ]
+        let journal = lignes.map(JSONCoding.line).joined(separator: "\n") + "\n{\"catalogue\":\"coup"
+        try Data(journal.utf8).write(to: dossier.appendingPathComponent("suivi.journal"))
+        let suivi = try ReleveSeuils.lireSuivi(fichier.path)
+        XCTAssertEqual(ReleveSeuils.candidates(suivi).map(\.id), [1, 4], "4 ajoutée, 2 retouchée par Claude, 3 retirée")
+        let sortie = ReleveSeuils.commande(["--echantillons", fichier.path, dossier.appendingPathComponent("r").path],
+                                           lightroom: Self.lightroomInterdit)
+        XCTAssertEqual(sortie.code, 0, sortie.lignes.joined(separator: "\n"))
+        let lot = try JSONCoding.parse(Data(contentsOf: dossier.appendingPathComponent("r/lots/A1.json")))
+        XCTAssertEqual(Set(lot["photos"]?.array?.compactMap { $0["id"]?.int } ?? []), [1, 4])
+        // Sans suivi.json : le journal seul.
+        try FileManager.default.removeItem(at: fichier)
+        XCTAssertEqual(ReleveSeuils.candidates(try ReleveSeuils.lireSuivi(fichier.path)).map(\.id), [4])
+    }
+
     // MARK: Collecte
 
     /// Le faux module : chaque commande vignettes écrit ses JPEG dans son propre dossier temporaire,

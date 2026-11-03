@@ -18,7 +18,26 @@ ou à `--graphiques`.
   `Fichiers.ecrireParMorceaux`, un provisoire renommé d'un coup) ; illisible ou d'un
   autre format, mis de côté avant la première écriture (`suivi-illisible-<date>.json`, jamais
   écrasé) ; une copie neuve vers une vue ; rien n'est écrit au catalogue ; `uninstall.sh --tout` le
-  retire. Qui entre : la sélection que voient `Fenetre.suivreSelection` et
+  retire. **Le journal** (demandé par Dany le 2 novembre 2026 : pendant une analyse, 65 Mo réécrits
+  au plus toutes les 60 s, des Go par heure sur le SSD) : une écriture ordinaire n'ajoute que les
+  entrées changées depuis la précédente (`changee` les note dans `sales`, `elaguer` les sorties dans
+  `retirees`), une ligne JSON chacune, à la fin de `suivi.journal` (`Releve.fichierJournal`,
+  `Fichiers.ajouterParMorceaux`) : `{catalogue, id, entree}` ou `{catalogue, id, retiree: true}`.
+  Le format de `suivi.json` ne change pas. Relecture : `suivi.json`, puis le journal rejoué ligne
+  par ligne (la dernière gagne ; une ligne illisible ou coupée ignorée, jamais tout le relevé ; un
+  journal sans `suivi.json` se rejoue sur un relevé vide) ; `--graphiques` le rejoue de même
+  (`SuiviGraphiques.lireReleve`), et `--mesures --echantillons` aussi (`ReleveSeuils.lireSuivi`) ;
+  tous deux lisent `suivi.json` et le journal d'une même version (`Suivi.lireFichiersDuReleve` :
+  identité de `suivi.json`, journal, `suivi.json`, identité de nouveau ; relu si `suivi.json` a été
+  remplacé entre-temps, ou si le journal manque pendant que `suivi.json.provisoire` attend ; revue du
+  2 novembre 2026). Compaction (`suivi.json` en entier, comme
+  avant, le journal effacé juste avant que le nouveau remplace l'ancien : `avantDeRemplacer` de
+  `Fichiers.ecrireParMorceaux`, un journal qui ne s'efface pas abandonne la compaction) seulement à
+  la première écriture après une relecture qui a trouvé un journal (le chargement), au-delà de
+  `SEUIL_JOURNAL` (5 Mo), dès `SEUIL_LIGNES` (5 000) entrées à écrire (une grande vue : une seule
+  écriture complète au lieu du journal puis du relevé entier), à la fin de la file au-delà de `SEUIL_JOURNAL_FIN` (1 Mo), pour mettre de
+  côté un relevé illisible, ou par `Releve.compacter`. Un ajout manqué (erreur) rend ses entrées à
+  la suivante, qui commence par un saut de ligne (`journalCoupe`). Qui entre : la sélection que voient `Fenetre.suivreSelection` et
   `FenetreRapide.suivreSelection` (`Releve.voirSelection` : une même clé ne compte qu'une fois,
   `Releve.revoir` à l'ouverture ou au rappel d'une fenêtre la fait compter même inchangée, une autre
   photo active dans le même groupe ne revoit qu'elle, comme une sélection de plus de `SEUIL_REVOIR`
@@ -63,8 +82,9 @@ ou à `--graphiques`.
   `Releve.delaiEcriture` : au moins `DELAI_ECRITURE` (20 s : une écriture par photo parcourue aux
   flèches figeait Lightroom), `FACTEUR_ECRITURE` (10) fois la durée propre de la dernière (la somme
   de ses morceaux, sans le temps des autres tâches quand elle rend la main) et `SECONDES_PAR_MO` (1)
-  par Mo du fichier (écrit ou relu ; chaque écriture l'écrit en entier : 85 000 originaux, 57 Mo,
-  environ toutes les 57 s), au plus `DELAI_ECRITURE_MAX` (60 s : ce qui n'est pas écrit se perd si
+  par Mo écrit la dernière fois (le fichier entier relu ou compacté, ou les lignes ajoutées au
+  journal depuis le 2 novembre 2026 ; avant, chaque écriture l'écrivait en entier : 85 000
+  originaux, 57 Mo, environ toutes les 57 s), au plus `DELAI_ECRITURE_MAX` (60 s : ce qui n'est pas écrit se perd si
   Lightroom quitte, `Arret.lua` ne s'exécutant pas ; les analyses se refont, une vue d'une photo
   nouvelle non), pendant une pause comme hors d'elle (plus d'écriture forcée au début de chaque
   pause depuis le correctif 1.3.8 : une liaison qui sert par moments réécrivait tout le relevé toutes

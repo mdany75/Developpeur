@@ -16,7 +16,8 @@
 --       suivi.json                             relevé du Suivi (Releve.lua, 1.3.7) : les photos
 --                                              ouvertes, par original, et leur analyse ; une table
 --                                              par catalogue (suivi-illisible-<date>.json : un
---                                              relevé illisible mis de côté)
+--                                              relevé illisible mis de côté ; suivi.journal : les
+--                                              entrées changées depuis, rejouées à la relecture)
 --       mes-demandes.json                      les demandes du menu Mes demandes de la fenêtre
 --                                              (Stockage.lua)
 --       Etapes/                                avant/après de chaque étape de Claude (1.3)

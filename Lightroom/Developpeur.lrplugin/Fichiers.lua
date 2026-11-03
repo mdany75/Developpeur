@@ -50,8 +50,10 @@ end
 -- peut rendre la main à Lightroom entre deux (correctif 1.3.8 : le relevé du Suivi, plus de 100 Mo à
 -- 250 000 originaux, ne se fait plus en un seul texte). `produire` rend faux pour abandonner : le
 -- fichier provisoire s'efface, le fichier d'avant reste tel quel (comme après une erreur, qui
--- remonte). Rend vrai si le fichier est remplacé.
-function Fichiers.ecrireParMorceaux(chemin, produire)
+-- remonte). Rend vrai si le fichier est remplacé. `avantDeRemplacer` (facultatif) est appelé une
+-- fois tout écrit, juste avant de remplacer le fichier (le relevé du Suivi y efface son journal,
+-- demandé par Dany le 2 novembre 2026) : une erreur y abandonne l'écriture comme une autre.
+function Fichiers.ecrireParMorceaux(chemin, produire, avantDeRemplacer)
     Fichiers.creerDossier(LrPathUtils.parent(chemin))
     local provisoire = chemin .. '.provisoire'
     local f, erreur = io.open(provisoire, 'wb')
@@ -74,11 +76,44 @@ function Fichiers.ecrireParMorceaux(chemin, produire)
         end
         return false
     end
+    if avantDeRemplacer then
+        local okAvant, erreurAvant = LrTasks.pcall(avantDeRemplacer)
+        if not okAvant then
+            LrFileUtils.delete(provisoire)
+            error(erreurAvant, 0)
+        end
+    end
     if not (type(os.rename) == 'function' and os.rename(provisoire, chemin)) then
         LrFileUtils.delete(chemin)
         LrFileUtils.move(provisoire, chemin)
     end
     return true
+end
+
+-- Ajoute à la fin d'un fichier (créé s'il manque) par morceaux : `produire(ecrire)` appelle
+-- ecrire(texte) pour chaque morceau, et peut rendre la main entre deux ; il rend faux pour s'arrêter
+-- (ce qui est déjà ajouté reste). Une erreur remonte, le fichier fermé. Rend vrai si tout est ajouté.
+-- Pour le journal du relevé du Suivi (demandé par Dany le 2 novembre 2026 : ne plus réécrire tout
+-- suivi.json pendant l'analyse).
+function Fichiers.ajouterParMorceaux(chemin, produire)
+    Fichiers.creerDossier(LrPathUtils.parent(chemin))
+    local f, erreur = io.open(chemin, 'ab')
+    if not f then
+        error("Écriture impossible : " .. tostring(erreur), 0)
+    end
+    local function ecrire(texte)
+        local ok, raison = f:write(texte)
+        if not ok then
+            error("Écriture impossible : " .. tostring(raison), 0)
+        end
+        f:flush()
+    end
+    local ok, suite = LrTasks.pcall(produire, ecrire)
+    f:close()
+    if not ok then
+        error(suite, 0)
+    end
+    return suite ~= false
 end
 
 -- Ajoute une ligne à la fin d'un fichier.
