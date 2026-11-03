@@ -101,6 +101,12 @@
           <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span></div>
           <p>Constaté le 2 novembre : le rendu d'une dune claire posé sur un diplôme au fond noir a monté l'exposition de +1,8 IL, photo délavée. L'exposition changera de 0,5 IL au plus, et le reste de l'écart sera dit (il vient de la scène).</p>
         </article>
+        <article class="chantier">
+          <h3><code>suivi.json</code> : ne plus réécrire tout le fichier pendant l'analyse</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Pendant une analyse, le Suivi réécrit <code>suivi.json</code> en entier (65 Mo chez toi) au plus toutes les 60 s, soit des Go écrits par heure sur le SSD. Un petit journal des changements, rejoué à la lecture, éviterait ces réécritures sans changer le format du fichier. Essai à 250 000 entrées.</p>
+          <p class="deja">Releve.lua (l. 60, 194-207).</p>
+        </article>
       </div>
     </section>
 
@@ -143,12 +149,6 @@
           <div class="marques"><span class="pastille moyenne">Grande</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 5/5</span></div>
           <p>Une recherche d'espèce sur tout le catalogue ne regarde que 200 photos, reclassées à chaque appel : le « cardinal rouge » donnait 0 photo le 2 novembre. Le Suivi passerait aussi chaque vignette à BioCLIP 2 et rangerait les 3 espèces les plus probables dans l'index. Après les seuils des espèces (étape 2).</p>
           <p class="deja">Especes.candidatsMax = 200 (Especes.swift:63).</p>
-        </article>
-        <article class="chantier">
-          <h3><code>suivi.json</code> : ne plus réécrire tout le fichier pendant l'analyse</h3>
-          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Pendant une analyse, le Suivi réécrit <code>suivi.json</code> en entier (65 Mo chez toi) au plus toutes les 60 s, soit des Go écrits par heure sur le SSD. Un petit journal des changements, rejoué à la lecture, éviterait ces réécritures sans changer le format du fichier. Essai à 250 000 entrées.</p>
-          <p class="deja">Releve.lua (l. 60, 194-207).</p>
         </article>
         <article class="chantier">
           <h3>Les constats encore ouverts de l'Analyse</h3>
