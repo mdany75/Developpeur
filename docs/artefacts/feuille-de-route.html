@@ -52,6 +52,7 @@
   .marques { display: flex; flex-wrap: wrap; gap: 6px; }
   .pastille { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
   .petite { background: var(--vert-doux); color: var(--vert); }
+  .pastille.fait { background: var(--vert); color: #fff; }
   .moyenne { background: var(--orange-doux); color: var(--orange); }
   .faible { background: var(--gris-doux); color: var(--texte); }
   .moyen { background: var(--rouge-doux); color: var(--rouge); }
@@ -195,13 +196,13 @@
         </article>
         <article class="chantier">
           <h3>La recherche par le sens, avec tes phrases</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>L'index se remplit à mesure que le Suivi voit tes photos. Quand il en aura quelques centaines, essaie « retrouve les photos de neige » dans la fenêtre Claude : tes résultats diront où mettre le seuil de pertinence (0,5 provisoire).</p>
+          <div class="marques"><span class="pastille fait">✓ essayée le 2 novembre</span><span class="pastille interet">ton avis : seuils fixés ?</span></div>
+          <p>Fait le 2 novembre sur ton index (84 108 photos) : neige 12/12, montagnes 12/12, pingouins 6/6, chien 10/12 (un dessin de chien, un gros plan de pelage). Une phrase absurde (« un astronaute à cheval ») trouve encore des enfants à cheval, à 0,23 : sur un si grand catalogue, il y a toujours un voisin. Recommandation : garder le seuil de pertinence (0,5) et le plancher (0,17), et les déclarer fixés si les planches te semblent justes.</p>
         </article>
         <article class="chantier">
           <h3>Le rendu d'une autre photo, à l'œil</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Mesuré, mais pas encore jugé côte à côte par toi, ni sur une référence au rendu marqué (ton étalonnage le plus fort est à saturation 12). Et le témoin de la peau pour <code>match_look</code> reste à 5, provisoire.</p>
+          <div class="marques"><span class="pastille fait">✓ essayé le 2 novembre</span><span class="pastille moyen">correction dans la 1.6.5</span></div>
+          <p>Fait le 2 novembre, sur une référence au rendu marqué (dune, étalonnage sarcelle et orange) et deux copies d'Essais, défait ensuite. Les couleurs passent bien, de façon discrète (camping). Mais l'exposition se copie d'une scène à l'autre jusqu'à ±2 IL : le diplôme sur fond noir a pris +1,8 IL et sort délavé. Correction dans la 1.6.5 : 0,5 IL au plus, le reste dit. Le témoin de la peau reste à 5, provisoire.</p>
         </article>
       </div>
     </section>
@@ -228,55 +229,55 @@
 
     <section class="etape">
       <div class="etape-tete"><span class="num">6</span><h2>Recommandations après la 1.6.3 : prochaine version</h2><span class="quand">✓ livrées dans la 1.6.4</span></div>
-      <div class="encadre"><p>Quatre relecteurs ont cherché dans le code, chacun sous un angle : nouveautés, qualité de la retouche, fiabilité, manques pour un photographe amateur. Un cinquième a vérifié chaque idée (pas déjà faite, preuve juste) et gardé les dix plus solides. Les petites d'abord, toutes à risque faible ou moyen.</p></div>
+      <div class="encadre"><p>Toutes livrées dans la 1.6.4, publiée le 2 novembre 2026 vers 19 h, et revérifiées dans le code. Au départ, quatre relecteurs avaient cherché dans le code, chacun sous un angle : nouveautés, qualité de la retouche, fiabilité, manques pour un photographe amateur. Un cinquième a vérifié chaque idée (pas déjà faite, preuve juste) et gardé les dix plus solides. Les petites d'abord, toutes à risque faible ou moyen.</p></div>
       <div class="chantiers">
         <article class="chantier">
           <h3>Ton guide de style suivi aussi dans la fenêtre Claude et la Demande rapide</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 5/5</span></div>
-          <p>Dans le connecteur, les invites de retouche finissent par ton guide de style. Dans la fenêtre Claude et la Demande rapide, les boutons envoient leur propre texte sans le guide, et seul le style « À ma façon » le fait lire. On ferait lire ton guide (<code>remember_style read</code>) au début de chaque retouche de la fenêtre, avec un essai qui le vérifie, tout en restant sous 7 500 caractères.</p>
-          <p class="deja">Consignes.lua ne cite le guide qu'à la peau (l. 54), aux suggestions (l. 70) et au style « À ma façon » (l. 196-198) ; aucune lecture du guide pour les boutons Retouche pro, Portrait ou Paysage.</p>
+          <div class="marques"><span class="pastille fait">✓ livré dans la 1.6.4</span></div>
+          <p>Livré dans la 1.6.4 : chaque bouton de retouche (Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports), dans la fenêtre Claude comme dans la Demande rapide, fait lire ton guide (<code>remember_style</code> avec <code>read</code>) avant de commencer ; « À ma façon » ne le demande pas deux fois. Constaté le 2 novembre : Retouche pro appelle <code>remember_style</code> en premier et suit le guide.</p>
+          <p class="deja">Preuve : Consignes.LIRE_GUIDE ; essai dans essais-moteur.lua.</p>
         </article>
         <article class="chantier">
           <h3>Recherche par le sens : ne rien rendre quand rien ne ressemble</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Aujourd'hui, la meilleure photo passe toujours, même quand ce que tu cherches n'existe pas (des chats pour « coucher de soleil »). On ajouterait un plancher sur le score brut (vers 0,17) : en dessous, une liste vide et la phrase « rien ne ressemble vraiment à … ». Le score brut serait rendu pour le prochain relevé, avec un test sur un faux index.</p>
-          <p class="deja">Sens.swift n'a que candidatsMax (l. 33) et aucun plancher ; la pertinence reste relative (0 à la médiane, 1 à la meilleure).</p>
+          <div class="marques"><span class="pastille fait">✓ livré dans la 1.6.4</span></div>
+          <p>Livré dans la 1.6.4 : un plancher sur le score brut (0,17) ; en dessous, aucune photo et la phrase « Rien ne ressemble vraiment à … ». Chaque photo porte son score brut. Relevé le 2 novembre sur ton index de 84 108 photos : neige, montagnes, pingouins justes ; une phrase absurde trouve encore un voisin (0,23), donc 0,17 ne coupe que ce qui est vraiment sans rapport.</p>
+          <p class="deja">Preuve : Sens.swift ; SensTests.</p>
         </article>
         <article class="chantier">
           <h3>Tirage : vérifier les pixels et la proportion avant d'exporter</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Pour un tirage, Développeur calcule le grand côté voulu mais ne le compare jamais à la taille réelle de la photo recadrée, et l'export n'agrandit pas. Un oiseau très recadré partirait donc en 30x45 à 113 ppp sans avertissement. On dirait la résolution réelle, on proposerait un format plus petit ou la super résolution sous 240 ppp, et on signalerait un format dont la proportion diffère du recadrage.</p>
-          <p class="deja">Tools+Livraison.swift (l. 63-75) calcule seulement grandCote à partir des cm et du ppp ; Livraison.lua:130 pose LR_size_doNotEnlarge = true ; aucune comparaison avec les dimensions recadrées.</p>
+          <div class="marques"><span class="pastille fait">✓ livré dans la 1.6.4</span></div>
+          <p>Livré dans la 1.6.4 : pour un tirage, Développeur lit la taille de la photo recadrée et dit la résolution réelle ; sous 240 ppp, il avertit et propose un format plus petit qui reste net, ou la super résolution ; il signale un format dont la proportion diffère du recadrage de plus de 2 %. L'export part quand même.</p>
+          <p class="deja">Preuve : Tools+Livraison.swift (verifierTirage) ; Version135Tests.</p>
         </article>
         <article class="chantier">
           <h3>Ajustements d'un clic choisis d'après la proposition</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>La boîte Ajuster montre toujours les quatre mêmes boutons (« Moins chaud », « Peau plus naturelle », « Garder le ciel », « Plus de contraste »), même sur un paysage sans personne. On les choisirait d'après ce que touche la proposition en attente, avec les deux sens (plus chaud ou moins chaud, plus clair ou plus sombre…), six au plus, et la liste actuelle en repli.</p>
-          <p class="deja">Consignes.ajustementsRapides est une liste fixe de quatre boutons (Consignes.lua:322).</p>
+          <div class="marques"><span class="pastille fait">✓ livré dans la 1.6.4</span></div>
+          <p>Livré dans la 1.6.4 : la boîte Ajuster… choisit ses boutons d'après ce que touche la proposition, dans le sens qui tempère (« Moins chaud » si elle réchauffe, « Plus chaud » si elle refroidit, « Peau plus naturelle » seulement s'il y a de la peau, « Garder le ciel » seulement s'il y a un ciel), six au plus, et la liste d'avant quand rien n'est reconnu.</p>
+          <p class="deja">Preuve : Conversation.ceQueTouche ; essais-moteur.lua.</p>
         </article>
         <article class="chantier">
           <h3>Fixer les seuils des espèces sur une collection, sans rien exporter</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Les quatre seuils des espèces restent provisoires tant que tu n'as pas jugé de vraies photos. Or <code>--especes-essai</code> ne lit qu'un dossier de JPEG, alors que <code>--sens-essai</code> lit déjà une collection ou des ids. On lui donnerait les mêmes options, en lecture seule, avec une planche où tu coches juste ou faux pour fixer les seuils.</p>
-          <p class="deja">main.swift:72 : <code>--especes-essai</code> &lt;dossier de JPEG&gt; seulement ; main.swift:66 : <code>--sens-essai</code> accepte déjà --collection, --dossier, --ids et --images.</p>
+          <div class="marques"><span class="pastille fait">✓ livré dans la 1.6.4</span></div>
+          <p>Livré dans la 1.6.4 : <code>--especes-essai</code> lit une collection, un dossier ou des numéros de photos, en lecture seule, et fait une planche où tu coches Juste ou Faux ; <code>--jugement</code> dit ensuite quels seuils séparent le mieux les bonnes espèces des mauvaises. Reste à faire avec toi : juger une planche.</p>
+          <p class="deja">Preuve : main.swift ; EssaiEspeces.swift ; EssaiEspecesTests.</p>
         </article>
         <article class="chantier">
           <h3>Retouche pro sur une sélection : une référence par lumière, puis harmoniser</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Sur plusieurs photos, le bouton Retouche pro les retouche une à une, ce qui est long et donne une série inégale. On formerait d'abord les groupes de lumière (<code>match_series</code> avec <code>groups</code>), on retoucherait la référence de chaque groupe, puis on copierait et harmoniserait les autres. Les photos seules dans leur groupe resteraient retouchées une à une.</p>
-          <p class="deja">Consignes.surLaSelection (Consignes.lua:359-361) envoie « pour toutes les photos sélectionnées, une à une » ; <code>match_series</code> <code>groups</code> existe déjà côté connecteur (Tools+Serie.swift).</p>
+          <div class="marques"><span class="pastille fait">✓ livré dans la 1.6.4</span></div>
+          <p>Livré dans la 1.6.4 : sur plusieurs photos, Retouche pro forme d'abord les groupes de lumière (<code>match_series</code> avec <code>groups</code>), retouche la référence de chaque groupe, copie ses réglages aux autres photos du groupe et les harmonise ; une photo seule dans son groupe se retouche seule.</p>
+          <p class="deja">Preuve : Consignes.retoucheProSurLaSelection ; essais-moteur.lua.</p>
         </article>
         <article class="chantier">
           <h3>Ménage : vider Temporaire/PhotoActive et les dimensions-*.txt au chargement</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Les vignettes de la photo active et de Focus s'accumulent sans fin dans <code>Temporaire/PhotoActive</code> (137 Mo chez toi depuis le 20 octobre). On les viderait au chargement du module, avec les <code>dimensions-*.txt</code>. Un essai vérifierait que chaque dossier temporaire du code est vidé ou porte une exception écrite.</p>
-          <p class="deja">Menage.TEMPORAIRES = { 'Groupes', 'Rapide', 'Suivi', 'Fibo' } (Menage.lua:35), sans PhotoActive ni <code>dimensions-*.txt</code>.</p>
+          <div class="marques"><span class="pastille fait">✓ livré dans la 1.6.4</span></div>
+          <p>Livré dans la 1.6.4 : au chargement du module, <code>Temporaire/PhotoActive</code>, <code>Pourquoi</code>, <code>Collees</code> et les petits fichiers laissés par une commande interrompue (<code>dimensions-*.txt</code> et autres) sont effacés, jamais pendant qu'une fenêtre du module est ouverte ; le verrou de Fibo est gardé exprès. Constaté le 2 novembre après la relance de Lightroom : il ne restait que ce verrou. Un essai vérifie que chaque dossier temporaire du code est vidé ou porte une exception écrite.</p>
+          <p class="deja">Preuve : Menage.lua (TEMPORAIRES, FICHIERS, GARDES) ; essais-menage.lua.</p>
         </article>
         <article class="chantier">
           <h3>File des outils : garder le résultat d'un long appel malgré une lecture entre-temps</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Dans Claude Desktop, un appel de plus de 50 s garde son résultat pour l'appel répété, mais n'importe quelle commande suivante l'efface, même <code>get_status</code>. Pour <code>generative_edit</code> (environ 5 min), Fibo 2 tournerait deux fois. Les outils de lecture seule ne feraient plus tomber le résultat gardé, avec un test dans <code>FileOutilsTests</code>.</p>
-          <p class="deja">FileOutils.swift:76 : « if let precedent = orphelin, precedent !== appel { orphelin = nil } » pour toute commande, sans distinguer les lectures.</p>
+          <div class="marques"><span class="pastille fait">✓ livré dans la 1.6.4</span></div>
+          <p>Livré dans la 1.6.4 : les outils en lecture seule (<code>get_status</code>, <code>get_settings</code>, <code>view_photo</code>, les listes…) ne font plus tomber le résultat gardé d'un long appel ; seule une commande qui change une photo l'efface. Fibo 2 ne tourne donc plus deux fois pour rien.</p>
+          <p class="deja">Preuve : FileOutils.laisseLeResultatGarde ; FileOutilsTests.</p>
         </article>
       </div>
     </section>
