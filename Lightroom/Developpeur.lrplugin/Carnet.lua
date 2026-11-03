@@ -145,7 +145,7 @@ end
 local registre
 
 function Carnet.fichier()
-    return LrPathUtils.child(Chemins.racine(), 'carnet.json')
+    return LrPathUtils.child(Chemins.donnees(), 'carnet.json')
 end
 
 -- Copie neuve, sans métatable ni Json.null.
@@ -304,10 +304,16 @@ local function normaliser(r)
 end
 
 local function charger()
+    -- Le fichier relu à chaque accès (dossier commun : réglé ou changé, il se relit ; introuvable,
+    -- Chemins.donnees refuse, rien n'est lu ni écrit ailleurs).
+    local fichier = Carnet.fichier()
+    if registre and registre.fichier ~= fichier then
+        registre = nil
+    end
     if registre then
         return registre
     end
-    local contenu = Fichiers.lire(Carnet.fichier())
+    local contenu = Fichiers.lire(fichier)
     local ok, r = pcall(function() return contenu and Json.decode(contenu) end)
     if ok and type(r) == 'table' and tonumber(r.format) == Carnet.FORMAT then
         registre = normaliser(r)
@@ -316,6 +322,7 @@ local function charger()
         -- Un fichier présent mais illisible, ou d'un autre format : mis de côté avant d'écrire.
         registre.illisible = contenu ~= nil and contenu ~= ''
     end
+    registre.fichier = fichier
     return registre
 end
 
@@ -383,7 +390,7 @@ local function enregistrer()
     local r = charger()
     local fichier = Carnet.fichier()
     if r.illisible and Fichiers.existe(fichier) then
-        local aCote = LrPathUtils.child(Chemins.racine(), 'carnet-illisible-' .. tostring(os.time()) .. '.json')
+        local aCote = LrPathUtils.child(Chemins.donnees(), 'carnet-illisible-' .. tostring(os.time()) .. '.json')
         LrTasks.pcall(LrFileUtils.move, fichier, aCote)
         if Fichiers.existe(fichier) or not Fichiers.existe(aCote) then
             Liaison.noter("Carnet illisible non mis de côté : rien n'est écrit dans " .. fichier)

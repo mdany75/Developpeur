@@ -19,6 +19,10 @@
 #                  (~/Library/Logs/Developpeur) ; « Fibo non importées » (les photos de Fibo 2
 #                  que Lightroom n'a pas pu importer) reste toujours s'il n'est pas vide
 #
+# Dossier commun (réglé dans le Gestionnaire de modules externes, souvent sur le SSD Photos) : ce
+# script n'y touche JAMAIS, ni à rien d'autre sur le SSD, même avec --tout. --tout retire seulement
+# le pointeur local (dossier-commun.json) et le dit ; sans --tout, le pointeur reste.
+#
 # Le catalogue et les photos ne sont jamais touchés : les retouches déjà faites restent (elles
 # s'annulent dans le panneau Historique).
 
@@ -53,7 +57,20 @@ for arg in "$@"; do
     esac
 done
 
+# Le dossier commun réglé (pointeur local dossier-commun.json, {"format":1,"dossier":"…"}), vide
+# s'il n'y en a pas.
+POINTEUR="${DEST_DIR}/dossier-commun.json"
+DOSSIER_COMMUN=""
+if [[ -f "${POINTEUR}" ]]; then
+    DOSSIER_COMMUN="$(sed -n 's/.*"dossier"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${POINTEUR}" | head -n 1)"
+fi
+
 retirer() {
+    # Jamais le dossier commun ni rien dedans (garde-fou : ce script ne le vise pas).
+    if [[ -n "${DOSSIER_COMMUN}" && ( "$1" == "${DOSSIER_COMMUN}" || "$1" == "${DOSSIER_COMMUN}/"* ) ]]; then
+        printf 'Gardé (dossier commun) : %s\n' "$1"
+        return
+    fi
     if [[ -e "$1" || -L "$1" ]]; then
         rm -rf "$1"
         printf 'Supprimé : %s\n' "$1"
@@ -100,6 +117,10 @@ if [[ "${TOUT}" == 1 ]]; then
         retirer "${DEST_DIR}"
     fi
     retirer "${JOURNAUX}"
+    if [[ -n "${DOSSIER_COMMUN}" ]]; then
+        printf 'Retiré : le réglage du dossier commun (%s).\n' "${POINTEUR}"
+        printf 'Gardé, jamais touché : le dossier commun %s (ses conversations, carnet, Suivi et autres données) ; le retirer à la main au besoin.\n' "${DOSSIER_COMMUN}"
+    fi
 else
     for chemin in "${TRAVAIL[@]}"; do
         retirer "${chemin}"
@@ -112,6 +133,7 @@ else
     GARDES=()
     [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, profils de publication, consommation, notes proposées, carnet de progrès et leçons, suivi des photos ouvertes, index et modèles de la recherche par le sens, avant/après des étapes, photos de Fibo 2 non importées)")
     [[ -d "${JOURNAUX}" ]] && GARDES+=("${JOURNAUX} (journaux)")
+    [[ -n "${DOSSIER_COMMUN}" ]] && GARDES+=("${DOSSIER_COMMUN} (dossier commun, jamais touché par ce script, même avec --tout)")
     if [[ ${#GARDES[@]} -gt 0 ]]; then
         printf 'Gardé pour vous :\n'
         printf '  - %s\n' "${GARDES[@]}"

@@ -122,10 +122,16 @@ function Stockage.lire(id)
         return nil
     end
     c.id = c.id or id
+    -- Un chemin absolu écrit sur l'autre Mac ou avant le dossier commun : relu dans la racine des
+    -- données actuelle (Chemins.rebaser ; les images sont d'ordinaire relatives au dossier).
+    c.dossier = Chemins.rebaser(c.dossier)
     -- Un texte en train d'arriver quand Lightroom s'est fermé : gardé tel quel.
     for _, e in ipairs(c.elements) do
         e.partiel = false
         e.images = e.images or {}
+        for j, chemin in ipairs(e.images) do
+            e.images[j] = Chemins.rebaser(chemin)
+        end
         e.changements = e.changements or {}
         if e.genre == 'notation' then
             e.notes = e.notes or {}
@@ -157,7 +163,7 @@ end
 -- Mes demandes -----------------------------------------------------------------------------------
 -- Les demandes personnelles de Dany (demandé par Dany le 22 octobre 2026) : le menu Mes demandes de
 -- la fenêtre Claude, à droite du menu Style, les met dans le champ de demande. Rangées dans
--- mes-demandes.json (Chemins.racine()) : { format = 1, demandes = [ { nom, description, texte } ] },
+-- mes-demandes.json (Chemins.donnees()) : { format = 1, demandes = [ { nom, description, texte } ] },
 -- par nom (sans tenir compte des majuscules ni des accents), écrit d'un coup (Fichiers.ecrire :
 -- provisoire, puis renommé), relu à chaque ouverture de la fenêtre et avant chaque changement. Un
 -- fichier illisible (ou d'un autre format) n'est jamais écrasé ni perdu en silence : le journal le
@@ -175,7 +181,7 @@ Stockage.TEXTE_VIDE = "Écrivez le texte de la demande."
 Stockage.DEMANDE_INTROUVABLE = "Cette demande n'est plus dans Mes demandes."
 
 function Stockage.fichierDemandes()
-    return LrPathUtils.child(Chemins.racine(), 'mes-demandes.json')
+    return LrPathUtils.child(Chemins.donnees(), 'mes-demandes.json')
 end
 
 -- Un texte d'une seule ligne (le nom, la description) : espaces et sauts de ligne ramenés à une
@@ -241,7 +247,7 @@ end
 function Stockage.ecrireDemandes(liste, illisible)
     local fichier = Stockage.fichierDemandes()
     if illisible and Fichiers.existe(fichier) then
-        local aCote = LrPathUtils.child(Chemins.racine(), 'mes-demandes-illisible-' .. tostring(os.time()) .. '.json')
+        local aCote = LrPathUtils.child(Chemins.donnees(), 'mes-demandes-illisible-' .. tostring(os.time()) .. '.json')
         pcall(LrFileUtils.move, fichier, aCote)
         if Fichiers.existe(fichier) or not Fichiers.existe(aCote) then
             Journal.noter("Mes demandes : mes-demandes.json illisible non mis de côté, rien n'est écrit")
@@ -292,6 +298,11 @@ end
 -- Relit le fichier, applique `changer(liste)` (qui rend nil, ou la raison d'un refus), puis écrit.
 -- Rend vrai et la liste écrite, ou faux et la raison.
 local function changerDemandes(changer)
+    -- Dossier commun introuvable : refusé, rien n'est écrit ailleurs.
+    local introuvable = Chemins.refusDonnees()
+    if introuvable then
+        return false, introuvable
+    end
     local liste, illisible = Stockage.lireDemandes()
     local refus = changer(liste)
     if refus then

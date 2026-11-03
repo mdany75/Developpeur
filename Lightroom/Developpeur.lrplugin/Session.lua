@@ -60,6 +60,13 @@ function Session:lancer(premiereLigne)
     if not Fichiers.existe(self.connecteur) then
         error("Le connecteur MCP-Développeur est introuvable (" .. tostring(self.connecteur) .. "). Réinstallez Développeur IA, ou réglez son chemin dans Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom, section Fenêtre Claude.", 0)
     end
+    -- Dossier commun (3 novembre 2026) : relais.sh reçoit sa racine (DEVELOPPEUR_DONNEES) pour y
+    -- reprendre puis y ranger l'échange de la session (Claude Code/<id>.jsonl), afin que l'autre Mac
+    -- reprenne la conversation. Introuvable : refusé, rien n'est lancé.
+    local commun = Chemins.dossierCommun()
+    if commun.regle and not commun.present then
+        error(Chemins.messageAbsent(commun.chemin), 0)
+    end
     numero = numero + 1
     self.dossier = LrPathUtils.child(Chemins.sessions(), string.format('%s-%d-%d', self.idConversation, os.time(), numero))
     Fichiers.creerDossier(self.dossier)
@@ -77,7 +84,8 @@ function Session:lancer(premiereLigne)
     self.lanceLe = os.time()
     local q = Texte.shell
     -- « $PPID » : le parent du shell lancé par LrTasks.execute, c'est-à-dire Lightroom.
-    local commande = table.concat({ '/bin/sh', q(Chemins.relais()), q(self.dossier), q(self.claude), q(self.modele),
+    local donnees = commun.regle and ('DEVELOPPEUR_DONNEES=' .. q(commun.chemin) .. ' ') or ''
+    local commande = donnees .. table.concat({ '/bin/sh', q(Chemins.relais()), q(self.dossier), q(self.claude), q(self.modele),
         q(self.effort or ''), q(self.reprise or ''), q(self.travail), q(Chemins.configMCP()), q(consignes), '"$PPID"',
         '> /dev/null 2>&1 &' }, ' ')
     Journal.noter("Lancement de Claude Code :", self.modele, "effort " .. tostring(self.effort or 'par défaut'),

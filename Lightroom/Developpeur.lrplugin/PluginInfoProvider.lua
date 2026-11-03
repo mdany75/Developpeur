@@ -8,13 +8,17 @@
 --     fermeture de Claude Code après inactivité, raccourci clavier, dossiers. (Les cases Leçon et
 --     « À l'ouverture » sont retirées au correctif 1.3.6, avec la leçon et la proposition préparée à
 --     l'ouverture de la fenêtre.)
--- Les deux sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
+--   - le dossier commun (3 novembre 2026) : chemin, Choisir…, Revenir au dossier de ce Mac
+--     (DossierCommun.lua, qui seul écrit le pointeur dossier-commun.json).
+-- Les deux premières sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
 
 local LrApplication = import 'LrApplication'
 local LrDate = import 'LrDate'
 local LrDialogs = import 'LrDialogs'
+local LrFunctionContext = import 'LrFunctionContext'
 local LrPathUtils = import 'LrPathUtils'
+local LrProgressScope = import 'LrProgressScope'
 local LrShell = import 'LrShell'
 local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
@@ -69,6 +73,7 @@ local function diagnostic()
             tostring(prefs.nouvelleParPhoto)) .. " ; avant/après des étapes : " .. tostring(prefs.avantApresEtapes)
             .. " ; apparence : " .. apparence(prefs.apparence),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
+        "Dossier commun : " .. require('DossierCommun').texteEtat(),
         "",
         "Derniers événements :",
     }
@@ -289,6 +294,10 @@ local function sectionFenetre(f, prefs, ligne)
             f:static_text { title = require('Raccourcis').texte() }),
         ligne("",
             f:push_button { title = "Afficher les conversations dans le Finder", action = function()
+                -- Dossier commun introuvable : dit, rien n'est créé ailleurs.
+                if not Chemins.verifierDonnees("Conversations") then
+                    return
+                end
                 Fichiers.creerDossier(Chemins.conversations())
                 LrShell.revealInShell(Chemins.conversations())
             end },
@@ -299,6 +308,128 @@ local function sectionFenetre(f, prefs, ligne)
                     LrDialogs.message("Journal", "Pas encore de journal (" .. Chemins.journal() .. ").", 'info')
                 end
             end }),
+    }
+end
+
+-- Section du dossier commun ------------------------------------------------------------------------
+
+-- Les fenêtres qui lisent ou écrivent les données, ouvertes : le dossier ne change pas sous elles.
+local function fenetresOuvertes()
+    local ouvertes = {}
+    for _, f in ipairs({ { 'Fenetre', "la fenêtre Claude" }, { 'FenetreRapide', "la Demande rapide" },
+        { 'FenetreSuivi', "la fenêtre Suivi" }, { 'FenetrePublication', "la fenêtre Publication" },
+        { 'FenetreConsommation', "la fenêtre Consommation" } }) do
+        local ok, m = pcall(require, f[1])
+        if ok and type(m) == 'table' and m.ouverte then
+            ouvertes[#ouvertes + 1] = f[2]
+        end
+    end
+    return ouvertes
+end
+
+-- Le refus d'un changement de dossier pendant que Claude travaille ou qu'une fenêtre est ouverte.
+local function refusChangement()
+    local okM, Moteur = pcall(require, 'Moteur')
+    if okM and Moteur.travaille then
+        return "Claude travaille : réessayez quand il a fini."
+    end
+    local ouvertes = fenetresOuvertes()
+    if #ouvertes > 0 then
+        return "Fermez d'abord " .. table.concat(ouvertes, ", ") .. "."
+    end
+    return nil
+end
+
+-- Choisir… : le dossier, puis la copie avec sa progression (une tâche à part, comme choisirDossier).
+local function choisirDossierCommun(propertyTable)
+    local refus = refusChangement()
+    if refus then
+        LrDialogs.message("Dossier commun", refus, 'info')
+        return
+    end
+    local choix = LrDialogs.runOpenPanel {
+        title = "Choisir le dossier commun (sur le SSD Photos, par exemple)",
+        prompt = "Choisir",
+        canChooseFiles = false,
+        canChooseDirectories = true,
+        canCreateDirectories = true,
+        allowsMultipleSelection = false,
+    }
+    local dossier = choix and choix[1]
+    if not dossier then
+        return
+    end
+    local DossierCommun = require 'DossierCommun'
+    local invalide = DossierCommun.refus(dossier)
+    if invalide then
+        LrDialogs.message("Dossier commun", invalide, 'warning')
+        return
+    end
+    LrFunctionContext.postAsyncTaskWithContext('Développeur · dossier commun', function(context)
+        local barre = LrProgressScope { title = "Dossier commun : copie des données", functionContext = context }
+        barre:setCancelable(true)
+        local ok, r = LrTasks.pcall(DossierCommun.choisir, dossier, {
+            debut = function(total) barre:setCaption(string.format("%d fichier%s à copier", total, total > 1 and "s" or "")) end,
+            avancer = function(fait, total)
+                barre:setPortionComplete(fait, math.max(total, 1))
+                return not barre:isCanceled()
+            end,
+        })
+        barre:done()
+        propertyTable.dossierCommun = DossierCommun.texteEtat()
+        if ok then
+            LrDialogs.message("Dossier commun réglé", DossierCommun.texteChoix(r), 'info')
+        else
+            LrDialogs.message("Dossier commun non réglé", tostring(r), 'critical')
+        end
+    end)
+end
+
+local function revenirAuDossierDuMac(propertyTable)
+    local refus = refusChangement()
+    if refus then
+        LrDialogs.message("Dossier commun", refus, 'info')
+        return
+    end
+    LrTasks.startAsyncTask(function()
+        local DossierCommun = require 'DossierCommun'
+        local ok, quitte = LrTasks.pcall(DossierCommun.revenir)
+        propertyTable.dossierCommun = DossierCommun.texteEtat()
+        if not ok then
+            LrDialogs.message("Dossier commun", tostring(quitte), 'critical')
+        elseif not quitte then
+            LrDialogs.message("Dossier commun", "Aucun dossier commun n'est réglé : Développeur utilise déjà le dossier de ce Mac.", 'info')
+        else
+            LrDialogs.message("Retour au dossier de ce Mac",
+                "Développeur utilise de nouveau le dossier de ce Mac (" .. Chemins.locale() .. ").\n\n"
+                .. "Rien n'a été copié : les conversations, le carnet, le Suivi et les autres données restent dans le dossier commun ("
+                .. quitte .. "). Celles que ce Mac avait avant le dossier commun sont dans « Avant le dossier commun … », à côté.", 'info')
+        end
+    end)
+end
+
+local function sectionDossierCommun(f, propertyTable, ligne)
+    local bind = LrView.bind
+    propertyTable.dossierCommun = require('DossierCommun').texteEtat()
+    return {
+        title = "Dossier commun",
+        synopsis = bind { key = 'dossierCommun', bind_to_object = propertyTable },
+
+        f:static_text {
+            title = "Deux Mac, un même SSD : conversations, carnet, Suivi, notes, mes demandes, publication, consommation, guide de style et avant/après dans un dossier commun. Sur l'un ou l'autre Mac, vous reprenez le travail où vous l'avez laissé (jamais les deux en même temps).",
+            width_in_chars = 66, height_in_lines = 3,
+        },
+        ligne("Dossier commun :", f:static_text {
+            title = bind { key = 'dossierCommun', bind_to_object = propertyTable },
+            fill_horizontal = 1,
+        }),
+        ligne("",
+            f:push_button { title = "Choisir…", action = function() choisirDossierCommun(propertyTable) end },
+            f:push_button { title = "Revenir au dossier de ce Mac", action = function() revenirAuDossierDuMac(propertyTable) end }),
+        ligne("", f:static_text {
+            title = "Choisir un dossier vide y copie les données de ce Mac ; un dossier qui en a déjà (l'autre Mac) est pris tel quel. Les données de ce Mac sont ensuite mises de côté, jamais effacées.",
+            width_in_chars = 60, height_in_lines = 2,
+        }),
     }
 end
 
@@ -317,6 +448,7 @@ local function sectionsForTopOfDialog(f, propertyTable)
     return {
         sectionLiaison(f, propertyTable, prefs, ligne),
         sectionFenetre(f, prefs, ligne),
+        sectionDossierCommun(f, propertyTable, ligne),
     }
 end
 

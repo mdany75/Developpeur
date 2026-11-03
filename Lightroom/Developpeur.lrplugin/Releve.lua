@@ -282,6 +282,10 @@ local LISTES = { vues = true, cherches = true, defauts = true }
 local CHAMPS_MEMOIRE = { 'retoucheeParClaude', 'proprietaireMemoire' }
 
 local registre
+-- Le fichier d'où le registre a été lu : la racine des données peut changer (dossier commun réglé
+-- ou retiré dans le Gestionnaire de modules externes) ; un registre d'une autre racine n'y est
+-- jamais écrit, il est oublié et le nouveau fichier se relit.
+local registreFichier
 -- Une relecture du fichier en cours (une tâche à la fois : les autres l'attendent).
 local enChargement = false
 -- Une écriture du fichier en cours (une à la fois : elles écriraient le même fichier provisoire).
@@ -323,12 +327,12 @@ local function changee(e)
 end
 
 function Releve.fichier()
-    return LrPathUtils.child(Chemins.racine(), 'suivi.json')
+    return LrPathUtils.child(Chemins.donnees(), 'suivi.json')
 end
 
 -- Le journal des changements, à côté de suivi.json (demandé par Dany le 2 novembre 2026).
 function Releve.fichierJournal()
-    return LrPathUtils.child(Chemins.racine(), 'suivi.journal')
+    return LrPathUtils.child(Chemins.donnees(), 'suivi.journal')
 end
 
 -- Copie neuve, sans métatable ni Json.null.
@@ -595,6 +599,14 @@ local function relire()
 end
 
 local function charger()
+    -- Dossier commun introuvable : Releve.fichier refuse (Chemins.donnees), rien n'est lu ni écrit.
+    local fichier = Releve.fichier()
+    if registre and registreFichier ~= fichier then
+        local ecriture, chargement, arrete = enEcriture, enChargement, Releve.arrete
+        Journal.noter("Suivi : la racine des données a changé, relevé relu :", fichier)
+        Releve.oublier()
+        enEcriture, enChargement, Releve.arrete = ecriture, chargement, arrete
+    end
     if registre then
         return registre
     end
@@ -618,6 +630,7 @@ local function charger()
         error(relu, 0)
     end
     registre = relu
+    registreFichier = fichier
     return registre
 end
 
@@ -635,7 +648,7 @@ function Releve.oublier()
     Releve.reglesGenre, Releve.sansGenre = nil, false
     Releve.reglesSens, Releve.sondeSens, Releve.indexSens = nil, false, nil
     Releve.aEcrire, Releve.ecritLe, Releve.arrete = false, nil, false
-    Releve.reessais, Releve.selectionPosee = {}, 0
+    Releve.reessais, Releve.selectionPosee, Releve.enPause = {}, 0, nil
 end
 
 local function cheminCatalogue()
@@ -755,11 +768,11 @@ end
 local function nomDeCote()
     local base = 'suivi-illisible-' .. tostring(os.time())
     local nom, n = base .. '.json', 1
-    while Fichiers.existe(LrPathUtils.child(Chemins.racine(), nom)) do
+    while Fichiers.existe(LrPathUtils.child(Chemins.donnees(), nom)) do
         n = n + 1
         nom = base .. '-' .. n .. '.json'
     end
-    return LrPathUtils.child(Chemins.racine(), nom)
+    return LrPathUtils.child(Chemins.donnees(), nom)
 end
 
 -- Le texte JSON d'une entrée, gardé jusqu'à ce qu'elle change (changee).
@@ -2341,6 +2354,21 @@ function Releve.relancer()
     end
     if #Releve.aVoir == 0 and os.time() < Releve.prochaineVerification then
         return false
+    end
+    -- Le dossier commun introuvable (SSD débranché) : le Suivi se met en pause, sans rien écrire
+    -- ailleurs ; les vues attendent en mémoire (fondues au-delà de MAX_EN_ATTENTE) et se rangent
+    -- quand il revient. Dit une fois au journal.
+    local refus = Chemins.refusDonnees()
+    if refus then
+        if Releve.enPause ~= refus then
+            Releve.enPause = refus
+            Journal.noter("Suivi en pause :", refus)
+        end
+        return false
+    end
+    if Releve.enPause then
+        Releve.enPause = nil
+        Journal.noter("Suivi : dossier commun retrouvé, le relevé reprend")
     end
     Releve.enCours = true
     LrTasks.startAsyncTask(function()

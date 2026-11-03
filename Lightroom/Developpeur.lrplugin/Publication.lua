@@ -112,7 +112,7 @@ end
 -- Profils de l'utilisateur (publication.json) --------------------------------------------------
 
 function Publication.fichierProfils()
-    return LrPathUtils.child(Chemins.racine(), 'publication.json')
+    return LrPathUtils.child(Chemins.donnees(), 'publication.json')
 end
 
 function Publication.profilsPerso()

@@ -19,9 +19,11 @@ Consommation.BUDGET_PAR_DEFAUT = 2000000
 Consommation.DUREE_GARDEE = 92 * 86400
 
 local registre
+-- Le fichier d'où le registre a été lu (la racine des données peut changer : dossier commun).
+local registreFichier
 
 function Consommation.fichier()
-    return LrPathUtils.child(Chemins.racine(), 'consommation.json')
+    return LrPathUtils.child(Chemins.donnees(), 'consommation.json')
 end
 
 -- Jetons comptés : la lecture du cache coûte un dixième d'un jeton d'entrée.
@@ -35,10 +37,17 @@ local function vide()
 end
 
 function Consommation.charger()
+    -- Le fichier relu à chaque accès (dossier commun réglé ou changé : relu ; introuvable :
+    -- Chemins.donnees refuse, rien n'est lu ni écrit ailleurs).
+    local fichier = Consommation.fichier()
+    if registre and registreFichier ~= fichier then
+        registre = nil
+    end
+    registreFichier = fichier
     if registre then
         return registre
     end
-    local texte = Fichiers.lire(Consommation.fichier())
+    local texte = Fichiers.lire(fichier)
     local ok, r = pcall(function() return texte and Json.decode(texte) end)
     if ok and type(r) == 'table' then
         registre = r

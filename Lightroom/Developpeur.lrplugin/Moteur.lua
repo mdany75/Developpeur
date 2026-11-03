@@ -138,11 +138,19 @@ end
 -- autres restent sans photo, sur le disque, plus montrées (rien n'est effacé). La liste est rangée
 -- de la plus récente à la plus ancienne (Stockage.charger).
 function Moteur.charger()
-    if Moteur.charge then
+    -- La racine des données relue (dossier commun) : une autre racine que celle de la liste
+    -- chargée la fait relire, jamais pendant que Claude travaille. Introuvable : la liste reste.
+    local okRacine, racine = pcall(Chemins.donnees)
+    if Moteur.charge and (not okRacine or Moteur.chargeDe == nil or Moteur.chargeDe == racine or Moteur.travaille) then
         return
     end
     Moteur.charge = true
     local ok, liste = LrTasks.pcall(Stockage.charger)
+    -- Une liste illisible (dossier commun introuvable) se relit à la prochaine fois.
+    Moteur.chargeDe = ok and okRacine and racine or nil
+    if not ok then
+        Moteur.charge = false
+    end
     Moteur.conversations = ok and liste or {}
     local prises = {}
     for _, c in ipairs(Moteur.conversations) do
@@ -452,6 +460,11 @@ function Moteur.envoyer(texte, options)
     if Moteur.travaille then
         return false, Moteur.CLAUDE_TRAVAILLE
     end
+    -- Le dossier commun introuvable : la demande est refusée, rien n'est écrit ailleurs.
+    local refus = Chemins.refusDonnees()
+    if refus then
+        return false, refus
+    end
     local okBudget, niveau = pcall(Consommation.niveau)
     if okBudget and niveau == 'arret' then
         return false, string.format("Budget de la semaine atteint (%s jetons) : augmentez-le dans la fenêtre Consommation pour continuer.",
@@ -605,6 +618,10 @@ function Moteur.envoyerRapide(texte)
     end
     if Moteur.travaille then
         return nil, Moteur.RAPIDE_TRAVAILLE
+    end
+    local refus = Chemins.refusDonnees()
+    if refus then
+        return nil, refus
     end
     local okBudget, niveau = pcall(Consommation.niveau)
     if okBudget and niveau == 'arret' then
