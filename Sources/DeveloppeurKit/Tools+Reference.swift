@@ -211,9 +211,11 @@ extension ToolHandler {
                         }
                     }
                     suite.reglages = suite.reglages.filter { $0.value != mesuree.etat.valeur($0.key) }
+                    // Les limites de la passe 2 se disent même si elle n'écrit rien (relecture du 2 novembre
+                    // 2026) : la passe 1 tombée pile sur la borne, la passe 2 qui voudrait la dépasser.
+                    limites += suite.limites.filter { !limites.contains($0) }
                     guard !suite.reglages.isEmpty else { break }
                     reglages = suite.reglages
-                    limites += suite.limites.filter { !limites.contains($0) }
                 }
                 let ecartApres = Reference.ecart(photo: mesuree.signature, reference: ref.signature)
                 ligne["etapes"] = .array(etapes)

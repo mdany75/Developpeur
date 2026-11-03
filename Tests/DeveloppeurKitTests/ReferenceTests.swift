@@ -434,6 +434,18 @@ final class ReferenceTests: XCTestCase {
     /// peu (la passe 2 voudrait pousser encore) et dont le contraste ne se rend pas (la passe 2 le
     /// voudrait encore). Sur les deux passes : l'exposition change de 0,5 IL au plus, le contraste de
     /// 30, et les limites le disent.
+    /// Relecture du 2 novembre 2026 : la passe 1 tombe pile sur la borne (+0,5 IL, sans limite), la
+    /// passe 2 voudrait davantage et n'a plus rien à écrire. La limite de la passe 2 doit rester dite.
+    func testLaLimiteDeLaPasse2ResteDiteQuandElleNEcritRien() throws {
+        let etat = brancherRendu(reference: [.zero, .zero, .zero], clarteReference: 8, effetExposition: 3)
+        let fait = try appel(["reference_id": 1, "photo_id": 2, "confirm": true, "strength": 1])
+        XCTAssertEqual(fake.calls.filter { $0.command == "appliquer" }.count, 1, "la passe 2 n'écrit rien")
+        XCTAssertEqual(etat()["Exposure2012"] ?? 0, 0.5, accuracy: 0.001)
+        let ligne = try XCTUnwrap(fait["photos"]?.array?.first)
+        let limites = ligne["limites"]?.array?.compactMap(\.string) ?? []
+        XCTAssertEqual(limites.filter { $0.hasPrefix("Exposition changée de 0,5 IL au plus") }.count, 1, "\(limites)")
+    }
+
     func testUneSceneTresDifferenteNeCopiePasSonExposition() throws {
         let etat = brancherRendu(clarteReference: 25, clartePhoto: -10, effetExposition: 3)
         let fait = try appel(["reference_id": 1, "photo_id": 2, "confirm": true, "strength": 1])
