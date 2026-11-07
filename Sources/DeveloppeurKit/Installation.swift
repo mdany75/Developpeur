@@ -1,3 +1,4 @@
+import CoreServices
 import CryptoKit
 import Foundation
 
@@ -71,6 +72,11 @@ public final class Installation {
         /// Deux ensembles dont chacun a ce que l'autre n'a pas (modèles, SAM 2) : le dépôt et
         /// l'installation ajoutent chacun ce qui manque, sans rien retirer.
         case differents = "differents"
+        /// Sur le SSD lui-même (1.7.1) : Fibo 2 Studio ou les modèles de Fibo que ce Mac utilise
+        /// directement sur le SSD, sans copie, et que le manifeste annonce à l'autre Mac.
+        case surLeSSD = "sur_le_ssd"
+        /// Sur le SSD lui-même, pas encore annoncé : le dépôt l'inscrit au manifeste, sans rien copier.
+        case surLeSSDAInscrire = "sur_le_ssd_a_inscrire"
 
         public var texte: String {
             switch self {
@@ -81,9 +87,11 @@ public final class Installation {
             case .absentDuMac: return "absent du Mac"
             case .absentPartout: return "absent du Mac et du SSD"
             case .differents: return "différents (chacun a ce que l'autre n'a pas)"
+            case .surLeSSD: return "utilisé directement sur le SSD"
+            case .surLeSSDAInscrire: return "utilisé directement sur le SSD, à inscrire au manifeste"
             }
         }
-        public var aDeposer: Bool { self == .macPlusRecent || self == .absentDuSSD || self == .differents }
+        public var aDeposer: Bool { self == .macPlusRecent || self == .absentDuSSD || self == .differents || self == .surLeSSDAInscrire }
         public var aInstaller: Bool { self == .ssdPlusRecent || self == .absentDuMac || self == .differents }
     }
 
@@ -199,6 +207,10 @@ public final class Installation {
         public var nomOrdinateur: () -> String
         public var mfluxEnCours: () -> Bool
         public var fiboStudioOuvert: () -> Bool
+        /// Les Fibo 2 Studio que ce Mac connaît (Launch Services), où qu'ils soient : sur le SSD aussi.
+        public var applicationsFibo: () -> [URL]
+        /// Le volume qui porte un chemin (sa racine), nil si inconnu.
+        public var volume: (URL) -> String?
         /// Octets libres du volume qui porte ce chemin (nil : inconnu, rien n'est refusé).
         public var placeLibre: (URL) -> Int64?
         public var lancer: Lanceur
@@ -214,6 +226,8 @@ public final class Installation {
                     nomOrdinateur: @escaping () -> String = Installation.nomDeCetOrdinateur,
                     mfluxEnCours: @escaping () -> Bool = Fibo.mfluxEnCours,
                     fiboStudioOuvert: @escaping () -> Bool = Installation.fiboStudioEnCours,
+                    applicationsFibo: @escaping () -> [URL] = Installation.applicationsFiboConnues,
+                    volume: @escaping (URL) -> String? = Installation.volumeReel,
                     placeLibre: @escaping (URL) -> Int64? = Installation.placeLibreReelle,
                     lancer: @escaping Lanceur = Installation.lancerProcessus,
                     corbeille: @escaping (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) },
@@ -231,6 +245,8 @@ public final class Installation {
             self.nomOrdinateur = nomOrdinateur
             self.mfluxEnCours = mfluxEnCours
             self.fiboStudioOuvert = fiboStudioOuvert
+            self.applicationsFibo = applicationsFibo
+            self.volume = volume
             self.placeLibre = placeLibre
             self.lancer = lancer
             self.corbeille = corbeille
@@ -326,7 +342,8 @@ public final class Installation {
     /// Le côté SSD d'un élément, d'après le manifeste, seulement si ses fichiers sont là (et à leur
     /// taille, pour un fichier) : un élément annoncé mais incomplet est absent.
     func coteSSD(_ element: Element, installation: URL, manifeste: [String: [String: JSONValue]]) -> Cote? {
-        guard let e = manifeste[element.rawValue], let version = e["version"]?.string else { return nil }
+        // Un élément utilisé sur le SSD lui-même se lit par `partage`, jamais comme une copie.
+        guard let e = manifeste[element.rawValue], e["partage"] == nil, let version = e["version"]?.string else { return nil }
         let fm = FileManager.default
         for f in e["fichiers"]?.array ?? [] {
             guard let chemin = f["chemin"]?.string else { return nil }
@@ -486,11 +503,99 @@ public final class Installation {
     public func comparer() throws -> [Ligne] {
         let installation = try dossierInstallation()
         let manifeste = lireManifeste(installation)
-        return Element.allCases.map { element in
-            let mac = coteMac(element)
-            let ssd = coteSSD(element, installation: installation, manifeste: manifeste)
-            return Ligne(element: element, mac: mac, ssd: ssd, etat: Self.comparer(mac: mac, ssd: ssd))
+        return Element.allCases.map { ligne($0, installation: installation, manifeste: manifeste) }
+    }
+
+    func ligne(_ element: Element, installation: URL, manifeste: [String: [String: JSONValue]]) -> Ligne {
+        if let p = partage(element, installation: installation, manifeste: manifeste) { return p }
+        let mac = coteMac(element)
+        let ssd = coteSSD(element, installation: installation, manifeste: manifeste)
+        return Ligne(element: element, mac: mac, ssd: ssd, etat: Self.comparer(mac: mac, ssd: ssd))
+    }
+
+    // MARK: Sur le SSD lui-même (1.7.1)
+
+    /// Fibo 2 Studio et les modèles de Fibo peuvent vivre sur le SSD lui-même, hors du dossier commun
+    /// (Dany les a mis dans /Volumes/Photos/Divers le 6 novembre 2026 : l'application, et le cache de
+    /// Hugging Face par un lien `~/.cache/huggingface/hub`). Alors rien ne se copie : ni dépôt d'une
+    /// archive, ni installation dans /Applications ; le manifeste dit seulement où ils sont
+    /// (`partage`, chemin depuis la racine du volume), pour que l'autre Mac les trouve.
+    func surLeSSD(_ url: URL, installation: URL) -> Bool {
+        guard let v = env.volume(url), let s = env.volume(installation) else { return false }
+        return v == s && env.volume(env.domicile) != s
+    }
+
+    func cheminDansVolume(_ url: URL, installation: URL) -> String? {
+        guard let racine = env.volume(installation) else { return nil }
+        let r = racine.hasSuffix("/") ? racine : racine + "/"
+        return url.path.hasPrefix(r) ? String(url.path.dropFirst(r.count)) : nil
+    }
+
+    func depuisVolume(_ chemin: String, installation: URL) -> URL? {
+        guard let racine = env.volume(installation), !chemin.isEmpty, !chemin.hasPrefix("/"),
+              !chemin.split(separator: "/").contains("..") else { return nil }
+        return URL(fileURLWithPath: racine, isDirectory: true).appendingPathComponent(chemin)
+    }
+
+    /// La ligne d'un élément utilisé sur le SSD lui-même, ou nil s'il ne l'est pas.
+    func partage(_ element: Element, installation: URL, manifeste: [String: [String: JSONValue]]) -> Ligne? {
+        let annonce = manifeste[element.rawValue]?["partage"]?.string
+        let annonceURL = annonce.flatMap { depuisVolume($0, installation: installation) }
+        func etat(_ chemin: String, _ version: String) -> Etat {
+            annonce == chemin && manifeste[element.rawValue]?["version"]?.string == version ? .surLeSSD : .surLeSSDAInscrire
         }
+        switch element {
+        case .fibo2studio:
+            let candidates = [annonceURL].compactMap { $0 } + env.applicationsFibo()
+            guard let app = candidates.first(where: { surLeSSD($0, installation: installation) && Self.versionApplication($0) != nil }),
+                  let v = Self.versionApplication(app), let chemin = cheminDansVolume(app, installation: installation) else { return nil }
+            let cote = Cote(version: v, detail: ["chemin": .string(app.path), "partage": .string(chemin)])
+            return Ligne(element: element, mac: cote, ssd: cote, etat: etat(chemin, v))
+        case .modelesHF:
+            // Ce Mac lit-il ses modèles sur le SSD (le cache est un lien vers lui) ?
+            let reel = env.cacheHF.resolvingSymlinksInPath()
+            if surLeSSD(reel, installation: installation), let chemin = cheminDansVolume(reel, installation: installation) {
+                let inv = Self.inventaireHF(hub: reel, depots: Self.depotsHF)
+                guard !inv.ensemble.isEmpty else { return nil }
+                let v = Self.texteModeles(inv.ensemble)
+                let cote = Cote(version: v, ensemble: inv.ensemble, marques: inv.marques,
+                                detail: ["chemin": .string(reel.path), "partage": .string(chemin), "taille": .number(Double(inv.taille))])
+                return Ligne(element: element, mac: cote, ssd: cote, etat: etat(chemin, v))
+            }
+            // L'autre Mac : les modèles annoncés sur le SSD, à lier (cache vide) ou à compléter.
+            guard let hub = annonceURL, let chemin = annonce else { return nil }
+            let inv = Self.inventaireHF(hub: hub, depots: Self.depotsHF)
+            guard !inv.ensemble.isEmpty else { return nil }
+            let ssd = Cote(version: Self.texteModeles(inv.ensemble), ensemble: inv.ensemble, marques: inv.marques,
+                           detail: ["chemin": .string(hub.path), "partage": .string(chemin), "taille": .number(Double(inv.taille))])
+            let mac = coteMac(.modelesHF)
+            var e = Self.comparer(mac: mac, ssd: ssd)
+            // Ce Mac a ce que le SSD n'a pas : rien à déposer (le SSD n'est pas une copie), à jour.
+            if e == .macPlusRecent { e = .aJour }
+            if e == .differents { e = .ssdPlusRecent }
+            return Ligne(element: element, mac: mac, ssd: ssd, etat: e)
+        default:
+            return nil
+        }
+    }
+
+    /// Les Fibo 2 Studio connus de Launch Services, hors des dossiers de développement et de la Corbeille.
+    public static func applicationsFiboConnues() -> [URL] {
+        guard let urls = LSCopyApplicationURLsForBundleIdentifier(identifiantFibo as CFString, nil)?.takeRetainedValue() as? [URL] else { return [] }
+        return urls.filter { u in
+            let p = u.path
+            return FileManager.default.fileExists(atPath: p) && !p.contains("/.Trash") && !p.contains("/Developer/") && !p.contains("/DerivedData/")
+        }
+    }
+
+    public static let identifiantFibo = "ca.dany.Fibo2Studio"
+
+    /// La racine du volume qui porte un chemin.
+    public static func volumeReel(_ url: URL) -> String? {
+        var u = url
+        // Un chemin qui n'existe pas encore : son premier parent existant.
+        while !FileManager.default.fileExists(atPath: u.path), u.path != "/" { u = u.deletingLastPathComponent() }
+        return (try? u.resourceValues(forKeys: [.volumeURLKey]))?.volume?.path
     }
 
     public static func json(_ ligne: Ligne) -> JSONValue {
@@ -506,6 +611,9 @@ public final class Installation {
     }
 
     public static func texte(_ ligne: Ligne) -> String {
+        if ligne.etat == .surLeSSD || ligne.etat == .surLeSSDAInscrire, let c = ligne.mac, let chemin = c.detail["partage"]?.string {
+            return "\(ligne.element.nom) : \(ligne.etat.texte) (\(c.version), \(chemin))"
+        }
         let mac = ligne.mac.map { "Mac \($0.version)" } ?? "absent du Mac"
         let ssd = ligne.ssd.map { "SSD \($0.version)" + ($0.detail["depuis"]?.string.map { ", déposé depuis « \($0) »" } ?? "") } ?? "absent du SSD"
         return "\(ligne.element.nom) : \(ligne.etat.texte) (\(mac) ; \(ssd))"
@@ -575,6 +683,7 @@ public final class Installation {
                 let pourquoi: String
                 switch ligne.etat {
                 case .aJour: pourquoi = "déjà à jour"
+                case .surLeSSD: pourquoi = "utilisé directement sur le SSD, rien à copier"
                 case .absentPartout: pourquoi = "absent du Mac et du SSD"
                 case .absentDuMac, .ssdPlusRecent: pourquoi = "le SSD est plus récent : rien à déposer (--installer)"
                 default: pourquoi = "ce Mac est plus récent : rien à installer (--deposer)"
@@ -597,10 +706,7 @@ public final class Installation {
             }
             if let f = faits.last { journaliser(([(depot ? "dépôt" : "installation") + ", " + f.action + " : " + f.texte] + f.notes.map { "  - " + $0 }).joined(separator: "\n")) }
             // L'état d'après, relu.
-            let manifeste = lireManifeste(installation)
-            let mac = coteMac(element)
-            let ssd = coteSSD(element, installation: installation, manifeste: manifeste)
-            lignes[i] = Ligne(element: element, mac: mac, ssd: ssd, etat: Self.comparer(mac: mac, ssd: ssd))
+            lignes[i] = self.ligne(element, installation: installation, manifeste: lireManifeste(installation))
         }
         return (lignes, faits)
     }
@@ -641,6 +747,17 @@ public final class Installation {
     func deposer(_ element: Element, ligne: Ligne, installation: URL, archive: URL?) throws -> String {
         let fm = FileManager.default
         var manifeste = lireManifeste(installation)
+        // Sur le SSD lui-même : l'inscrire au manifeste, sans rien copier.
+        if ligne.etat == .surLeSSDAInscrire, let cote = ligne.mac, let chemin = cote.detail["partage"]?.string {
+            var plus: [String: JSONValue] = ["partage": .string(chemin)]
+            if let ensemble = cote.ensemble {
+                plus["ensemble"] = .array(ensemble.sorted().map(JSONValue.string))
+                plus["marques"] = Self.marquesJSON(cote.marques)
+            }
+            manifeste[element.rawValue] = entree(version: cote.version, fichiers: [], en: plus)
+            try ecrireManifeste(installation, manifeste)
+            return "\(element.nom) \(cote.version) : utilisé directement sur le SSD (\(chemin)), annoncé à l'autre Mac sans copie."
+        }
         switch element {
         case .uv:
             guard let uv = uvDuMac() else { throw Refus("uv est absent de ce Mac.") }
@@ -848,7 +965,13 @@ public final class Installation {
 
         case .modelesHF:
             if env.mfluxEnCours() { throw Refus(Self.texteMfluxEnCours) }
-            let hub = installation.appendingPathComponent("modeles_hf/hub", isDirectory: true)
+            // Les modèles utilisés sur le SSD lui-même : ce Mac les y lit par un lien, si son cache est
+            // vide ; sinon il complète le sien depuis eux.
+            let partage = ssd.detail["partage"] != nil ? ssd.detail["chemin"]?.string.map { URL(fileURLWithPath: $0, isDirectory: true) } : nil
+            if let partage, try lierCacheHF(vers: partage) {
+                return "Modèles de Fibo : ce Mac les lit directement sur le SSD (\(env.cacheHF.path) → \(partage.path))."
+            }
+            let hub = partage ?? installation.appendingPathComponent("modeles_hf/hub", isDirectory: true)
             let inv = Self.inventaireHF(hub: hub, depots: Self.depotsHF)
             try copierArbre(inv.entrees, de: hub, vers: env.cacheHF, element: element, marques: Set(inv.marques.keys))
             // Chaque fichier de chaque instantané du SSD doit maintenant être là, lien compris.
@@ -927,6 +1050,26 @@ public final class Installation {
             // Le fait, puis ses notes (une par ligne : Prochaines étapes et avertissements d'install.sh).
             return (["Développeur IA \(ssd.version) installé."] + Self.notesInstallSh(s.sortie)).joined(separator: "\n")
         }
+    }
+
+    /// Pose le lien du cache de Hugging Face vers les modèles du SSD, si le cache n'existe pas ou est
+    /// vide (un dossier vide est retiré) ; faux s'il a déjà des fichiers (rien n'est touché).
+    func lierCacheHF(vers hub: URL) throws -> Bool {
+        let fm = FileManager.default
+        let cache = env.cacheHF
+        if (try? fm.destinationOfSymbolicLink(atPath: cache.path)) != nil {
+            // Un lien vivant ailleurs n'est pas touché ; un lien mort (un SSD d'avant) est remplacé.
+            guard !fm.fileExists(atPath: cache.path) else { return false }
+            try fm.removeItem(at: cache)
+        } else if fm.fileExists(atPath: cache.path) {
+            var dossier: ObjCBool = false
+            guard fm.fileExists(atPath: cache.path, isDirectory: &dossier), dossier.boolValue,
+                  ((try? fm.contentsOfDirectory(atPath: cache.path)) ?? ["?"]).allSatisfy({ $0 == ".DS_Store" }) else { return false }
+            try fm.removeItem(at: cache)
+        }
+        try fm.createDirectory(at: cache.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fm.createSymbolicLink(at: cache, withDestinationURL: hub)
+        return true
     }
 
     /// L'uv de l'installation de mflux : exactement celui qui a rempli le cache (numéro du manifeste) ;

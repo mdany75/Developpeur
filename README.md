@@ -1456,7 +1456,10 @@ photos (jamais les deux Mac en même temps) :
 "$HOME/Library/Application Support/Developpeur/mcp-developpeur" --mises-a-jour
 ```
 
-  (`--deposer` ou `--installer` pour agir ; rien n'est jamais téléchargé). Après une mise à jour
+  (`--deposer` ou `--installer` pour agir ; rien n'est jamais téléchargé). Si Fibo 2 Studio ou
+  les modèles de Fibo sont rangés sur le SSD lui-même (par exemple dans « Divers »), ils sont
+  utilisés là, sans copie : l'autre Mac ouvre Fibo 2 Studio depuis le SSD et lit les modèles par
+  un lien. Après une mise à jour
   de Développeur IA, quitter et relancer Lightroom, puis ouvrir une nouvelle session de Claude Code
   (ou relancer Claude Desktop).
 

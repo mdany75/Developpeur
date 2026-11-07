@@ -15,6 +15,8 @@ final class InstallationTests: XCTestCase {
     var fiboOuvert = false
     var libre: Int64? = nil
     var avances: [Installation.Avance] = []
+    /// Les Fibo 2 Studio que « Launch Services » connaît sur les Mac simulés.
+    var appsConnues: [URL] = []
     let fm = FileManager.default
 
     override func setUp() {
@@ -27,6 +29,7 @@ final class InstallationTests: XCTestCase {
         fiboOuvert = false
         libre = nil
         avances = []
+        appsConnues = []
     }
 
     override func tearDown() {
@@ -50,7 +53,14 @@ final class InstallationTests: XCTestCase {
             donnees: DossierDonnees(racineLocale: racine), domicile: d, applications: d.appendingPathComponent("Applications", isDirectory: true),
             uvCandidats: [d.appendingPathComponent(".local/bin/uv"), fauxUV],
             nomOrdinateur: { "Mac \(nom)" }, mfluxEnCours: { [unowned self] in self.mfluxTourne },
-            fiboStudioOuvert: { [unowned self] in self.fiboOuvert }, placeLibre: { [unowned self] _ in self.libre },
+            fiboStudioOuvert: { [unowned self] in self.fiboOuvert },
+            applicationsFibo: { [unowned self] in self.appsConnues },
+            // Deux volumes : le faux SSD (…/Volumes/Photos) et celui des domiciles.
+            volume: { [unowned self] url in
+                let v = self.base.appendingPathComponent("Volumes/Photos").path
+                return url.path == v || url.path.hasPrefix(v + "/") ? v : self.base.path
+            },
+            placeLibre: { [unowned self] _ in self.libre },
             corbeille: { [unowned self] url in
                 let c = self.base.appendingPathComponent("Corbeille-\(nom)", isDirectory: true)
                 try self.fm.createDirectory(at: c, withIntermediateDirectories: true)
@@ -129,8 +139,8 @@ final class InstallationTests: XCTestCase {
         lien(d.appendingPathComponent(".local/bin/claude"), f.path)
     }
 
-    func poserFibo(_ d: URL, version: String) {
-        let app = d.appendingPathComponent("Applications/Fibo 2 Studio.app/Contents")
+    func poserFibo(_ d: URL, version: String, dans dossier: String = "Applications") {
+        let app = d.appendingPathComponent("\(dossier)/Fibo 2 Studio.app/Contents")
         ecrire(app.appendingPathComponent("Info.plist"), """
         <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>\(version)</string></dict></plist>
@@ -491,6 +501,70 @@ final class InstallationTests: XCTestCase {
         let instantanes: Set<String> = Set((manifeste()["modeles_hf"]?["ensemble"]?.array?.compactMap(\.string) ?? []).filter { !$0.contains(":") })
         XCTAssertEqual(instantanes, ["briaai/Fibo-2.0-dev@rev1", "briaai/Fibo-2.0-dev@rev2"])
         XCTAssertEqual(try etat(m1, .modelesHF), .ssdPlusRecent)
+    }
+
+    /// 1.7.1 : Fibo 2 Studio et les modèles de Fibo mis par Dany sur le SSD lui-même (Divers), hors du
+    /// dossier commun : rien ne se copie ; le manifeste les annonce, l'autre Mac les utilise tels quels
+    /// (modèles : un lien du cache vers le SSD). Constaté le 7 novembre 2026 : « Mettre à jour depuis le
+    /// SSD » proposait Fibo 2 Studio 2.8.1, dit absent de ce Mac, qui avait la 2.9.1 sur le SSD.
+    func testFiboEtModelesUtilisesDirectementSurLeSSD() throws {
+        let m1 = mac("un"), m2 = mac("deux"), m3 = mac("trois")
+        let volume = base.appendingPathComponent("Volumes/Photos")
+        poserFibo(volume, version: "2.9.1", dans: "Divers")
+        let app = volume.appendingPathComponent("Divers/Fibo 2 Studio.app")
+        let hub = volume.appendingPathComponent("Divers/Fibo 2/hub")
+        poserCacheHF(hub)
+        lien(m1.env.cacheHF, hub.path)
+        // Une ancienne copie déposée au SSD (2.8.1) ne compte plus.
+        poserFibo(m2.env.domicile, version: "2.8.1")
+        XCTAssertEqual(try m2.executer(deposer: true, elements: [.fibo2studio]).faits.first?.action, "depose")
+        XCTAssertEqual(manifeste()["fibo2studio"]?["version"]?.string, "2.8.1")
+        try? fm.removeItem(at: m2.env.applicationFibo)
+        appsConnues = [app]
+
+        XCTAssertEqual(try etat(m1, .fibo2studio), .surLeSSDAInscrire, "pas « absent de ce Mac »")
+        XCTAssertEqual(try etat(m1, .modelesHF), .surLeSSDAInscrire)
+        let texte = Installation.texte(try XCTUnwrap(try m1.comparer().first { $0.element == .fibo2studio }))
+        XCTAssertEqual(texte, "Fibo 2 Studio : utilisé directement sur le SSD, à inscrire au manifeste (2.9.1, Divers/Fibo 2 Studio.app)")
+        XCTAssertFalse(try m1.comparer().contains { $0.etat.aInstaller }, "rien à installer")
+
+        // Le dépôt inscrit sans copier.
+        let (lignes, faits) = try m1.executer(deposer: true, elements: nil)
+        for element in [Installation.Element.fibo2studio, .modelesHF] {
+            let f = try XCTUnwrap(faits.first { $0.element == element })
+            XCTAssertEqual(f.action, "depose", f.texte)
+            XCTAssertTrue(f.texte.contains("sans copie"), f.texte)
+            XCTAssertEqual(lignes.first { $0.element == element }?.etat, .surLeSSD)
+        }
+        XCTAssertFalse(fm.fileExists(atPath: ssd.appendingPathComponent("Installation/modeles_hf").path), "aucune copie des modèles")
+        XCTAssertEqual(manifeste()["fibo2studio"]?["partage"]?.string, "Divers/Fibo 2 Studio.app")
+        XCTAssertEqual(manifeste()["fibo2studio"]?["version"]?.string, "2.9.1")
+        XCTAssertEqual(manifeste()["fibo2studio"]?["fichiers"]?.array?.count, 0)
+        XCTAssertEqual(manifeste()["modeles_hf"]?["partage"]?.string, "Divers/Fibo 2/hub")
+        XCTAssertFalse(try m1.comparer().contains { $0.etat.aDeposer || $0.etat.aInstaller }, "ensuite, plus rien à faire")
+
+        // L'autre Mac, que Launch Services ignore : l'application d'après le manifeste, les modèles par un lien.
+        appsConnues = []
+        XCTAssertEqual(try etat(m2, .fibo2studio), .surLeSSD)
+        XCTAssertEqual(try etat(m2, .modelesHF), .absentDuMac)
+        let (apres, installes) = try m2.executer(deposer: false, elements: nil)
+        let modeles = try XCTUnwrap(installes.first { $0.element == .modelesHF })
+        XCTAssertEqual(modeles.action, "installe", modeles.texte)
+        XCTAssertEqual(try fm.destinationOfSymbolicLink(atPath: m2.env.cacheHF.path), hub.path)
+        XCTAssertEqual(apres.first { $0.element == .modelesHF }?.etat, .surLeSSD)
+        XCTAssertNil(installes.first { $0.element == .fibo2studio && $0.action == "installe" }, "Fibo 2 Studio n'est pas copié dans Applications")
+        XCTAssertFalse(fm.fileExists(atPath: m2.env.applicationFibo.path))
+
+        // Un Mac qui a déjà ses propres modèles complets : à jour, son cache n'est pas touché.
+        poserCacheHF(m3.env.cacheHF)
+        XCTAssertEqual(try etat(m3, .modelesHF), .aJour)
+        XCTAssertNil(try? fm.destinationOfSymbolicLink(atPath: m3.env.cacheHF.path))
+        // Un cache lien mort (un SSD d'avant) est remplacé ; un lien vivant ailleurs ne l'est pas.
+        let m4 = mac("quatre")
+        lien(m4.env.cacheHF, base.appendingPathComponent("disparu").path)
+        XCTAssertTrue(try m4.lierCacheHF(vers: hub))
+        XCTAssertEqual(try fm.destinationOfSymbolicLink(atPath: m4.env.cacheHF.path), hub.path)
+        XCTAssertFalse(try m3.lierCacheHF(vers: hub), "un cache plein n'est pas remplacé")
     }
 
     func testCopieInterrompueRepriseEtPartielRemplace() throws {

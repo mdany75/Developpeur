@@ -1,5 +1,14 @@
 # Changements
 
+## 1.7.1 — 2026-11-07
+
+### Corrigé
+- **Fibo 2 Studio et les modèles de Fibo rangés sur le SSD** : « Mettre à jour depuis le SSD »
+  proposait d'installer Fibo 2 Studio 2.8.1, dit absent de ce Mac, alors que la 2.9.1 était sur le
+  SSD. Ce qui est sur le SSD lui-même est maintenant « utilisé directement sur le SSD » : rien n'est
+  copié ni installé ; le SSD l'annonce à l'autre Mac, qui ouvre Fibo 2 Studio depuis le SSD et lit
+  les modèles par un lien (sans copier 64 Go).
+
 ## 1.7 — 2026-11-03
 
 La 1.7 est faite pour travailler sur deux Mac avec le même SSD : vos données de Développeur

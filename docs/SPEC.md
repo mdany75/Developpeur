@@ -10792,6 +10792,23 @@ côté (`.partiel`) puis remplace l'ancien.
 | `claude_code` | `claude_code/claude-<v>` | lien `~/.local/bin/claude` → `~/.local/share/claude/versions/<v>` | le binaire dans `versions/<v>`, puis le lien ; jamais `~/.claude` |
 | `developpeur` | `developpeur/Developpeur.zip` | la plus ancienne de `mcp-developpeur --version` (connecteur installé) et de l'`Info.lua` du module installé ; dans l'archive, son `Info.lua` (`unzip -p`) | `install.sh` de l'archive décompressée dans `Temporaire/Mises a jour` (`DEVELOPPEUR_DEPUIS_SSD=1`) ; il dit lui-même si Claude Desktop est ouvert |
 
+**Utilisés directement sur le SSD (1.7.1).** Fibo 2 Studio et les modèles de Fibo peuvent vivre
+sur le SSD lui-même, hors du dossier commun : Dany y a mis l'application
+(`/Volumes/Photos/Divers/Fibo 2 Studio.app`, 2.9.1) et les modèles (`~/.cache/huggingface/hub`,
+lien vers `/Volumes/Photos/Divers/Fibo 2/hub`) le 6 novembre 2026. **Constaté le 7 novembre
+2026** : au lancement de Lightroom, « Mettre à jour depuis le SSD » proposait Fibo 2 Studio 2.8.1,
+« absent de ce Mac », qui avait la 2.9.1 sur le SSD (seul `/Applications` était lu). Depuis :
+l'application se cherche aussi par Launch Services (`ca.dany.Fibo2Studio`, hors `~/Developer`,
+DerivedData et Corbeille) et par le chemin annoncé au manifeste ; les modèles, par le cache résolu.
+Ce qui est sur le volume du dossier commun (et non sur celui du dossier personnel) est **utilisé
+directement sur le SSD** (`sur_le_ssd`) : ni dépôt d'une copie, ni installation dans
+`/Applications`. Le dépôt l'inscrit seulement au manifeste (`sur_le_ssd_a_inscrire`, entrée
+`partage` : chemin depuis la racine du volume, sans fichiers) ; une ancienne copie déposée est
+ignorée. Sur l'autre Mac : Fibo 2 Studio s'ouvre depuis le SSD (rien à installer) ; les modèles,
+si son cache est vide, absent ou un lien mort, par un lien `~/.cache/huggingface/hub` → le hub du
+SSD, sinon il complète son cache depuis eux (`lierCacheHF`). Test :
+`testFiboEtModelesUtilisesDirectementSurLeSSD`.
+
 **Archive au même numéro.** Une archive de Développeur au numéro déjà sur le SSD n'est déposée que si son empreinte diffère (archive refaite avant la publication) ; l'autre Mac la voit « à jour » par le numéro (constaté le 3 novembre 2026 : la 1.7 reconstruite après la recette).
 
 **Les modèles retenus** (`Installation.depotsHF`) : `briaai/Fibo-2.0-dev` et
