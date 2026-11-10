@@ -150,7 +150,13 @@ public final class ToolHandler {
     /// Filigranes de l'utilisateur (Édition › Modifier les filigranes), lus dans leurs fichiers.
     var filigranes = FiligranesUtilisateur()
     /// Version de Lightroom Classic, lue une fois (commande « etat ») quand un réglage récent le demande.
-    var versionLightroom: String?
+    var versionLightroom: String? {
+        didSet { versionLightroomLue = Date() }
+    }
+    /// Quand la version gardée a été lue : plus vieille que `relectureVersion`, elle est relue avant
+    /// de refuser un réglage récent (Lightroom mis à jour pendant la session).
+    var versionLightroomLue = Date.distantPast
+    static let relectureVersion: TimeInterval = 60
     var preferencesLightroom = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Preferences/com.adobe.LightroomClassicCC7.plist")
 
@@ -484,8 +490,8 @@ public final class ToolHandler {
     private func status(_ args: Arguments) throws -> JSONValue {
         var etat = try lightroom.send("etat", args.bool("request_backup") == true ? ["sauvegarde": true] : [:], timeout: 10).object ?? [:]
         etat["version_serveur"] = .string(versionServeur)
+        noterVersionLightroom(.object(etat))
         if let version = etat["lightroom"]?.string {
-            versionLightroom = version
             if let alerte = Self.avertissementFormesMasques(version) { etat["avertissement_masques"] = .string(alerte) }
         }
         if let module = etat["version_module"]?.string, let ecart = Self.ecartVersions(serveur: versionServeur, module: module) {

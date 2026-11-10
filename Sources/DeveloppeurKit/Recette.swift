@@ -617,6 +617,8 @@ public final class Recette {
         try sequenceHDR(id, photo)
         try sequenceLivraison25(id, photo)
         try sequenceRetoucheMasques(id, photo)
+        // Lightroom Classic 16 (Recette+16.swift) : la Lueur et l'étalonnage d'un masque.
+        try sequenceLightroom16(id, photo)
     }
 
     /// Version 2.1 (pistes 2.3 et 2.4) : profil d'objectif choisi puis remis par défaut à
@@ -1646,6 +1648,8 @@ public final class Recette {
             try verifierBalance(apres, balance)
             return "balance gardée"
         }
+        // Lightroom Classic 16 (Recette+16.swift) : la Projection et un trait de pinceau resté droit.
+        try etapeProjection(id, photo)
     }
 
     func sequenceFlash(_ id: Int, _ depart: Etat, _ photo: String) throws {
@@ -2292,10 +2296,11 @@ public final class Recette {
     }
 
     /// La bande horizontale qu'un trait de pinceau a assombrie entre deux rendus de même taille,
-    /// mesurée au milieu de l'image (de 45 % à 55 % de la largeur) : sa hauteur en pixels (là où
-    /// l'écart de luminance dépasse la moitié de son maximum), son centre en part de la hauteur, et
-    /// la largeur du rendu.
-    static func bandeAssombrie(avant: Data, apres: Data) -> (hauteur: Double, centre: Double, largeur: Double)? {
+    /// mesurée dans les colonnes données (par défaut de 32 % à 68 % de la largeur, le long du trait ;
+    /// les bords et le centre pour la Projection, Recette+16.swift) : sa hauteur en pixels (là où
+    /// plus de la moitié des pixels de la rangée sont assombris), son centre en part de la hauteur,
+    /// et la largeur du rendu.
+    static func bandeAssombrie(avant: Data, apres: Data, colonnes: ClosedRange<Double> = 0.32...0.68) -> (hauteur: Double, centre: Double, largeur: Double)? {
         func pixels(_ data: Data) -> (w: Int, h: Int, v: [UInt8])? {
             guard let source = CGImageSourceCreateWithData(data as CFData, nil),
                   let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
@@ -2311,7 +2316,7 @@ public final class Recette {
         // la largeur). Constaté le 17 octobre 2026 : un écart moyen en niveaux, à mi-hauteur, donnait
         // 26 px au lieu de 41 sur une famille en vêtements sombres (−2 IL y assombrit peu en valeur
         // absolue), alors que la bande se voyait entière.
-        let x0 = Int(Double(a.w) * 0.32), x1 = Int(Double(a.w) * 0.68)
+        let x0 = Int(Double(a.w) * colonnes.lowerBound), x1 = max(x0 + 1, Int(Double(a.w) * colonnes.upperBound))
         var parts = [Double](repeating: 0, count: a.h)
         for y in 0..<a.h {
             var assombris = 0, comptes = 0

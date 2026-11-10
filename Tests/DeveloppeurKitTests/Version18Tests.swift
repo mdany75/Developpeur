@@ -107,6 +107,75 @@ final class Version18Tests: XCTestCase {
         XCTAssertNotEqual(Bilan.cadre(avant), Bilan.cadre(apres), "le bilan ne compare pas des pixels déplacés par la Projection")
     }
 
+    // MARK: Finitions relevées par la revue de la 1.8
+
+    /// Constaté le 10 novembre 2026 : GlowStyle n'est gardé que si Glow est au-dessus de 0.
+    func testStyleDeLueurSansQuantiteDitUneRemarque() {
+        fake.replies["etat"] = ["lightroom": "16.0"]
+        let seul = call("apply_settings", ["step_name": "lueur", "settings": ["GlowStyle": 2, "GlowWarmth": 20]])
+        XCTAssertFalse(seul.isError, seul.text)
+        XCTAssertTrue(seul.text.contains("Le style de la Lueur n'est gardé que si sa quantité (Glow) est au-dessus de 0"), seul.text)
+        XCTAssertTrue(seul.text.contains("GlowStyle, GlowWarmth sans Glow dans cet appel"), seul.text)
+        let aZero = call("apply_settings", ["step_name": "lueur", "settings": ["Glow": 0, "GlowStyle": 2]])
+        XCTAssertTrue(aZero.text.contains("avec Glow à 0"), aZero.text)
+        let avecQuantite = call("apply_settings", ["step_name": "lueur", "settings": ["Glow": 30, "GlowStyle": 2]])
+        XCTAssertFalse(avecQuantite.text.contains("n'est gardé que si"), avecQuantite.text)
+        XCTAssertFalse(call("apply_settings", ["step_name": "lueur", "settings": ["Glow": 30]]).text.contains("n'est gardé que si"))
+        // La quantité de la photo, d'après la réponse du module (Glow relatif) : au-dessus de 0, rien à dire.
+        fake.replies["appliquer"] = ["resultats": [["photo": ["id": 1], "changements": [["cle": "Glow", "avant": 30, "apres": 40]]]]]
+        let relatif = call("apply_settings", ["step_name": "lueur", "relative": true, "settings": ["Glow": 10, "GlowStyle": 1]])
+        XCTAssertFalse(relatif.text.contains("n'est gardé que si"), relatif.text)
+        fake.replies["appliquer"] = ["resultats": [["photo": ["id": 1], "changements": [["cle": "Glow", "avant": 10, "apres": 0]]]]]
+        let retiree = call("apply_settings", ["step_name": "lueur", "relative": true, "settings": ["Glow": -10, "GlowStyle": 1]])
+        XCTAssertTrue(retiree.text.contains("n'est gardé que si"), retiree.text)
+    }
+
+    /// Constaté : l'étalonnage d'un masque se range en entiers (0,5 devient 1) ; le serveur l'arrondit
+    /// de même, sans toucher aux autres réglages locaux.
+    func testEtalonnageDUnMasqueArrondiALEntier() throws {
+        fake.replies["etat"] = ["lightroom": "16.0"]
+        let result = call("add_mask", ["step_name": "x", "masks": [["kind": "sky", "adjustments": [
+            "ColorGradeShadowSat": 0.5, "ColorGradeShadowHue": 220.4, "ColorGradeMidtoneLum": -10.6, "Exposure": 0.25, "Glow": 40.5]]]])
+        XCTAssertFalse(result.isError, result.text)
+        let locaux = try XCTUnwrap(fake.lastParams["masques"]?.array?.first?["locaux"])
+        XCTAssertEqual(locaux["LocalColorGradeShadowSat"]?.double, 1)
+        XCTAssertEqual(locaux["LocalColorGradeShadowHue"]?.double, 220)
+        XCTAssertEqual(locaux["LocalColorGradeMidtoneLum"]?.double, -11)
+        XCTAssertEqual(locaux["LocalExposure2012"]?.double ?? 0, 0.0625, accuracy: 1e-9, "l'exposition garde son échelle, sans arrondi")
+        XCTAssertEqual(locaux["LocalGlow"]?.double ?? 0, 0.405, accuracy: 1e-9, "la lueur d'un masque va de 0 à 1 : pas arrondie")
+    }
+
+    /// Lightroom mis à jour pendant une session : la version gardée en mémoire (15.6) est relue avant
+    /// de refuser un réglage de la 16.0 ; une réponse du module qui en donne une autre la remplace.
+    func testVersionDeLightroomRelueApresUneMiseAJour() {
+        fake.replies["etat"] = ["lightroom": "15.6"]
+        XCTAssertTrue(call("apply_settings", ["step_name": "lueur", "settings": ["Glow": 30]]).isError)
+        XCTAssertEqual(tools.versionLightroom, "15.6")
+        // Relue tout de suite : pas de seconde lecture (la version se lit une fois par minute au plus).
+        XCTAssertTrue(call("apply_settings", ["step_name": "lueur", "settings": ["Glow": 30]]).isError)
+        XCTAssertEqual(fake.commands.filter { $0 == "etat" }.count, 1)
+        // Une minute plus tard, Lightroom relancé en 16.0 : relue avant le refus, la Lueur passe.
+        tools.versionLightroomLue = Date().addingTimeInterval(-ToolHandler.relectureVersion - 1)
+        fake.replies["etat"] = ["lightroom": "16.0"]
+        let apres = call("apply_settings", ["step_name": "lueur", "settings": ["Glow": 30]])
+        XCTAssertFalse(apres.isError, apres.text)
+        XCTAssertEqual(tools.versionLightroom, "16.0")
+        XCTAssertTrue(fake.commands.contains("appliquer"))
+
+        // Une réponse d'écriture qui donne la version la garde aussi.
+        fake.replies["appliquer"] = ["lightroom": "16.1", "resultats": []]
+        _ = call("apply_settings", ["step_name": "x", "settings": ["Exposure2012": 0.1]])
+        XCTAssertEqual(tools.versionLightroom, "16.1")
+        // Toujours en 15.6 après relecture : refusé, sans rien envoyer.
+        tools.versionLightroom = "15.6"
+        tools.versionLightroomLue = .distantPast
+        fake.replies["etat"] = ["lightroom": "15.6"]
+        fake.calls = []
+        XCTAssertTrue(call("apply_settings", ["step_name": "x", "settings": ["Glow": 30]]).isError)
+        XCTAssertFalse(fake.commands.contains("appliquer"))
+        XCTAssertEqual(fake.commands, ["etat"], "relue une fois avant le refus")
+    }
+
     func testDescriptionsDisentLesNouveautes() throws {
         let definitions = tools.definitions
         let applique = try XCTUnwrap(definitions.first { $0["name"] == "apply_settings" }?["description"]?.string)

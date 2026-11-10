@@ -595,7 +595,8 @@ cadre.
   curseurs de l'aperçu SDR). Avec Lightroom Classic 16 (1.8) : la Lueur (quantité, style
   Diffusion, Halo, Halation, Mouvement ou Série, gamme, étendue, chaleur, direction, douceur),
   dosée avec retenue, et la Projection, qui redonne leur forme aux visages étirés aux bords d'un
-  grand-angle. En valeurs absolues ou en décalage, sur une photo, une liste de
+  grand-angle. Lightroom ne garde le style de la Lueur que si sa quantité est au-dessus de 0 :
+  Claude le dit quand un style arrive seul. En valeurs absolues ou en décalage, sur une photo, une liste de
   photos ou toute la sélection.
 - Profils : Adobe Standard, les simulations de film Fujifilm des RAW (PROVIA, Velvia, ASTIA,
   CLASSIC CHROME, REALA ACE, PRO Neg., ETERNA, ACROS, MONOCHROME), et tous les profils à base de
@@ -643,6 +644,7 @@ cadre.
 - Avec Lightroom Classic 16 (1.8), l'étalonnage des couleurs (ombres, tons moyens, hautes
   lumières, global, fusion, équilibre) et la lueur dans un masque : des ombres plus froides dans
   le ciel seulement, une lueur sur une seule lampe. Le style de la lueur reste celui de la photo.
+  L'étalonnage d'un masque est arrondi à l'entier, comme Lightroom le range (0,5 devient 1).
 - Éclaircir et assombrir comme un tireur en chambre noire, pour mener l'œil au sujet, en une seule
   étape « Claude · éclaircir et assombrir » : les grandes zones trop claires assombries par un
   dégradé linéaire (−0,3 à −0,7 IL), le sujet ou le visage éclairci par un dégradé radial (+0,2 à

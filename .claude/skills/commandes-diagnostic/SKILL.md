@@ -74,7 +74,11 @@ l'étape, même après un échec (`notation` `remettre`, `Recette.garderRegistre
 1.4 (`Recette+14.swift`), sur toutes les photos données dès qu'il y en a deux : « groupes de lumière
 (match_series, groups), rien d'écrit » (chaque photo comptée une fois dans un groupe ou seule, aucun
 réglage changé, la prise de vue en nombres lue par la commande `vignettes` : ouverture, vitesse,
-flash))
+flash)) ; et Lightroom Classic 16 (`Recette+16.swift`, sautées avec leur raison avant la 16.0) :
+à la fin du RAW, « Lueur (Glow 40, style 2) relue en entiers, rendu changé, annulée » et
+« étalonnage dans un masque radial (ombres 220, 30), relu en entiers, annulé » ; à la fin du JPEG,
+« Projection 100 : trait de pinceau à 0,2 de la hauteur, droit au centre et aux bords, annulés »
+(une copie `--jpeg` sans profil d'objectif)
 
 ## Recette d'une version
 

@@ -21,7 +21,22 @@
   infobulles des boutons montrent aussi le réglage. Un fichier de réglage abîmé n'est jamais
   écrasé : il est mis de côté (`invites-illisible-<date>.json`) avant d'en écrire un nouveau.
 
+- **La recette vérifie Lightroom Classic 16** : trois étapes de plus, sautées avec leur raison
+  sous une version plus ancienne que la 16.0, chacune défaite ensuite. Sur la copie RAW, la Lueur
+  (Glow 40, style Halation) relue en entiers et visible sur l'aperçu, puis un étalonnage des ombres
+  dans un masque radial (teinte 220, saturation 30) relu dans le masque. Sur la copie JPEG, la
+  Projection 100 et un trait de pinceau à 0,2 de la hauteur, qui doit rester droit au centre et aux
+  bords (écart de moins de 0,02 de la hauteur).
+- Un style de Lueur (GlowStyle, gamme, étendue, chaleur, direction, douceur) demandé sans
+  quantité au-dessus de 0 a sa remarque : « le style de la Lueur n'est gardé que si sa quantité
+  (Glow) est au-dessus de 0 » (constaté le 10 novembre 2026).
+
 ### Changé
+- L'étalonnage d'un masque est arrondi à l'entier par le serveur, comme Lightroom le range
+  (0,5 devient 1).
+- Lightroom mis à jour pendant une session (par exemple de la 15.6 à la 16.0) : la version gardée
+  en mémoire est relue avant de refuser un réglage récent, et remplacée par celle que donne une
+  réponse du module.
 - **Classer monte en haut de la fenêtre Claude**, dans la rangée du titre, juste à gauche de
   « Repartir à neuf », de la même forme que les petits boutons de cette rangée. Il fait exactement
   la même chose qu'avant (Claude propose des mots-clés, un lieu s'il est sûr et une légende, puis

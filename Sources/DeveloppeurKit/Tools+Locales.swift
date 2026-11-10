@@ -53,6 +53,9 @@ extension ToolHandler {
     /// Réglages locaux récents : version de Lightroom Classic qui les connaît (refusés avant).
     static let localAdjustmentsSince: [String: String] = Dictionary(uniqueKeysWithValues:
         localAdjustments.filter { $0.key.hasPrefix("LocalColorGrade") || $0.key == "LocalGlow" }.map { ($0.name, "16.0") })
+    /// Réglages locaux que Lightroom range en entiers : l'étalonnage d'un masque (LocalColorGrade…),
+    /// arrondi comme Lightroom le fait (0,5 devient 1, constaté le 10 novembre 2026).
+    static func entierDansLightroom(_ cle: String) -> Bool { cle.hasPrefix("LocalColorGrade") }
     /// Réglages locaux qui sont des angles : l'intensité d'un masque ne les change pas.
     static func estAngle(_ name: String) -> Bool { name == "ToningHue" || (name.hasPrefix("ColorGrade") && name.hasSuffix("Hue")) }
     /// Courbe locale par canal : clé de la correction (relevé : un tableau de textes « x,y »).
@@ -396,8 +399,8 @@ extension ToolHandler {
             // La version de Lightroom vient avec la réponse : une autre que celle des formes relevées
             // se dit (versionsFormesMasques), sans rien refuser ; plus court quand la relecture du
             // module (masques_relus) a tout trouvé gardé.
+            noterVersionLightroom(reponse)
             if let version = reponse["lightroom"]?.string {
-                versionLightroom = version
                 if let alerte = Self.alerteFormes(version, reponse: reponse, masks: masks) {
                     notes.append(.string(alerte))
                 }
@@ -785,7 +788,9 @@ extension ToolHandler {
             guard let number = raw.double, item.range.contains(number) else {
                 throw LightroomError.invalid("« \(path).adjustments.\(name) » va de \(Self.format(item.range.lowerBound)) à \(Self.format(item.range.upperBound)).")
             }
-            locals[item.key] = .number(number * item.scale)
+            // L'étalonnage d'un masque se range en entiers (constaté dans Lightroom Classic 16.0 :
+            // 0,5 devient 1) : le serveur envoie déjà la valeur que Lightroom gardera.
+            locals[item.key] = .number(Self.entierDansLightroom(item.key) ? (number * item.scale).rounded() : number * item.scale)
         }
         try verifierVersion(adjustments.keys.sorted().compactMap { name in Self.localAdjustmentsSince[name].map { (name, $0) } })
 

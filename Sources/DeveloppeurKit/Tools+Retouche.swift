@@ -221,6 +221,10 @@ extension ToolHandler {
         // Une rotation attend que Lightroom ait tourné la photo.
         let delai: TimeInterval = develop["rotation"] != nil ? 300 : 180
         var reponse = recadrerApres(try lightroom.send("appliquer", params, timeout: delai), params, notes: &notes)
+        noterVersionLightroom(reponse)
+        if let remarque = Self.remarqueLueur(develop["reglages"]?.object ?? [:], relatif: args.bool("relative") == true, reponse: reponse) {
+            notes.append(.string(remarque))
+        }
         if let balance, var objet = reponse.object {
             objet["balance_point"] = secondePasseBalance(balance, args: args)
             reponse = .object(objet)
@@ -641,12 +645,50 @@ extension ToolHandler {
         if versionLightroom == nil {
             versionLightroom = (try? lightroom.send("etat", [:], timeout: 10))?["lightroom"]?.string ?? ""
         }
-        guard let version = versionLightroom, !version.isEmpty else { return }
-        let trop = recents.filter { Self.versionInferieure(version, $0.depuis) }
+        guard var version = versionLightroom, !version.isEmpty else { return }
+        var trop = recents.filter { Self.versionInferieure(version, $0.depuis) }
+        // Lightroom mis à jour pendant la session (15.6 puis 16.0, sans relancer le serveur) : la
+        // version gardée en mémoire serait l'ancienne. Lue il y a plus d'une minute (une mise à jour
+        // demande de relancer Lightroom), elle est relue avant tout refus.
+        if !trop.isEmpty, Date().timeIntervalSince(versionLightroomLue) > Self.relectureVersion,
+           let relue = (try? lightroom.send("etat", [:], timeout: 10))?["lightroom"]?.string, !relue.isEmpty {
+            versionLightroom = relue
+            version = relue
+            trop = recents.filter { Self.versionInferieure(version, $0.depuis) }
+        }
         guard trop.isEmpty else {
             throw LightroomError.invalid("Lightroom Classic \(version) ne connaît pas encore : " + trop.map { "\($0.cle) (depuis la \($0.depuis))" }.joined(separator: ", ")
                 + ". Rien n'a été appliqué : retirer ces réglages, ou mettre Lightroom à jour.")
         }
+    }
+
+    /// La version de Lightroom qu'une réponse du module donne (etat, masquer…) remplace celle
+    /// gardée en mémoire : Lightroom a pu être mis à jour pendant la session.
+    func noterVersionLightroom(_ reponse: JSONValue) {
+        if let version = reponse["lightroom"]?.string, !version.isEmpty { versionLightroom = version }
+    }
+
+    /// Styles de la Lueur (Lightroom Classic 16.0) : gardés seulement si la quantité (Glow) est
+    /// au-dessus de 0 (constaté le 10 novembre 2026).
+    static let clesStyleLueur = ["GlowStyle", "GlowRange", "GlowSpread", "GlowWarmth", "GlowDirection", "GlowDirectionalSoftness"]
+    static let remarqueStyleLueur = "Le style de la Lueur n'est gardé que si sa quantité (Glow) est au-dessus de 0"
+
+    /// La remarque d'apply_settings quand un style de la Lueur arrive sans quantité au-dessus de 0 :
+    /// ni dans l'appel (Glow absolu), ni sur la photo d'après la réponse du module (le Glow qu'elle
+    /// rend dans ses changements, pour chaque photo). Nil quand rien n'est à dire.
+    static func remarqueLueur(_ reglages: [String: JSONValue], relatif: Bool, reponse: JSONValue) -> String? {
+        let styles = clesStyleLueur.filter { reglages[$0] != nil }
+        guard !styles.isEmpty else { return nil }
+        if !relatif, let glow = reglages["Glow"]?.double, glow > 0 { return nil }
+        let resultats = reponse["resultats"]?.array ?? []
+        let quantites = resultats.map { resultat in
+            (resultat["changements"]?.array ?? []).first { $0["cle"]?.string == "Glow" }?["apres"]?.double
+        }
+        if !quantites.isEmpty, quantites.allSatisfy({ ($0 ?? 0) > 0 }) { return nil }
+        let fin = reglages["Glow"] == nil
+            ? " : \(styles.joined(separator: ", ")) sans Glow dans cet appel ; si la photo n'a pas déjà de Lueur, poser aussi Glow (par exemple 30)."
+            : " : \(styles.joined(separator: ", ")) avec Glow à 0, Lightroom remet le style par défaut ; poser Glow au-dessus de 0 (par exemple 30)."
+        return remarqueStyleLueur + " (constaté dans Lightroom Classic 16.0)" + fin
     }
 
     /// « 12.4 » < « 13.0 » (comparaison par numéros).

@@ -68,6 +68,8 @@ défait ensuite.
 
 - Recette, étape « TIFF réimporté, empilé avec l'original » : réussie le 10 novembre 2026 au matin (88/88), puis en échec trois fois sous la charge d'un tri assisté de 20 000 photos (réimporté en retard, puis au catalogue sans pile après 2 min ; fichier retiré et mis à la Corbeille chaque fois). La 1.8 est publiée sur l'accord de Dany ; refaire la recette une fois le tri fini.
 - Réimportation arrivée après le retrait de la recette (`pas_au_catalogue`, fichier mis à la Corbeille avant que Lightroom, occupé, ne l'ajoute) : ce que fait Lightroom (fenêtre d'erreur ou photo manquante) — dans la recette, Lightroom chargé ([Réimportation, aperçus dynamiques](#réimportation-aperçus-dynamiques)).
+- Les trois étapes de la recette de la 16 (Lueur, étalonnage dans un masque radial, Projection et trait de pinceau droit) : jamais encore passées dans Lightroom ; le seuil de L* de la Lueur (0,2) et la mesure de la bande aux bords sont à confirmer — dans la recette ([Lightroom Classic 16](#lightroom-classic-16-18)).
+- La remarque d'un style de Lueur sans quantité, et l'étalonnage d'un masque arrondi (0,5 envoyé 1) relu tel quel — dans la recette ou à la main ([Lightroom Classic 16](#lightroom-classic-16-18)).
 - Photo hors ligne (original et aperçu dynamique absents) : `applyDevelopSettings` de la 16 la saute avec une fenêtre ; ce que voit Claude — à la main, avec Dany ([Lightroom Classic 16](#lightroom-classic-16-18)).
 
 **Liaison et commandes longues**
@@ -3292,7 +3294,32 @@ Constaté le 10 novembre 2026 sur la copie RAW 53918083 (« Essai mesures 16 »)
   chaleur restent ceux de la photo (« Les paramètres de Lueur sont globaux et partagés entre tous
   les masques », libellé de Lightroom).
 - Ces réglages sont refusés sous une version plus ancienne que la 16.0 (`since`,
-  `localAdjustmentsSince`), sans rien envoyer.
+  `localAdjustmentsSince`), sans rien envoyer. La version gardée en mémoire
+  (`ToolHandler.versionLightroom`), lue il y a plus d'une minute (`relectureVersion` : une mise à
+  jour demande de relancer Lightroom), est relue (commande `etat`) avant tout refus, et remplacée par
+  celle que donne `get_status` ou une réponse du module (`noterVersionLightroom`) : Lightroom a pu
+  être mis à jour pendant la session (revue de la 1.8).
+- Finitions de la revue de la 1.8 (après la 1.8 publiée) : un style de la Lueur (`GlowStyle`,
+  `GlowRange`, `GlowSpread`, `GlowWarmth`, `GlowDirection`, `GlowDirectionalSoftness`) sans `Glow`
+  au-dessus de 0, ni dans l'appel (valeur absolue) ni dans les changements que rend le module pour
+  chaque photo, a sa remarque d'`apply_settings` (`ToolHandler.remarqueLueur`) : « le style de la
+  Lueur n'est gardé que si sa quantité (Glow) est au-dessus de 0 ». Le module ne relit pas la
+  quantité d'une photo que l'appel ne touche pas : la remarque dit alors « si la photo n'a pas déjà
+  de Lueur ». L'étalonnage d'un masque (`LocalColorGrade*`) est arrondi à l'entier par le serveur
+  (`ToolHandler.entierDansLightroom`), comme Lightroom le range ; la lueur d'un masque (0 à 1) ne
+  l'est pas.
+- Recette (`Recette+16.swift`), sautée avec sa raison sous une version plus ancienne que la 16.0
+  (`get_status`) : « Lueur (Glow 40, style 2) relue en entiers, rendu changé, annulée » (copie RAW ;
+  `Glow` et `GlowStyle` relus par `get_settings` avec `all_keys`, L* moyen de l'aperçu changé d'au
+  moins 0,2) ; « étalonnage dans un masque radial (ombres 220, 30), relu en entiers, annulé » (copie
+  RAW ; `LocalColorGradeShadowHue` 220 et `LocalColorGradeShadowSat` 30 dans `reglages_locaux`) ;
+  « Projection 100 : trait de pinceau à 0,2 de la hauteur, droit au centre et aux bords, annulés »
+  (copie `--jpeg`, sans profil d'objectif ; trait de 0,02 à 0,98 de la largeur, `size` 0,01,
+  `feather` 0, Exposure −2 ; la bande assombrie mesurée par `bandeAssombrie` dans les colonnes 4 à
+  14 %, 45 à 55 % et 86 à 96 % de la largeur, à moins de 0,02 de la hauteur de 0,2). Chaque étape
+  vérifie la photo revenue comme au départ. Le module simulé de `Recette16Tests` imite la 16.0
+  (style gardé seulement si `Glow` > 0, valeurs entières) et ses écarts (trait courbé sans
+  recalage, étalonnage local perdu, Lueur sans effet au rendu).
 
 Pas d'accès pour un module : la Projection automatique, Supprimer › Imperfections, le
 vecteurscope, les points de mise au point affichés, l'optimisation du catalogue. Nouveau dans le
