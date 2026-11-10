@@ -307,11 +307,11 @@ final class CarnetTests: XCTestCase {
         XCTAssertTrue(Carnet.geometrieIntacte(reglages: ["PerspectiveUpright": 0, "PerspectiveScale": 100, "Exposure2012": 1], angleRecadrage: 0))
         for (cle, valeur) in [("PerspectiveUpright", 1.0), ("PerspectiveVertical", -10), ("PerspectiveHorizontal", 3), ("PerspectiveRotate", 0.5),
                               ("PerspectiveAspect", 5), ("PerspectiveScale", 105), ("PerspectiveX", 2), ("PerspectiveY", -2),
-                              ("LensManualDistortionAmount", 4)] {
+                              ("LensManualDistortionAmount", 4), ("ReshapeAmount", 30)] {
             XCTAssertFalse(Carnet.geometrieIntacte(reglages: [cle: .number(valeur)], angleRecadrage: 0), cle)
         }
         XCTAssertFalse(Carnet.geometrieIntacte(reglages: nil, angleRecadrage: 0.005))
-        XCTAssertEqual(Set(Carnet.clesGeometrie).count, 9)
+        XCTAssertEqual(Set(Carnet.clesGeometrie).count, 10, "1.8 : la Projection de Lightroom 16")
         XCTAssertTrue(Carnet.clesGeometrie.allSatisfy { DevelopCatalogue.setting($0) != nil }, "des réglages du catalogue")
         XCTAssertNil(Carnet.constatHorizon(tilt: 2, vertical: false, angleActuel: 0, reglages: ["PerspectiveUpright": 2]))
     }

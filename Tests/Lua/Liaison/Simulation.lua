@@ -178,9 +178,13 @@ end
 -- entière au point de l'image d'origine (de 0 à 1). Chaque rendu note coinsVides, la part de son
 -- cadre qui tombe hors de l'image d'origine. Lightroom calcule aussi les matrices
 -- UprightTransform_* (constaté) ; la simulation les pose au rendu suivant (le moment est supposé).
+-- Constaté dans Lightroom Classic 16.0 (10 novembre 2026, copie JPEG d'Essais sans profil
+-- d'objectif) : la Projection (ReshapeAmount) déforme aussi l'image après coup, les positions des
+-- masques restant dans l'image d'avant (un trait posé droit à 0,2 de la hauteur se courbe de 0,17
+-- au centre à 0,24 au bord sous la Projection 100).
 local function transformee(r)
     for _, cle in ipairs({ 'PerspectiveUpright', 'PerspectiveVertical', 'PerspectiveHorizontal', 'PerspectiveRotate',
-        'PerspectiveAspect', 'PerspectiveX', 'PerspectiveY', 'LensManualDistortionAmount' }) do
+        'PerspectiveAspect', 'PerspectiveX', 'PerspectiveY', 'LensManualDistortionAmount', 'ReshapeAmount' }) do
         if (tonumber(r[cle]) or 0) ~= 0 then
             return true
         end

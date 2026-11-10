@@ -317,7 +317,7 @@ local function preparerContrainte(plan)
     for _, source in ipairs({ plan.actuels, plan.balancePreset or {}, plan.nouveaux }) do
         for cle, valeur in pairs(source) do
             final[cle] = valeur
-            if source ~= plan.actuels and (cle:match('^Crop') or cle:match('^Perspective') or cle:match('^Lens')) then
+            if source ~= plan.actuels and (cle:match('^Crop') or cle:match('^Perspective') or cle:match('^Lens') or cle == 'ReshapeAmount') then
                 touche = true
             end
         end

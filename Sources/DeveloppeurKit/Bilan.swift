@@ -169,8 +169,9 @@ enum Bilan {
 
     // MARK: Empreintes
 
-    /// Réglages d'objectif qui déforment l'image (avec ceux dont la clé commence par « Perspective »).
-    static let clesGeometrie: Set<String> = ["LensProfileEnable", "LensProfileDistortionScale", "LensManualDistortionAmount"]
+    /// Réglages d'objectif et Projection (Lightroom Classic 16) qui déforment l'image (avec ceux dont
+    /// la clé commence par « Perspective »).
+    static let clesGeometrie: Set<String> = ["LensProfileEnable", "LensProfileDistortionScale", "LensManualDistortionAmount", "ReshapeAmount"]
 
     /// Empreinte du cadre d'une réponse « apercu » (avec point_af) : la géométrie de la photo
     /// (dimensions affichées, orientation, cadre), l'angle de recadrage et les réglages qui la

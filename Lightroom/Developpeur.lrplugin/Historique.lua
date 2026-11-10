@@ -361,7 +361,7 @@ local CALIBRAGE = { 'ShadowTint', 'RedHue', 'RedSaturation', 'GreenHue', 'GreenS
 local COURBE_PARAMETRIQUE = { 'ParametricShadows', 'ParametricDarks', 'ParametricLights', 'ParametricHighlights' }
 local OBJECTIF_MANUEL = { 'LensManualDistortionAmount', 'VignetteAmount', 'DefringePurpleAmount', 'DefringeGreenAmount' }
 local TRANSFORMATION = { PerspectiveVertical = 0, PerspectiveHorizontal = 0, PerspectiveRotate = 0, PerspectiveAspect = 0,
-    PerspectiveScale = 100, PerspectiveX = 0, PerspectiveY = 0 }
+    PerspectiveScale = 100, PerspectiveX = 0, PerspectiveY = 0, ReshapeAmount = 0 }
 
 -- Le signe moins et l'espace fine insécable des milliers et des unités (U+2212, U+202F : mesurés
 -- dans Metriques.lua).
@@ -554,6 +554,8 @@ function Historique.ecarts(r, raw)
     ajouter(vignetage and ("Vignetage " .. signe(vignetage)) or nil)
     local grain = ecart(r, 'GrainAmount', 0)
     ajouter(grain and ("Grain " .. chiffres(grain)) or nil)
+    local lueur = ecart(r, 'Glow', 0)
+    ajouter(lueur and ("Lueur " .. chiffres(lueur)) or nil)
     ajouter(touche(r, CALIBRAGE) and "Calibrage touché" or nil)
     recadrage(r, parties)
     local masques = compter(r.MaskGroupBasedCorrections)

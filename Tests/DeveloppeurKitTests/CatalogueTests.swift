@@ -5,7 +5,7 @@ final class CatalogueTests: XCTestCase {
     func testKeysAreUniqueAndRangesAreSane() {
         let keys = DevelopCatalogue.keys
         XCTAssertEqual(Set(keys).count, keys.count)
-        XCTAssertEqual(keys.count, 124)
+        XCTAssertEqual(keys.count, 132, "1.8 : Lueur (7) et Projection de Lightroom 16")
         for setting in DevelopCatalogue.all {
             XCTAssertLessThan(setting.min, setting.max, setting.key)
             XCTAssertFalse(setting.label.isEmpty, setting.key)

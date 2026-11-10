@@ -850,6 +850,43 @@ test("Upright et recadrage dans la même retouche : le cadre se place ensuite su
     egal(S.coinsVides(photo), 0)
 end)
 
+-- 1.8 : la Projection de Lightroom Classic 16 déforme l'image comme Upright (constat de la
+-- simulation) : le recalage la compte et la retire du rendu sans corrections.
+test("geometrie : la Projection (Lightroom 16) est une transformation, retirée du rendu sans corrections", function()
+    local photo = photoFuji()
+    photo.reglages.LensProfileEnable = 0
+    photo.reglages.ReshapeAmount = 60
+    S.active = photo
+    local info = Commandes.executer('geometrie', { photos = { 4 } }).photos[1]
+    egal(info.transformation, true, "la Projection déforme l'image")
+    egal(info.active, true)
+    Commandes.executer('geometrie', { photos = { 4 }, rendre = true })
+    local tel, sans = S.rendus[#S.rendus - 1].reglagesRendus, S.rendus[#S.rendus].reglagesRendus
+    egal(tel.ReshapeAmount, 60)
+    egal(sans.ReshapeAmount, 0, "le rendu sans corrections retire la Projection")
+    egal(photo.reglages.ReshapeAmount, 60, "photo remise")
+    -- L'empreinte suit la Projection : une grille calculée sans elle n'est pas reprise.
+    local avant = info.empreinte
+    photo.reglages.ReshapeAmount = 80
+    egal(Commandes.executer('geometrie', { photos = { 4 } }).photos[1].empreinte ~= avant, true, "la Projection change l'empreinte")
+    photo.reglages.ReshapeAmount = 0
+    photo.reglages.PerspectiveUpright = 1
+    local sansProjection = Commandes.executer('geometrie', { photos = { 4 } }).photos[1].empreinte
+    photo.reglages.ReshapeAmount = nil
+    egal(Commandes.executer('geometrie', { photos = { 4 } }).photos[1].empreinte, sansProjection, "0 vaut une clé absente")
+end)
+
+-- Une version qui ne range pas la Projection (Lightroom 15.x) ne la reçoit pas des rendus du recalage.
+test("geometrie : sans ReshapeAmount rangé, les rendus du recalage ne la posent pas", function()
+    local photo = photoFuji()
+    photo.reglages.PerspectiveUpright = 2
+    photo.reglages.ReshapeAmount = nil
+    S.active = photo
+    Commandes.executer('geometrie', { photos = { 4 }, rendre = true })
+    egal(S.rendus[#S.rendus].reglagesRendus.ReshapeAmount, nil, "rendu sans corrections")
+    egal(photo.reglages.ReshapeAmount, nil, "retour : rien d'ajouté")
+end)
+
 test("geometrie : rendus du recalage case décochée, photo remise", function()
     local photo = photoFuji()
     photo.reglages.PerspectiveUpright = 2

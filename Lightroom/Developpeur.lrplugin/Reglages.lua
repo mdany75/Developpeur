@@ -15,7 +15,7 @@ local Reglages = {}
 -- Lightroom Classic 15.6).
 local DEFAUTS = {
     PerspectiveUpright = 0, PerspectiveVertical = 0, PerspectiveHorizontal = 0, PerspectiveRotate = 0,
-    PerspectiveAspect = 0, PerspectiveScale = 100, PerspectiveX = 0, PerspectiveY = 0, CropConstrainToWarp = 0,
+    PerspectiveAspect = 0, PerspectiveScale = 100, PerspectiveX = 0, PerspectiveY = 0, CropConstrainToWarp = 0, ReshapeAmount = 0,
     ParametricShadowSplit = 25, ParametricMidtoneSplit = 50, ParametricHighlightSplit = 75, CurveRefineSaturation = 100,
 }
 for cle, valeur in pairs(Recadrage.AUCUN) do

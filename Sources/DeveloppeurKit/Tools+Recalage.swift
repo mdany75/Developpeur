@@ -123,7 +123,7 @@ extension ToolHandler {
     /// retouche change la géométrie (le module le signale alors après l'écriture).
     static func changeGeometrie(_ params: [String: JSONValue]) -> Bool {
         if params["preset"] != nil { return true }
-        return (params["reglages"]?.object ?? [:]).keys.contains { $0.hasPrefix("Perspective") || $0.hasPrefix("Lens") }
+        return (params["reglages"]?.object ?? [:]).keys.contains { $0.hasPrefix("Perspective") || $0.hasPrefix("Lens") || $0 == "ReshapeAmount" }
     }
 
     /// Grilles pour un recadrage demandé (`recadrage` sans `retirer`) sur une géométrie qui ne

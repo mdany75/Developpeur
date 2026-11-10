@@ -172,6 +172,17 @@ public enum DevelopCatalogue {
             DevelopSetting("GrainAmount", "Grain : gain", group: "Effets", min: 0, max: 100),
             DevelopSetting("GrainSize", "Grain : taille (défaut 25)", group: "Effets", min: 0, max: 100, neutral: 25),
             DevelopSetting("GrainFrequency", "Grain : cassure (défaut 50)", group: "Effets", min: 0, max: 100, neutral: 50),
+            // Lueur (Lightroom Classic 16.0). Bornes et défauts constatés le 10 novembre 2026 sur une copie
+            // RAW : une valeur hors bornes est remise au défaut par Lightroom, les valeurs sont arrondies à
+            // l'entier ; le style n'est gardé que si la quantité est au-dessus de 0. Styles d'après les
+            // paramètres prédéfinis « Style - Glow » d'Adobe et les libellés français de Lightroom.
+            DevelopSetting("Glow", "Lueur : quantité (diffusion des hautes lumières, effet d'atmosphère)", group: "Effets", min: 0, max: 100, whole: true, since: "16.0"),
+            DevelopSetting("GlowStyle", "Lueur : style (0 diffusion, 1 halo, 2 halation, 3 mouvement, 4 série ; défaut 1 ; gardé seulement si Glow > 0)", group: "Effets", min: 0, max: 4, whole: true, neutral: 1, since: "16.0"),
+            DevelopSetting("GlowRange", "Lueur : gamme, tons qui rayonnent (défaut 50)", group: "Effets", min: 0, max: 100, whole: true, neutral: 50, since: "16.0"),
+            DevelopSetting("GlowSpread", "Lueur : étendue (défaut 50)", group: "Effets", min: 0, max: 100, whole: true, neutral: 50, since: "16.0"),
+            DevelopSetting("GlowWarmth", "Lueur : chaleur", group: "Effets", min: -100, max: 100, whole: true, since: "16.0"),
+            DevelopSetting("GlowDirection", "Lueur : direction en degrés (styles mouvement et série)", group: "Effets", min: -180, max: 180, whole: true, since: "16.0"),
+            DevelopSetting("GlowDirectionalSoftness", "Lueur : douceur (styles mouvement et série, défaut 50)", group: "Effets", min: 0, max: 100, whole: true, neutral: 50, since: "16.0"),
 
             DevelopSetting("LensProfileEnable", "Corrections de profil d'objectif (0 ou 1)", group: "Optique", min: 0, max: 1),
             DevelopSetting("AutoLateralCA", "Suppression de l'aberration chromatique (0 ou 1)", group: "Optique", min: 0, max: 1),
@@ -195,6 +206,9 @@ public enum DevelopCatalogue {
             DevelopSetting("PerspectiveScale", "Transformation : échelle", group: "Transformation", min: 50, max: 150, neutral: 100),
             DevelopSetting("PerspectiveX", "Transformation : décalage horizontal", group: "Transformation", min: -100, max: 100),
             DevelopSetting("PerspectiveY", "Transformation : décalage vertical", group: "Transformation", min: -100, max: 100),
+            // Projection (Lightroom Classic 16.0) : redonne leur forme aux visages et objets étirés aux bords
+            // d'un grand-angle. De 0 à 100, constaté le 10 novembre 2026 (hors bornes : remise à 0).
+            DevelopSetting("ReshapeAmount", "Projection : visages et objets étirés aux bords d'un grand-angle", group: "Transformation", min: 0, max: 100, whole: true, since: "16.0"),
 
             DevelopSetting("ShadowTint", "Calibrage : teinte des ombres", group: "Calibrage de l'appareil", min: -100, max: 100),
             DevelopSetting("RedHue", "Calibrage : rouge primaire, teinte", group: "Calibrage de l'appareil", min: -100, max: 100),

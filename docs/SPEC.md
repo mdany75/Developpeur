@@ -64,6 +64,12 @@ ici. Un point constaté passe dans sa section, avec sa règle dans la simulation
 test, puis sort de cette liste. Tout essai sur une nouvelle copie d'Essais remise à l'origine,
 défait ensuite.
 
+**Lightroom Classic 16 (1.8)**
+
+- Recalage de la Projection par le module 1.8 chargé : trait de pinceau droit sur une copie à `ReshapeAmount` 100, et `--recalage` — dans la recette ou à la main ([Lightroom Classic 16](#lightroom-classic-16-18)).
+- Photo hors ligne (original et aperçu dynamique absents) : `applyDevelopSettings` de la 16 la saute avec une fenêtre ; ce que voit Claude — à la main, avec Dany ([Lightroom Classic 16](#lightroom-classic-16-18)).
+- Raccourcis ⌃⌥C et ⌘⌃⌥C sous la 16 (trois espaces devant le titre, relevés dans la 15.6) — à la main dans Lightroom.
+
 **Liaison et commandes longues**
 
 - Réponse perdue reprise par le serveur, une seule écriture à l'Historique — à la main dans Lightroom ([Réponse perdue](#réponse-perdue-reprise-au-module-après-la-151)).
@@ -3130,13 +3136,13 @@ Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou
 
 ## Réglages
 
-Les 124 réglages globaux de `Catalogue.swift`, par leur nom dans le SDK de Lightroom (le même que
+Les 132 réglages globaux de `Catalogue.swift`, par leur nom dans le SDK de Lightroom (le même que
 dans les XMP) : balance des blancs, tonalité (`*2012`), HDR (`HDREditMode`, `HDRMaxValue`, curseurs
 `SDR*` de l'aperçu SDR), présence, courbe paramétrique (ses trois limites de zones et « Affiner la
 saturation » compris), TSL, noir et
 blanc (`ConvertToGrayscale`, rangé en booléen, et `GrayMixer*`), étalonnage des couleurs, détail
-(dont les réglages fins du bruit), effets (dont le style du vignetage), optique (dont la distorsion
-et le vignetage manuels, les franges), transformation (`Perspective*`), calibrage de l'appareil. Le serveur refuse un nom inconnu et ramène une
+(dont les réglages fins du bruit), effets (dont le style du vignetage, et la Lueur `Glow*` de la 16), optique (dont la distorsion
+et le vignetage manuels, les franges), transformation (`Perspective*`, et la Projection `ReshapeAmount` de la 16), calibrage de l'appareil. Le serveur refuse un nom inconnu et ramène une
 valeur absolue dans sa plage ; le module borne de nouveau (valeurs relatives comprises), règle la
 plage de la température et de la teinte selon la photo (RAW : 2000 à 50000 K et ±150 ; autres :
 ±100, rangées par Lightroom dans `IncrementalTemperature` et `IncrementalTint`), arrondit (exposition au centième, rayon de netteté au dixième, le reste à l'unité), puis
@@ -3204,6 +3210,52 @@ Exclus : suppression générative d'Adobe, fusions HDR et panorama, retouche au 
 n'expose pas. Changer un vêtement ou un objet, sur demande, passe hors de Lightroom par Fibo 2 (voir
 Retouche générative par Fibo 2). Le débruitage, les détails bruts et la super résolution passent par `ameliorer` (voir
 Débruitage, détails bruts, super résolution).
+
+### Lightroom Classic 16 (1.8)
+
+Lightroom Classic 16.0 (Camera Raw 19.0, version de processus toujours 6, macOS 14 au moins) :
+recette de la 1.7.1 réussie le 10 novembre 2026, 88 étapes sur 88, sur trois nouvelles copies
+d'Essais (53855784 portrait RAW, 53855688 JPEG, 53855742 X-T20) ; formes des masques relues
+« gardé » (dégradé, radial, pinceau, plage), objets et personne précise calculés : la 16.0 rejoint la
+15.6 dans `versionsFormesMasques`. Le SDK ne retire rien ; `LrSdkVersion` 13.3 reste accepté.
+
+Constaté le 10 novembre 2026 sur la copie RAW 53918083 (« Essai mesures 16 »), par
+`apply_settings` puis `--dump` :
+
+- **Lueur** : `Glow` 0 à 100 (défaut 0), `GlowStyle` 0 à 4 (défaut 1), `GlowRange`, `GlowSpread`,
+  `GlowDirectionalSoftness` 0 à 100 (défaut 50), `GlowWarmth` −100 à 100, `GlowDirection` −180 à
+  180. Une valeur hors bornes est remise au défaut par Lightroom (et non bornée) : le serveur la
+  ramène lui-même dans sa plage. Les valeurs sont arrondies à l'entier. `GlowStyle` n'est gardé
+  que si la quantité est au-dessus de 0. Styles (paramètres prédéfinis « Style - Glow » d'Adobe et
+  libellés français) : 0 Diffusion, 1 Halo, 2 Halation, 3 Mouvement, 4 Série.
+- **Projection** : `ReshapeAmount` 0 à 100 (hors bornes : 0), rendue sans autre préférence.
+  Constaté sur la copie JPEG 54011312 sans profil d'objectif : un trait de pinceau posé droit à
+  0,2 de la hauteur se courbe sous la Projection 100 (0,17 au centre, 0,24 au bord ; droit sans
+  elle). Lightroom range donc les positions dans l'image d'avant la Projection, comme pour
+  Upright : elle entre dans `Recalage.transformationActive`, `NEUTRE_GEOMETRIE` (rendu sans
+  corrections à 0) et `empreinteGeometrie` (une grille calculée sans elle n'est pas reprise),
+  `Carnet.clesGeometrie`, `Bilan.clesGeometrie`, `changeGeometrie` (un cadre demandé dans la même
+  retouche attend la nouvelle grille) et la case « Contraindre le recadrage » ; la simulation la
+  déforme (`transformee`). Une photo qui ne range pas `ReshapeAmount` (Lightroom 15.x) ne la reçoit
+  pas des rendus du recalage.
+- **Étalonnage dans un masque** (`LocalColorGrade*`) : rangé à l'échelle des curseurs globaux, en
+  entiers (0,5 devient 1). Un radial couvrant toute l'image, teinte 240 et saturation 50 (puis 100),
+  rend au pixel près comme le même étalonnage global (moyennes 47,6/48,5/61,9 et 32,9/42,0/71,7).
+  Sans `LocalColorGradeBlending` écrit, le rendu égale celui de la fusion globale par défaut :
+  le module n'écrit ces clés que si elles sont demandées (absentes de `Locaux.NEUTRES`).
+- **Lueur dans un masque** (`LocalGlow`) : de 0 à 1, ajoutée à la quantité globale (0,4 local rend
+  comme `Glow` 40 ; `Glow` 40 et 0,6 local comme `Glow` 100 ; −1 sans effet). Style, gamme et
+  chaleur restent ceux de la photo (« Les paramètres de Lueur sont globaux et partagés entre tous
+  les masques », libellé de Lightroom).
+- Ces réglages sont refusés sous une version plus ancienne que la 16.0 (`since`,
+  `localAdjustmentsSince`), sans rien envoyer.
+
+Pas d'accès pour un module : la Projection automatique, Supprimer › Imperfections, le
+vecteurscope, les points de mise au point affichés, l'optimisation du catalogue. Nouveau dans le
+SDK, non employé (non documenté) : `catalog:applyDevelopSettings` pour une série,
+`photo:copySettings` et `pasteSettings` (le Copier-Coller de Lightroom). `photo:applyDevelopSettings`
+passe maintenant par le moteur de rendu : la recette 88/88 le tient dans les délais ; une photo
+hors ligne y serait sautée avec une fenêtre (à constater).
 
 ## Profil
 

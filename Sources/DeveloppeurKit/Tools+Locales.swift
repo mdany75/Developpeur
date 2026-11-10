@@ -30,7 +30,31 @@ extension ToolHandler {
         // de −1 à +1, curseur ×100 pour le grain, ±180° pour la teinte).
         ("Hue", "LocalHue", -180...180, 1.0 / 180, "teinte : décalage en degrés"),
         ("Grain", "LocalGrain", -100...100, 0.01, "grain"),
+        // Lightroom Classic 16.0, constaté le 10 novembre 2026 : l'étalonnage d'un masque se range à
+        // l'échelle des curseurs globaux, en entiers (un masque sur toute l'image rend comme le même
+        // étalonnage global) ; la lueur d'un masque de 0 à 1, ajoutée à la quantité globale (style,
+        // gamme, chaleur restent ceux de la photo : Glow… d'apply_settings).
+        ("ColorGradeShadowHue", "LocalColorGradeShadowHue", 0...359, 1, "étalonnage : teinte des ombres en degrés"),
+        ("ColorGradeShadowSat", "LocalColorGradeShadowSat", 0...100, 1, "étalonnage : saturation des ombres"),
+        ("ColorGradeShadowLum", "LocalColorGradeShadowLum", -100...100, 1, "étalonnage : luminance des ombres"),
+        ("ColorGradeMidtoneHue", "LocalColorGradeMidtoneHue", 0...359, 1, "étalonnage : teinte des tons moyens en degrés"),
+        ("ColorGradeMidtoneSat", "LocalColorGradeMidtoneSat", 0...100, 1, "étalonnage : saturation des tons moyens"),
+        ("ColorGradeMidtoneLum", "LocalColorGradeMidtoneLum", -100...100, 1, "étalonnage : luminance des tons moyens"),
+        ("ColorGradeHighlightHue", "LocalColorGradeHighlightHue", 0...359, 1, "étalonnage : teinte des hautes lumières en degrés"),
+        ("ColorGradeHighlightSat", "LocalColorGradeHighlightSat", 0...100, 1, "étalonnage : saturation des hautes lumières"),
+        ("ColorGradeHighlightLum", "LocalColorGradeHighlightLum", -100...100, 1, "étalonnage : luminance des hautes lumières"),
+        ("ColorGradeGlobalHue", "LocalColorGradeGlobalHue", 0...359, 1, "étalonnage : teinte globale en degrés"),
+        ("ColorGradeGlobalSat", "LocalColorGradeGlobalSat", 0...100, 1, "étalonnage : saturation globale"),
+        ("ColorGradeGlobalLum", "LocalColorGradeGlobalLum", -100...100, 1, "étalonnage : luminance globale"),
+        ("ColorGradeBlending", "LocalColorGradeBlending", 0...100, 1, "étalonnage : fusion"),
+        ("ColorGradeBalance", "LocalColorGradeBalance", -100...100, 1, "étalonnage : équilibre"),
+        ("Glow", "LocalGlow", 0...100, 0.01, "lueur"),
     ]
+    /// Réglages locaux récents : version de Lightroom Classic qui les connaît (refusés avant).
+    static let localAdjustmentsSince: [String: String] = Dictionary(uniqueKeysWithValues:
+        localAdjustments.filter { $0.key.hasPrefix("LocalColorGrade") || $0.key == "LocalGlow" }.map { ($0.name, "16.0") })
+    /// Réglages locaux qui sont des angles : l'intensité d'un masque ne les change pas.
+    static func estAngle(_ name: String) -> Bool { name == "ToningHue" || (name.hasPrefix("ColorGrade") && name.hasSuffix("Hue")) }
     /// Courbe locale par canal : clé de la correction (relevé : un tableau de textes « x,y »).
     static let localCurveKeys: [(channel: String, key: String)] = [("rgb", "MainCurve"), ("red", "RedCurve"), ("green", "GreenCurve"), ("blue", "BlueCurve")]
 
@@ -244,7 +268,7 @@ extension ToolHandler {
                  ] + writeProperties,
                  required: []),
             tool("retouch_spots",
-                 "Efface des taches (poussières du capteur, petits défauts) et corrige des yeux rouges sur une photo, en une étape « Claude · <step_name> ». Taches déjà posées (les siennes ou celles de l'utilisateur) : action list les numérote avec leur position et leur opacité (0 à 100) ; remove en retire (tous les numéros en un appel : ensuite ils se décalent, la réponse donne la liste renumérotée), opacity change leur opacité (spot_numbers), clear vide toutes les taches ou tous les yeux rouges, chacune en une étape que undo_last défait ; spots et red_eyes vont sans action. Positions dans l'image telle que la montre view_photo ; pour viser juste, regarder d'abord la zone avec view_photo et region (zoom). Yeux rouges : seulement des pupilles rouges vues dans un zoom (sur une pupille sombre, la correction grise l'iris et la paupière), au centre de la pupille vu dans le zoom (Vision peut s'en écarter de quelques pixels sur des yeux plissés), au rayon que donne Vision, puis vérifier par un zoom. Le serveur recale les positions sur la correction d'objectif, Upright et la perspective (deux rendus de plus la première fois). Les retouches déjà présentes restent. Respecte le mode « Proposer d'abord » (confirm).",
+                 "Efface des taches (poussières du capteur, petits défauts) et corrige des yeux rouges sur une photo, en une étape « Claude · <step_name> ». Taches déjà posées (les siennes ou celles de l'utilisateur) : action list les numérote avec leur position et leur opacité (0 à 100) ; remove en retire (tous les numéros en un appel : ensuite ils se décalent, la réponse donne la liste renumérotée), opacity change leur opacité (spot_numbers), clear vide toutes les taches ou tous les yeux rouges, chacune en une étape que undo_last défait ; spots et red_eyes vont sans action. Positions dans l'image telle que la montre view_photo ; pour viser juste, regarder d'abord la zone avec view_photo et region (zoom). Yeux rouges : seulement des pupilles rouges vues dans un zoom (sur une pupille sombre, la correction grise l'iris et la paupière), au centre de la pupille vu dans le zoom (Vision peut s'en écarter de quelques pixels sur des yeux plissés), au rayon que donne Vision, puis vérifier par un zoom. Le serveur recale les positions sur la correction d'objectif, Upright et la perspective (deux rendus de plus la première fois). Les retouches déjà présentes restent. Imperfections de la peau (boutons, petites taches) sur un portrait : dans Lightroom Classic 16, proposer l'outil Supprimer › Imperfections, à faire à la main (aucun module ne peut le lancer). Respecte le mode « Proposer d'abord » (confirm).",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("spots", ["type": "array", "items": spot, "maxItems": .number(Double(Self.maxSpots)), "description": "Taches à effacer."]),
@@ -370,7 +394,7 @@ extension ToolHandler {
             if releveFormes { params["releve_formes"] = true }
             let reponse = try lightroom.send("masquer", params, timeout: 180)
             // La version de Lightroom vient avec la réponse : une autre que celle des formes relevées
-            // se dit (versionFormesMasques), sans rien refuser ; plus court quand la relecture du
+            // se dit (versionsFormesMasques), sans rien refuser ; plus court quand la relecture du
             // module (masques_relus) a tout trouvé gardé.
             if let version = reponse["lightroom"]?.string {
                 versionLightroom = version
@@ -555,8 +579,8 @@ extension ToolHandler {
     static func describe(_ locaux: [String: Double], facteur: Double) -> String {
         let parts = localAdjustments.compactMap { item -> String? in
             guard let value = locaux[item.key] else { return nil }
-            let shown = (value * (item.name == "ToningHue" ? 1 : facteur) / item.scale * 100).rounded() / 100
-            let text = (shown > 0 && item.name != "ToningHue" ? "+" : "") + format(shown).replacingOccurrences(of: ".", with: ",")
+            let shown = (value * (estAngle(item.name) ? 1 : facteur) / item.scale * 100).rounded() / 100
+            let text = (shown > 0 && !estAngle(item.name) ? "+" : "") + format(shown).replacingOccurrences(of: ".", with: ",")
             let label = item.label.replacingOccurrences(of: " en IL", with: "").replacingOccurrences(of: " en degrés", with: "")
             return "\(label) \(text)\(item.name == "Exposure" ? " IL" : "")"
         }
@@ -611,18 +635,19 @@ extension ToolHandler {
         }
     }
 
-    /// Version de Lightroom Classic où les formes écrites des masques à position (dégradés,
-    /// pinceau, objet, plage de couleurs, personne précise) ont été relevées et constatées. Une
+    /// Versions de Lightroom Classic où les formes écrites des masques à position (dégradés,
+    /// pinceau, objet, plage de couleurs, personne précise) ont été relevées et constatées (16.0 : la
+    /// recette du 10 novembre 2026, 88 étapes, toutes ces formes relues « gardé » ou calculées). Une
     /// autre version peut les ranger autrement : le serveur le dit (get_status, add_mask), sans
     /// rien refuser.
-    static let versionFormesMasques = "15.6"
+    static let versionsFormesMasques = ["15.6", "16.0"]
 
-    /// L'avertissement pour une autre version que `versionFormesMasques` (majeure et mineure), ou
-    /// nil. Version inconnue (module ancien, faux module) : nil.
+    /// L'avertissement pour une version absente de `versionsFormesMasques` (majeure et mineure),
+    /// ou nil. Version inconnue (module ancien, faux module) : nil.
     static func avertissementFormesMasques(_ version: String) -> String? {
         let numeros = { (texte: String) in texte.split(separator: ".").prefix(2).map { Int($0.prefix { $0.isNumber }) ?? 0 } }
-        guard !version.isEmpty, numeros(version) != numeros(versionFormesMasques) else { return nil }
-        return "Lightroom Classic \(version) : les formes des dégradés, pinceaux, objets, plages de couleurs et personnes précises ont été relevées dans la \(versionFormesMasques). Vérifier le premier masque de ce genre (add_mask avec mask_map, ou view_photo) avant d'en poser d'autres, et dire à l'utilisateur s'il est mal placé."
+        guard !version.isEmpty, !versionsFormesMasques.contains(where: { numeros($0) == numeros(version) }) else { return nil }
+        return "Lightroom Classic \(version) : les formes des dégradés, pinceaux, objets, plages de couleurs et personnes précises ont été relevées dans la \(versionsFormesMasques.joined(separator: " et la ")). Vérifier le premier masque de ce genre (add_mask avec mask_map, ou view_photo) avant d'en poser d'autres, et dire à l'utilisateur s'il est mal placé."
     }
 
     /// L'avertissement de version d'un appel d'add_mask, d'après la relecture des formes du module
@@ -762,6 +787,7 @@ extension ToolHandler {
             }
             locals[item.key] = .number(number * item.scale)
         }
+        try verifierVersion(adjustments.keys.sorted().compactMap { name in Self.localAdjustmentsSince[name].map { (name, $0) } })
 
         var (result, name) = try areaParameter(mask, kind: kind, path: path)
         result["locaux"] = .object(locals)

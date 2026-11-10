@@ -24,7 +24,7 @@ local Recalage = {}
 -- positions calculées sur l'image non transformée peuvent être décalées.
 local function transformationActive(actuels)
     for _, cle in ipairs({ 'PerspectiveUpright', 'PerspectiveVertical', 'PerspectiveHorizontal', 'PerspectiveRotate',
-        'PerspectiveAspect', 'PerspectiveX', 'PerspectiveY', 'LensManualDistortionAmount' }) do
+        'PerspectiveAspect', 'PerspectiveX', 'PerspectiveY', 'LensManualDistortionAmount', 'ReshapeAmount' }) do
         if (valeurNumerique(actuels[cle]) or 0) ~= 0 then
             return true
         end
@@ -36,7 +36,7 @@ end
 local NEUTRE_GEOMETRIE = {
     LensProfileEnable = 0, LensManualDistortionAmount = 0, PerspectiveUpright = 0, PerspectiveVertical = 0,
     PerspectiveHorizontal = 0, PerspectiveRotate = 0, PerspectiveAspect = 0, PerspectiveScale = 100,
-    PerspectiveX = 0, PerspectiveY = 0,
+    PerspectiveX = 0, PerspectiveY = 0, ReshapeAmount = 0,
 }
 
 -- Une correction géométrique déplace-t-elle l'image ? Le profil d'objectif, actif sur la plupart
@@ -59,7 +59,8 @@ local function empreinteGeometrie(photo, actuels)
     local morceaux = { tostring(largeur), tostring(hauteur), tostring(brut(photo, 'orientation')) }
     local cles = {}
     for cle, valeur in pairs(actuels) do
-        if (cle:match('^LensProfile') or cle:match('^LensManual') or cle:match('^Perspective') or cle:match('^Upright'))
+        if (cle:match('^LensProfile') or cle:match('^LensManual') or cle:match('^Perspective') or cle:match('^Upright')
+            or cle == 'ReshapeAmount')
             and not cle:match('^UprightTransform')
             and (NEUTRE_GEOMETRIE[cle] == nil or valeurNumerique(valeur) ~= NEUTRE_GEOMETRIE[cle]) then
             cles[#cles + 1] = cle

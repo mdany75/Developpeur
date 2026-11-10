@@ -587,7 +587,10 @@ cadre.
   paramétrique et par points (RVB et par canal), TSL, noir et blanc et son mélangeur, étalonnage
   des couleurs, couleur ponctuelle, netteté et réduction du bruit, vignetage et grain, corrections
   d'objectif, transformation (Upright, perspective), calibrage, mode HDR (édition HDR, limite HDR,
-  curseurs de l'aperçu SDR). En valeurs absolues ou en décalage, sur une photo, une liste de
+  curseurs de l'aperçu SDR). Avec Lightroom Classic 16 (1.8) : la Lueur (quantité, style
+  Diffusion, Halo, Halation, Mouvement ou Série, gamme, étendue, chaleur, direction, douceur),
+  dosée avec retenue, et la Projection, qui redonne leur forme aux visages étirés aux bords d'un
+  grand-angle. En valeurs absolues ou en décalage, sur une photo, une liste de
   photos ou toute la sélection.
 - Profils : Adobe Standard, les simulations de film Fujifilm des RAW (PROVIA, Velvia, ASTIA,
   CLASSIC CHROME, REALA ACE, PRO Neg., ETERNA, ACROS, MONOCHROME), et tous les profils à base de
@@ -632,6 +635,9 @@ cadre.
   désigné par un cadre ou un trait, pinceau le long de traits (éclaircir et assombrir à la main),
   dégradés linéaires et radiaux, plages de luminance, de couleurs (prélevées dans l'image) et de
   profondeur (photos Portrait d'iPhone).
+- Avec Lightroom Classic 16 (1.8), l'étalonnage des couleurs (ombres, tons moyens, hautes
+  lumières, global, fusion, équilibre) et la lueur dans un masque : des ombres plus froides dans
+  le ciel seulement, une lueur sur une seule lampe. Le style de la lueur reste celui de la photo.
 - Éclaircir et assombrir comme un tireur en chambre noire, pour mener l'œil au sujet, en une seule
   étape « Claude · éclaircir et assombrir » : les grandes zones trop claires assombries par un
   dégradé linéaire (−0,3 à −0,7 IL), le sujet ou le visage éclairci par un dégradé radial (+0,2 à
@@ -1297,13 +1303,17 @@ Le SDK de Lightroom ne donne pas tout aux modules. Claude vous propose de faire 
 - **Fusion HDR et panorama** (Photo › Fusion de photos), et la correction de champ plat.
 - **Mise au point du flou d'objectif par un cadre tracé sur l'image** : Claude la règle sur le
   sujet ou sur une plage de profondeur.
+- **Imperfections de la peau en un clic** (Lightroom Classic 16 : Supprimer › Imperfections) et
+  **Projection automatique** (bouton Automatique du panneau Transformation) : Claude règle la
+  Projection lui-même, mais aucun module ne peut lancer ces deux boutons.
 
 Le débruitage, les détails bruts, la super résolution et la suppression des reflets demandent
 Lightroom Classic 15.3 ou plus récent ; le contour d'un masque IA, 15.5. La plage de couleurs suit
 un modèle de couleur approché : Claude en vérifie la sélection sur l'aperçu ; une plage ne prend
 qu'une couleur (deux font planter Lightroom 15.6), une autre couleur s'y ajoute en seconde plage.
+La Lueur, la Projection, l'étalonnage et la lueur dans un masque demandent Lightroom Classic 16.
 Les formes des dégradés, pinceaux, objets et plages de couleurs ont été relevées dans Lightroom
-Classic 15.6 : sous une autre version, `get_status` et `add_mask` le disent, et Claude vérifie le
+Classic 15.6 et vérifiées dans la 16.0 : sous une autre version, `get_status` et `add_mask` le disent, et Claude vérifie le
 premier masque de ce genre. Depuis la 1.6, chaque dégradé, pinceau ou plage que Claude pose est
 relu tout de suite dans Lightroom et comparé à ce qui a été écrit : un masque que Lightroom n'a pas
 gardé tel quel est retiré tout de suite (depuis la 1.6.3), le reste de la retouche restant en

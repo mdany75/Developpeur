@@ -119,7 +119,7 @@ extension ToolHandler {
     var developDefinitions: [JSONValue] {
         [
             tool("apply_settings",
-                 "Applique une retouche globale en une étape du panneau Historique nommée « Claude · <step_name> » : réglages, profil, recadrage, courbe par points, couleur ponctuelle, balance des blancs ou tonalité automatique, flou d'objectif, paramètre prédéfini. L'état d'avant Claude est mémorisé. Valeurs absolues par défaut ; relative = true ajoute les valeurs de settings aux valeurs actuelles (utile pour décaler une série). Les valeurs hors plage sont ramenées dans la plage et signalées. Si le module est en mode « Proposer d'abord », il refuse sans confirm = true : montrer alors les valeurs (ou preview_settings) à l'utilisateur, attendre son accord, puis rappeler avec confirm = true.",
+                 "Applique une retouche globale en une étape du panneau Historique nommée « Claude · <step_name> » : réglages, profil, recadrage, courbe par points, couleur ponctuelle, balance des blancs ou tonalité automatique, flou d'objectif, paramètre prédéfini. L'état d'avant Claude est mémorisé. Valeurs absolues par défaut ; relative = true ajoute les valeurs de settings aux valeurs actuelles (utile pour décaler une série). Les valeurs hors plage sont ramenées dans la plage et signalées. Lightroom Classic 16 : Lueur (Glow…, avec retenue, sur demande ou pour une atmosphère : contre-jour, lumières de nuit, portrait doux) et Projection (ReshapeAmount : visages et objets étirés aux bords d'un grand-angle). Si le module est en mode « Proposer d'abord », il refuse sans confirm = true : montrer alors les valeurs (ou preview_settings) à l'utilisateur, attendre son accord, puis rappeler avec confirm = true.",
                  properties: developProperties + writeProperties + targetProperties,
                  required: ["step_name"]),
             tool("preview_settings",
@@ -463,7 +463,7 @@ extension ToolHandler {
             params["recadrage"] = crop
             labelled += DevelopCatalogue.cropKeys
         }
-        if params["recadrage"] != nil || values.keys.contains(where: { $0.hasPrefix("Perspective") || $0.hasPrefix("Lens") }) {
+        if params["recadrage"] != nil || values.keys.contains(where: { $0.hasPrefix("Perspective") || $0.hasPrefix("Lens") || $0 == "ReshapeAmount" }) {
             labelled += DevelopCatalogue.cropKeys + [DevelopCatalogue.constrainCropKey]
         }
         if let curves = try toneCurveParameter(args) {

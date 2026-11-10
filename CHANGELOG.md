@@ -1,5 +1,34 @@
 # Changements
 
+## 1.8 — 2026-11-10
+
+La 1.8 suit Lightroom Classic 16 : Développeur y a été vérifié en entier (recette de 88 étapes
+réussie), et Claude sait employer trois nouveautés de la 16.
+
+### Ajouté
+- **Lueur** (panneau Effets de Lightroom 16) : Claude peut doser la lueur et ses six réglages
+  (style Diffusion, Halo, Halation, Mouvement ou Série, gamme, étendue, chaleur, direction,
+  douceur), avec retenue, sur votre demande ou pour une atmosphère : contre-jour, lumières de nuit,
+  portrait doux.
+- **Projection** (panneau Transformation) : redonne leur forme aux visages et aux objets étirés
+  aux bords d'une photo au grand-angle. Les masques et les taches que Claude pose sur une photo
+  ainsi corrigée restent à leur place : la Projection compte dans le recalage des positions, comme
+  Upright.
+- **Étalonnage des couleurs et lueur dans un masque** : par exemple des ombres plus froides dans le
+  ciel seulement, ou une lueur sur une seule lampe.
+- Pour les imperfections de la peau, Claude vous propose le nouvel outil de Lightroom 16
+  (Supprimer › Imperfections), à faire à la main : aucun module ne peut le lancer.
+
+### Changé
+- Sous Lightroom 16, Claude ne vous met plus en garde à chaque masque : les formes des dégradés,
+  pinceaux, objets, plages de couleurs et personnes ont été vérifiées dans la 16.
+- Sous une version plus ancienne que la 16, ces nouveaux réglages sont refusés avec leur raison,
+  sans rien écrire.
+
+### Après l'installation
+- Quittez et relancez Lightroom, puis Claude Desktop, et ouvrez une nouvelle session de Claude
+  Code.
+
 ## 1.7.1 — 2026-11-07
 
 ### Corrigé

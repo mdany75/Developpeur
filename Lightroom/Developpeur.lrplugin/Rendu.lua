@@ -237,9 +237,12 @@ end
 local function rendreGeometrie(photo, actuels, taille, suivi)
     -- La grille porte sur l'image entière : cadre retiré et case décochée le temps des rendus.
     local sansCadre, retour = sansRecadrage(actuels)
+    -- La Projection (Lightroom Classic 16) : une version qui ne la range pas ne la reçoit pas.
+    local ignorees = { ReshapeAmount = actuels.ReshapeAmount == nil or nil }
     for cle in pairs(NEUTRE_GEOMETRIE) do
         local actuel = actuels[cle]
-        if actuel ~= nil then
+        if ignorees[cle] then
+        elseif actuel ~= nil then
             retour[cle] = pourLightroom(actuel)
         elseif DEFAUTS[cle] ~= nil then
             retour[cle] = DEFAUTS[cle]
@@ -255,7 +258,9 @@ local function rendreGeometrie(photo, actuels, taille, suivi)
         corrige = rendre(photo, taille, suivi)
         local neutre = {}
         for cle, valeur in pairs(sansCadre) do neutre[cle] = valeur end
-        for cle, valeur in pairs(NEUTRE_GEOMETRIE) do neutre[cle] = valeur end
+        for cle, valeur in pairs(NEUTRE_GEOMETRIE) do
+            if not ignorees[cle] then neutre[cle] = valeur end
+        end
         poser(photo, "Claude · recalage (sans correction)", neutre)
         origine = rendre(photo, taille, suivi)
     end)

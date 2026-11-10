@@ -347,6 +347,7 @@ Conversation.libelles = {
     Tint = "Teinte", Vibrance = "Vibrance", Saturation = "Saturation", Clarity2012 = "Clarté",
     Dehaze = "Correction du voile", Texture = "Texture", PostCropVignetteAmount = "Vignetage",
     GrainAmount = "Grain", Sharpness = "Netteté", LuminanceSmoothing = "Réduction du bruit",
+    Glow = "Lueur", ReshapeAmount = "Projection",
 }
 
 local function affichage(v)

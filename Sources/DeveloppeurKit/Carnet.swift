@@ -72,7 +72,7 @@ public enum Carnet {
     /// (Recalage.transformationActive du module) ; le recadrage tourné vient de `recadrage.angle`.
     public static let clesGeometrie = ["PerspectiveUpright", "PerspectiveVertical", "PerspectiveHorizontal", "PerspectiveRotate",
                                        "PerspectiveAspect", "PerspectiveScale", "PerspectiveX", "PerspectiveY",
-                                       "LensManualDistortionAmount"]
+                                       "LensManualDistortionAmount", "ReshapeAmount"]
 
     // MARK: Constats
 
