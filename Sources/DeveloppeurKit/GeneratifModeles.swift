@@ -4,8 +4,10 @@ import Foundation
 /// « maintenant que tu as plusieurs autres modèles de retouche, regarde dans Fibo 2 Studio, emploie le
 /// bon modèle, celui qui te donne le meilleur résultat ». D'après l'étude du même jour (mflux 0.24.0,
 /// `--help` de chaque commande, Fibo 2 Studio 2.16) : Fibo 2 par défaut pour toute retouche dans une
-/// zone ; Qwen-Image 2.1 Turbo, seul autre modèle de mflux à comprendre un vrai masque (`--mask-image`,
-/// blanc = repeindre, recollage exact hors du masque), à départager par le banc d'essai que Dany juge
+/// zone ; Qwen-Image 2.1 Turbo, seul autre modèle de retouche par consigne de mflux à lire un masque
+/// (`--mask-image`, blanc = repeindre, recollage exact hors du masque ; mflux-generate-fill, le
+/// remplissage de FLUX.1 Fill par `--masked-image-path`, en lit un aussi, sans consigne de retouche ni
+/// photo de référence, et n'est pas au catalogue), à départager par le banc d'essai que Dany juge
 /// (`--generatif-banc`) ; Qwen-Image-Edit-2511 et FLUX 3 Klein (sans masque) pour plus tard ; Krea 2
 /// Turbo écarté (création seulement, aucune retouche dans mflux) ; SeedVR2 reste l'agrandissement de la
 /// zone (`Generatif.nomSeedVR`). Ici, les données pures : le catalogue, la table « genre de retouche →
@@ -51,6 +53,11 @@ public enum ModeleGeneratif: String, CaseIterable {
         public let optionMasque: String?
         /// Le nombre de photos de référence que la commande accepte (le connecteur en donne une au plus).
         public let referencesMax: Int
+        /// La quantification passée à mflux (`--quantize`, bits) ; nil : les poids tels quels. Qwen-Image
+        /// 2.1 en 8 bits : environ 33 Go en bf16, sur un Mac de 48 Go avec Lightroom ouvert (le Mac a
+        /// gelé le 29 octobre 2026 avec deux calculs) ; `--quantize {3,4,5,6,8}` lu dans le `--help` de
+        /// mflux-generate-qwen-2.1-edit installé, le 10 novembre 2026.
+        public let quantification: Int?
         public let statut: Statut
         /// Vrai : generative_edit sait le lancer.
         public let branche: Bool
@@ -69,7 +76,7 @@ public enum ModeleGeneratif: String, CaseIterable {
             return Fiche(modele: self, nom: "Fibo 2", executable: Generatif.nomExecutable, optionModele: [],
                          depot: Generatif.depotNormal, revision: "fb2b781f9e9e5572a6c348a5af7a4d155a2b1ed0",
                          dossiers: ["transformer", "text_encoder", "vae"], etapes: nil, multiple: 16,
-                         optionMasque: "--mask-path", referencesMax: 5, statut: .parDefaut, branche: true,
+                         optionMasque: "--mask-path", referencesMax: 5, quantification: nil, statut: .parDefaut, branche: true,
                          telechargeAuPremierUsage: true, licence: "CC BY-NC 4.0",
                          pourQuoi: "retouche dans une zone (masque natif), fiche de FIBO-vlm ; le seul essayé sur les photos de Dany")
         case .qwenImage21:
@@ -77,7 +84,7 @@ public enum ModeleGeneratif: String, CaseIterable {
                          optionModele: ["--model", "qwen-image-2.1-turbo"],
                          depot: "Qwen/Qwen-Image-2.1-Turbo", revision: "fc13ba1986fcb905854dc8de2f52eee395f49b5b",
                          dossiers: ["transformer", "text_encoder", "vae", "processor"], etapes: 8, multiple: 32,
-                         optionMasque: "--mask-image", referencesMax: 10, statut: .aDepartager, branche: true,
+                         optionMasque: "--mask-image", referencesMax: 10, quantification: 8, statut: .aDepartager, branche: true,
                          telechargeAuPremierUsage: false, licence: "recherche, usage non commercial",
                          pourQuoi: "retouche dans une zone, rapide (8 étapes, sans guidage) ; recolle exactement la photo hors du masque")
         case .qwenEdit2511:
@@ -85,7 +92,7 @@ public enum ModeleGeneratif: String, CaseIterable {
                          optionModele: ["--model", "qwen-image-edit-2511"],
                          depot: "Qwen/Qwen-Image-Edit-2511", revision: "6f3ccc0b56e431dc6a0c2b2039706d7d26f22cb9",
                          dossiers: ["transformer", "text_encoder", "vae"], etapes: 20, multiple: 16,
-                         optionMasque: nil, referencesMax: 3 /* 1 à 3 images (fiche de Qwen-Image-Edit-2509) */, statut: .plusTard, branche: false,
+                         optionMasque: nil, referencesMax: 3 /* 1 à 3 images (fiche de Qwen-Image-Edit-2509) */, quantification: nil, statut: .plusTard, branche: false,
                          telechargeAuPremierUsage: false, licence: "Apache 2.0",
                          pourQuoi: "consigne simple sans masque ; environ 39 Go annoncés, à mesurer avec Lightroom ouvert")
         case .flux3Klein:
@@ -93,9 +100,24 @@ public enum ModeleGeneratif: String, CaseIterable {
                          optionModele: [],
                          depot: "black-forest-labs/flux-3-image-klein", revision: "8454017f9ebaada30c998fccd9f67a80c7580f68",
                          dossiers: ["transformer", "text_encoder", "vae"], etapes: 16, multiple: 16,
-                         optionMasque: nil, referencesMax: 10, statut: .plusTard, branche: false,
+                         optionMasque: nil, referencesMax: 10, quantification: nil, statut: .plusTard, branche: false,
                          telechargeAuPremierUsage: false, licence: "FLUX Kommunity (non relue)",
                          pourQuoi: "plusieurs photos de référence, sans masque ni négatif")
+        }
+    }
+
+    /// L'étape « Claude · <modèle> » de l'exportation, de l'importation et du journal de la nouvelle
+    /// photo : le modèle réellement employé (revue du 10 novembre 2026 ; « Claude · Fibo 2 » pour Fibo 2,
+    /// comme avant).
+    public var etape: String { "Claude · " + fiche.nom }
+
+    /// Le suffixe du nom de la nouvelle photo (`<photo>-Fibo.tif`, `<photo>-Qwen.tif`).
+    public var suffixe: String {
+        switch self {
+        case .fibo2: return "Fibo"
+        case .qwenImage21: return "Qwen"
+        case .qwenEdit2511: return "QwenEdit"
+        case .flux3Klein: return "Flux3"
         }
     }
 
@@ -246,6 +268,7 @@ extension Generatif {
                 "options_modele": .array(f.optionModele.map(JSONValue.string)), "depot": .string(f.depot), "revision": .string(f.revision),
                 "masque": f.optionMasque.map(JSONValue.string) ?? .null, "references_max": .number(Double(f.referencesMax)),
                 "multiple": .number(Double(f.multiple)), "statut": .string(f.statut.rawValue), "branche": .bool(f.branche),
+                "quantification": f.quantification.map { .number(Double($0)) } ?? .null,
                 "licence": .string(f.licence), "pour_quoi": .string(f.pourQuoi),
                 // Le vrai dossier (~/.cache/huggingface/hub est un lien vers le SSD sur ce Mac).
                 "chemin_cache": .string(m.instantane(cache: cache.resolvingSymlinksInPath()).path),
@@ -281,8 +304,8 @@ extension Generatif {
     static func instructionPourQwen(_ instruction: String) -> String {
         instruction.replacingOccurrences(of: "<image_1>", with: "image 1")
             .replacingOccurrences(of: "<image_2>", with: "image 2")
-            .replacingOccurrences(of: "grey area", with: "masked area")
-            .replacingOccurrences(of: "gray area", with: "masked area")
+            // Casse indifférente : « Grey area », « GRAY AREA », une majuscule en tête de phrase.
+            .replacingOccurrences(of: #"\b(grey|gray) area"#, with: "masked area", options: [.regularExpression, .caseInsensitive])
     }
 
     /// Les arguments de Qwen-Image 2.1 Turbo (`mflux-generate-qwen-2.1-edit --model qwen-image-2.1-turbo`),
@@ -290,8 +313,9 @@ extension Generatif {
     /// puis la photo de référence, le masque par `--mask-image` (blanc = repeindre, sur la première image,
     /// avec ou sans référence : mflux recolle exactement les pixels hors du masque), 8 étapes, sans
     /// --guidance (Turbo refuse tout autre que 1) ni --negative-prompt (sans effet à guidage 1), ni
-    /// --cfg-end ni --vae-full-precision (propres à Fibo 2) ; --low-ram, la taille (côtés multiples de
-    /// 32), la graine et la sortie. Ni --quantize ni --verify : à décider sur mesure, au banc.
+    /// --cfg-end ni --vae-full-precision (propres à Fibo 2) ; --quantize 8 (sa fiche : environ 33 Go en
+    /// bf16, trop avec Lightroom ouvert), --low-ram, la taille (côtés multiples de 32), la graine et la
+    /// sortie, un PNG (`.png`, d'après --output). Pas de --verify.
     static func argumentsQwen(entree: URL, masque: URL?, instruction: String, taille: (largeur: Int, hauteur: Int),
                               graine: Int, sortie: URL, reference: URL? = nil) -> [String] {
         let f = ModeleGeneratif.qwenImage21.fiche
@@ -299,6 +323,7 @@ extension Generatif {
         args += ["--image-paths", entree.path] + (reference.map { [$0.path] } ?? [])
         if let masque, let option = f.optionMasque { args += [option, masque.path] }
         args += ["--steps", String(f.etapes ?? 8)]
+        if let bits = f.quantification { args += ["--quantize", String(bits)] }
         args += ["--low-ram", "--width", String(taille.largeur), "--height", String(taille.hauteur), "--seed", String(graine), "--output", sortie.path]
         return args
     }

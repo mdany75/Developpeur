@@ -306,7 +306,7 @@ extension ToolHandler {
         do {
             return try retoucheGenerative(args)
         } catch is ArretDansLightroom {
-            throw LightroomError.plugin("Arrêté dans Lightroom (croix de la barre de progression) : Fibo 2 est arrêté, rien n'a été importé.")
+            throw LightroomError.plugin("Arrêté dans Lightroom (croix de la barre de progression) : le calcul de la retouche générative est arrêté, rien n'a été importé.")
         }
     }
 
@@ -333,6 +333,8 @@ extension ToolHandler {
         var exclusion: String?
         /// Les visages apparus dans la zone avec une photo de référence (`Generatif.visagesNouveaux`).
         var visagesNouveaux = 0
+        /// La sortie du modèle portait de la transparence, mise à plat sur l'entrée (`Generatif.aplatir`).
+        var transparence = false
         /// Une zone donnée : region, ou le masque de Lightroom.
         var avecZone: Bool { modif.region != nil || avecMasque }
     }
@@ -417,13 +419,13 @@ extension ToolHandler {
         let etapes = modele.fiche.etapes ?? qualite.etapes
         let executable = fibo.executable(pour: modele)
         guard FileManager.default.isExecutableFile(atPath: executable.path) else {
-            throw LightroomError.invalid("Fibo 2 (mflux) est introuvable sur ce Mac (\(fibo.executable.path)). L'installer dans le Terminal : uv tool install mflux ; le modèle se télécharge au premier usage. Rien n'a été fait.")
+            throw LightroomError.invalid("\(nomModele) (mflux) est introuvable sur ce Mac (\(executable.path)). L'installer dans le Terminal : uv tool install mflux ; \(modele.fiche.telechargeAuPremierUsage ? "le modèle se télécharge au premier usage" : "puis le modèle, une fois : hf download \(modele.fiche.depot) --revision \(modele.fiche.revision)"). Rien n'a été fait.")
         }
         // Un seul calcul de Fibo 2 à la fois sur ce Mac, quel que soit le serveur : deux mflux à
         // environ 21 Go chacun dépassent la mémoire (manque de mémoire constaté la nuit du 28 octobre
         // 2026, deux mflux à 36 Go).
         guard let verrou = fibo.prendreVerrou() else {
-            throw LightroomError.invalid("Un autre calcul de Fibo 2 est en cours sur ce Mac (une autre session de Claude) : attendre sa fin, puis réessayer. Rien n'a été fait.")
+            throw LightroomError.invalid("Un autre calcul de retouche générative (mflux) est en cours sur ce Mac (une autre session de Claude) : attendre sa fin, puis réessayer. Rien n'a été fait.")
         }
         defer { if verrou >= 0 { close(verrou) } }
         guard !fibo.autreCalcul() else {
@@ -443,7 +445,7 @@ extension ToolHandler {
             throw LightroomError.invalid("Liaison en pause dans Lightroom : rien n'a été fait. La reprendre (fenêtre de la liaison), puis rappeler generative_edit.")
         }
         if etat["mode"]?.string == "proposer d'abord", !confirme {
-            throw LightroomError.invalid("Mode « Proposer d'abord » actif dans Lightroom : rien n'a été fait. Dire à l'utilisateur ce que Fibo 2 changera (instruction_fr, zone, qualité, quelques minutes), attendre son accord, puis rappeler generative_edit avec confirm = true.")
+            throw LightroomError.invalid("Mode « Proposer d'abord » actif dans Lightroom : rien n'a été fait. Dire à l'utilisateur ce que \(nomModele) changera (instruction_fr, zone, qualité, quelques minutes), attendre son accord, puis rappeler generative_edit avec confirm = true.")
         }
         guard let photo = args.int("photo_id") ?? etat["photo_active"]?["id"]?.int else {
             throw LightroomError.invalid("Aucune photo active : donner photo_id.")
@@ -512,7 +514,9 @@ extension ToolHandler {
         }
         // L'étape et la raison que la fenêtre de la liaison montre avec une demande d'accord, et que
         // le journal de la nouvelle photo garde : le texte français (et la raison donnée).
-        let consigne = (modele == .fibo2 ? "" : nomModele + " : ") + Generatif.consigneJournal(modifications, raison: Self.raison(args))
+        // L'étape (« Claude · <modèle> ») nomme déjà le modèle : la consigne ne le redit pas (le journal
+        // aurait dit « Claude · Qwen-Image 2.1 Turbo : Qwen-Image 2.1 Turbo : … »).
+        let consigne = Generatif.consigneJournal(modifications, raison: Self.raison(args))
         // La fiche de FIBO-vlm : demandée (structured_prompt, vrai par défaut) et possible sur ce Mac ;
         // sinon la phrase seule, et la réponse dit pourquoi.
         // Avec une photo de référence, jamais : FIBO-vlm ne voit qu'une image (il décrirait la photo
@@ -533,7 +537,7 @@ extension ToolHandler {
             "photos": [.number(Double(photo))],
             "dossier": .string(dossier.path),
             "reglages": ["format": "TIFF", "espace": "AdobeRGB", "profondeur": 16, "metadonnees": "all", "sans_lieu": false],
-            "etape": .string(Self.etapeFibo),
+            "etape": .string(modele.etape),
             "raison": .string(consigne),
             "confirme": .bool(confirme),
         ], timeout: Self.exportTimeout)
@@ -562,7 +566,7 @@ extension ToolHandler {
         // englobant tient lieu de region pour le recadrage.
         if var masque = masqueLR {
             barre.montrer(.export, "masque de Lightroom (rendu en pleine taille)", rang: nil, detail: nil)
-            try lireMasque(&masque, photo: photo, garde: gardeAppel)
+            try lireMasque(&masque, photo: photo, modele: nomModele, garde: gardeAppel)
             try contexte.verifier()
             if masque.largeur != origine.width || masque.hauteur != origine.height {
                 masque.masque = Generatif.redimensionner(masque.masque, largeur: masque.largeur, hauteur: masque.hauteur,
@@ -627,7 +631,7 @@ extension ToolHandler {
             let n = rang + 1, taille = passage.taille
             guard let entree = Generatif.entree(origine, cadre: passage.avecZone ? passage.cadre : nil, taille: taille),
                   let imageEntree = Generatif.image8(entree, largeur: taille.largeur, hauteur: taille.hauteur) else {
-                throw LightroomError.plugin("Entrée de Fibo 2 impossible à préparer. Rien n'a été fait.")
+                throw LightroomError.plugin("Entrée de \(nomModele) impossible à préparer. Rien n'a été fait.")
             }
             let cheminEntree = dossier.appendingPathComponent("entree-\(n).png")
             try Generatif.ecrirePNG(imageEntree, vers: cheminEntree)
@@ -645,7 +649,7 @@ extension ToolHandler {
                     masque = Generatif.masqueRegion(regionCadre, largeur: taille.largeur, hauteur: taille.hauteur)
                 }
                 guard let image = Generatif.imageMasque(masque, largeur: taille.largeur, hauteur: taille.hauteur) else {
-                    throw LightroomError.plugin("Masque de Fibo 2 impossible à préparer. Rien n'a été fait.")
+                    throw LightroomError.plugin("Masque de \(nomModele) impossible à préparer. Rien n'a été fait.")
                 }
                 cheminMasque = dossier.appendingPathComponent("masque-\(n).png")
                 try Generatif.ecrirePNG(image, vers: cheminMasque!)
@@ -656,7 +660,7 @@ extension ToolHandler {
             // changée se mesure toujours contre l'entrée non grisée.
             if modele == .fibo2, cheminReference != nil, let masque = masqueFibo {
                 guard let grisee = Generatif.image8(Generatif.griser(entree, masque: masque), largeur: taille.largeur, hauteur: taille.hauteur) else {
-                    throw LightroomError.plugin("Entrée de Fibo 2 impossible à préparer. Rien n'a été fait.")
+                    throw LightroomError.plugin("Entrée de \(nomModele) impossible à préparer. Rien n'a été fait.")
                 }
                 try Generatif.ecrirePNG(grisee, vers: cheminEntree)
             }
@@ -723,7 +727,7 @@ extension ToolHandler {
                 passage.remarqueFiche = "mflux a refusé la fiche de FIBO-vlm (\(Generatif.derniereLigne(journal))) : Fibo 2 a reçu la phrase seule."
                 arguments = argumentsFibo(fiche: nil)
             }
-            guard let (fin, suivi) = essai else { throw LightroomError.plugin("Fibo 2 (mflux) ne s'est pas lancé. Rien n'a été fait.") }
+            guard let (fin, suivi) = essai else { throw LightroomError.plugin("\(nomModele) (mflux) ne s'est pas lancé. Rien n'a été fait.") }
             switch fin {
             case .reussi: break
             case .echec(let code, let journal, let signal):
@@ -736,9 +740,19 @@ extension ToolHandler {
             }
             if chargementVu == nil, let premiere = suivi.etat.premiere { chargementVu = premiere.date.timeIntervalSince(suivi.debut) }
             dureeFibo += Date().timeIntervalSince(debutFibo)
-            guard let generee = Generatif.lireImage(sortieDeFibo(cheminSortie, dossier: dossier, avant: avant))?.image,
-                  let sortie = Generatif.pixelsRGBA8(generee, largeur: taille.largeur, hauteur: taille.hauteur) else {
-                throw LightroomError.plugin(avecMuet("Fibo 2 a fini sans image lisible. Rien n'a été importé."))
+            let fichierSortie = sortieDeFibo(cheminSortie, dossier: dossier, avant: avant)
+            guard let lue = Generatif.lireImage(fichierSortie)?.image else {
+                throw LightroomError.plugin(avecMuet("\(nomModele) a fini sans image lisible. Rien n'a été importé."))
+            }
+            // Une sortie avec de la transparence (PNG RGBA) : mise à plat sur l'entrée, et réécrite pour
+            // SeedVR2, qui relit le fichier ; la réponse le dit.
+            let (generee, transparente) = Generatif.aplatir(lue, sur: imageEntree)
+            if transparente {
+                passage.transparence = true
+                try? Generatif.ecrirePNG(generee, vers: fichierSortie)
+            }
+            guard let sortie = Generatif.pixelsRGBA8(generee, largeur: taille.largeur, hauteur: taille.hauteur) else {
+                throw LightroomError.plugin(avecMuet("\(nomModele) a fini sans image lisible. Rien n'a été importé."))
             }
             try contexte.verifier()
 
@@ -801,7 +815,7 @@ extension ToolHandler {
         guard let finale = Generatif.recomposer(origine: origine, pieces: pieces) else {
             throw LightroomError.plugin("Recomposition impossible. Rien n'a été importé.")
         }
-        let nom = Self.nomGenere(tiff)
+        let nom = Self.nomGenere(tiff, modele: modele)
         let cheminFinal = dossier.appendingPathComponent(nom + ".tif")
         try Generatif.ecrireTIFF(finale, proprietes: proprietes, metadonnees: Generatif.lireMetadonnees(tiff), vers: cheminFinal)
         // La croix a pu être cliquée pendant la recomposition et l'écriture (plusieurs secondes) :
@@ -812,7 +826,7 @@ extension ToolHandler {
         // 6. La réponse, sans la nouvelle photo (le banc d'essai s'arrête avant l'importation).
         var resultat: [String: JSONValue] = [
             "photo_origine": .number(Double(photo)),
-            "modifications": .array(passages.map { Self.decrire($0) }),
+            "modifications": .array(passages.map { Self.decrire($0, modele: nomModele) }),
             "qualite": .string(qualite.texte),
             "graine": .number(Double(graine)),
             "fiche_fibo_vlm": .bool(passages.contains { $0.fiche != nil }),
@@ -859,10 +873,11 @@ extension ToolHandler {
             "chemin": .string(cheminFinal.path),
             "nom": .string(nom),
             "consigne": .string(consigne),
+            "etape": .string(modele.etape),
             "confirme": .bool(confirme),
         ]
         func echecImport(_ raison: String, peutEtreImportee: Bool) -> LightroomError {
-            let (texte, laisse) = Self.nonImportee(cheminFinal, nom: nom, fibo: fibo, raison: raison, peutEtreImportee: peutEtreImportee)
+            let (texte, laisse) = Self.nonImportee(cheminFinal, nom: nom, fibo: fibo, raison: raison, peutEtreImportee: peutEtreImportee, modele: nomModele)
             if laisse { tiffLaisse = cheminFinal }
             return LightroomError.plugin(avecMuet(texte))
         }
@@ -1046,7 +1061,7 @@ extension ToolHandler {
 
     /// Une modification dans la réponse : son nom, l'instruction anglaise, sa traduction, la part
     /// changée (de la photo), sa zone et son recadrage, la résolution de la zone et SeedVR2.
-    private static func decrire(_ passage: Passage) -> JSONValue {
+    private static func decrire(_ passage: Passage, modele: String) -> JSONValue {
         let c = passage.cadre, t = passage.taille
         var objet: [String: JSONValue] = [
             "label": .string(passage.modif.label),
@@ -1063,8 +1078,8 @@ extension ToolHandler {
             objet["recadrage_px"] = ["x": .number(Double(c.x)), "y": .number(Double(c.y)), "width": .number(Double(c.largeur)), "height": .number(Double(c.hauteur))]
         }
         let facteur = Generatif.facteur(cadre: c, taille: t)
-        let quoi = !passage.avecZone ? "La zone changée vient de la sortie de Fibo 2, \(t.largeur) × \(t.hauteur) px, pour toute la photo, \(c.largeur) × \(c.hauteur) px"
-            : "La zone vient de la sortie de Fibo 2, \(t.largeur) × \(t.hauteur) px, pour un recadrage de \(c.largeur) × \(c.hauteur) px de la photo"
+        let quoi = !passage.avecZone ? "La zone changée vient de la sortie de \(modele), \(t.largeur) × \(t.hauteur) px, pour toute la photo, \(c.largeur) × \(c.hauteur) px"
+            : "La zone vient de la sortie de \(modele), \(t.largeur) × \(t.hauteur) px, pour un recadrage de \(c.largeur) × \(c.hauteur) px de la photo"
         let comment: String
         if facteur <= 1.0001 {
             comment = " : à sa taille native, sans perte de détail."
@@ -1078,10 +1093,13 @@ extension ToolHandler {
         if let remarque = passage.remarqueFiche { objet["remarque_fiche"] = .string(remarque) }
         if let exclusion = passage.exclusion { objet["exclusion"] = .string(exclusion) }
         if let remarque = passage.remarqueSeedVR { objet["remarque_seedvr2"] = .string(remarque) }
+        if passage.transparence {
+            objet["remarque_transparence"] = .string("La sortie de \(modele) portait de la transparence : mise à plat sur la photo d'origine (là où elle était transparente, la photo reste). La vérifier avec view_photo et region.")
+        }
         if passage.visagesNouveaux > 0, passage.piece != nil {
             objet["a_verifier"] = .string("\(passage.visagesNouveaux == 1 ? "Un visage est apparu" : "\(passage.visagesNouveaux) visages sont apparus") dans la zone, peut-être recopié de la photo de référence : le regarder (view_photo avec region), et le dire à l'utilisateur.")
         }
-        if passage.piece == nil { objet["remarque"] = .string("Fibo 2 n'a rien changé de visible ici : rien n'en est repris.") }
+        if passage.piece == nil { objet["remarque"] = .string("\(modele) n'a rien changé de visible ici : rien n'en est repris.") }
         return .object(objet)
     }
 
@@ -1094,7 +1112,7 @@ extension ToolHandler {
     /// qu'ils ne soient libérés (la zone de mélange). Une personne précise que Lightroom n'a pas reconnue
     /// est refusée dès le premier rendu. Les couleurs prélevées, les cadres des personnes (Vision) et
     /// les recalages, comme add_mask ; les remarques du module sont gardées pour la réponse.
-    private func lireMasque(_ masque: inout MasqueLightroom, photo: Int, garde: URL? = nil) throws {
+    private func lireMasque(_ masque: inout MasqueLightroom, photo: Int, modele: String, garde: URL? = nil) throws {
         var zones = [JSONValue.object(masque.zone)]
         if zones.contains(where: Self.aDesCouleurs) || zones.contains(where: Self.aDesPersonnes) {
             zones = try prelever(zones, photo: photo)
@@ -1103,7 +1121,7 @@ extension ToolHandler {
             "photo": .number(Double(photo)),
             "action": "masquer",
             "libelles": DevelopCatalogue.labels(for: ["MaskGroupBasedCorrections"]),
-            "etape": "masque pour Fibo 2",
+            "etape": .string("masque pour \(modele)"),
             "taille": 0,
             "temoin": true,
         ]
@@ -1248,21 +1266,21 @@ extension ToolHandler {
     /// le ménage vide), sous un nom libre (`<nom>.tif`, puis -2, -3…) ; rend l'erreur à dire, avec
     /// son chemin et l'importation à la main, et vrai si le TIFF n'a pas pu quitter le dossier de
     /// l'appel (à y laisser : il ne doit pas être effacé).
-    static func nonImportee(_ fichier: URL, nom: String, fibo: Fibo, raison: String, peutEtreImportee: Bool) -> (texte: String, laisse: Bool) {
+    static func nonImportee(_ fichier: URL, nom: String, fibo: Fibo, raison: String, peutEtreImportee: Bool, modele: String = "Fibo 2") -> (texte: String, laisse: Bool) {
         let doute = peutEtreImportee
             ? " La photo est peut-être déjà au catalogue (Lightroom a reçu la commande sans répondre) : la chercher dans la pile de l'original avant d'importer ce TIFF, pour ne pas la doubler."
             : ""
         guard FileManager.default.fileExists(atPath: fichier.path) else {
             if peutEtreImportee {
-                return ("Lightroom n'a pas confirmé l'importation de la photo de Fibo 2 (\(raison)), et le TIFF temporaire n'est plus là : le module l'a sans doute importée. La chercher dans la pile de l'original (Bibliothèque) avant de relancer generative_edit ; l'original est intact.", false)
+                return ("Lightroom n'a pas confirmé l'importation de la photo de \(modele) (\(raison)), et le TIFF temporaire n'est plus là : le module l'a sans doute importée. La chercher dans la pile de l'original (Bibliothèque) avant de relancer generative_edit ; l'original est intact.", false)
             }
-            return ("Lightroom n'a pas importé la photo de Fibo 2 (\(raison)), et le TIFF final a disparu du dossier temporaire : rien n'a pu être gardé ; l'original est intact.", false)
+            return ("Lightroom n'a pas importé la photo de \(modele) (\(raison)), et le TIFF final a disparu du dossier temporaire : rien n'a pu être gardé ; l'original est intact.", false)
         }
         do {
             let garde = try garderNonImportee(fichier, nom: nom, dans: fibo.dossierNonImportees)
-            return ("Lightroom n'a pas importé la photo de Fibo 2 (\(raison)). Le résultat n'est pas perdu : \(garde.path). L'importer à la main dans Lightroom (Fichier › Importer des photos et des vidéos…, Ajouter), puis la ranger à côté de l'original ; l'original est intact.\(doute)", false)
+            return ("Lightroom n'a pas importé la photo de \(modele) (\(raison)). Le résultat n'est pas perdu : \(garde.path). L'importer à la main dans Lightroom (Fichier › Importer des photos et des vidéos…, Ajouter), puis la ranger à côté de l'original ; l'original est intact.\(doute)", false)
         } catch {
-            return ("Lightroom n'a pas importé la photo de Fibo 2 (\(raison)), et le résultat n'a pas pu être déplacé dans « Fibo non importées » (\(error.localizedDescription)). Il reste ici : \(fichier.path) ; le copier ailleurs avant le prochain chargement du module dans Lightroom, qui vide ce dossier, puis l'importer à la main (Fichier › Importer des photos et des vidéos…) ; l'original est intact.\(doute)", true)
+            return ("Lightroom n'a pas importé la photo de \(modele) (\(raison)), et le résultat n'a pas pu être déplacé dans « Fibo non importées » (\(error.localizedDescription)). Il reste ici : \(fichier.path) ; le copier ailleurs avant le prochain chargement du module dans Lightroom, qui vide ce dossier, puis l'importer à la main (Fichier › Importer des photos et des vidéos…) ; l'original est intact.\(doute)", true)
         }
     }
 
@@ -1326,9 +1344,6 @@ extension ToolHandler {
         return .object(objet)
     }
 
-    /// L'étape que la fenêtre de la liaison montre pour une demande d'accord de la retouche générative.
-    static let etapeFibo = "Claude · Fibo 2"
-
     /// Ce qu'il faut savoir de la nouvelle photo, d'après la réponse d'importerGeneree : empilée avec
     /// l'original, ou photo d'essai rangée dans « Développeur › Essais » sans pile ; sous « Copies
     /// virtuelles seulement », sa copie virtuelle, où se font les finitions.
@@ -1342,12 +1357,14 @@ extension ToolHandler {
         return "L'original est intact ; " + rangement + copie + ". undo_last défait les finitions puis la retire du catalogue, son fichier à la Corbeille, dans cette session de Lightroom (ensuite, Photo › Retirer du catalogue, à la main). La vérifier avec view_photo."
     }
 
-    /// Le nom de la nouvelle photo, sans extension : celui du TIFF exporté suivi de « -Fibo » (sans
-    /// le doubler pour une photo déjà faite par Fibo 2).
-    static func nomGenere(_ tiff: URL) -> String {
+    /// Le nom de la nouvelle photo, sans extension : celui du TIFF exporté suivi du suffixe du modèle
+    /// employé (« -Fibo », « -Qwen » : revue du 10 novembre 2026), sans doubler le suffixe d'une photo
+    /// déjà faite par un modèle de la retouche générative.
+    static func nomGenere(_ tiff: URL, modele: ModeleGeneratif = .fibo2) -> String {
         var base = tiff.deletingPathExtension().lastPathComponent
-        if let plage = base.range(of: #"-Fibo(-\d+)?$"#, options: .regularExpression) { base.removeSubrange(plage) }
-        return (base.isEmpty ? "Photo" : base) + "-Fibo"
+        let suffixes = ModeleGeneratif.allCases.map(\.suffixe).joined(separator: "|")
+        if let plage = base.range(of: "-(\(suffixes))(-\\d+)?$", options: .regularExpression) { base.removeSubrange(plage) }
+        return (base.isEmpty ? "Photo" : base) + "-" + modele.suffixe
     }
 
     static func nombre(_ valeur: Double) -> String {

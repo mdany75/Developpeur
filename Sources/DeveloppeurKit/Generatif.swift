@@ -2124,6 +2124,35 @@ public enum Generatif {
 
     // MARK: Images
 
+    /// Une sortie de modèle mise à plat sur l'entrée (`fond`, à la même taille) quand elle porte de la
+    /// transparence : le PNG RGBA de Qwen-Image 2.1 (revue du 10 novembre 2026) se dessinait sur un
+    /// tampon noir (`pixelsRGBA8`), et un alpha sous 255 noircissait la zone. L'alpha est composé sur
+    /// l'entrée (là où le modèle n'a rien rendu, la photo reste) ; `transparence` dit s'il y en avait.
+    static func aplatir(_ image: CGImage, sur fond: CGImage) -> (image: CGImage, transparence: Bool) {
+        switch image.alphaInfo {
+        case .none, .noneSkipFirst, .noneSkipLast: return (image, false)
+        default: break
+        }
+        let l = image.width, h = image.height
+        var rgba = [UInt8](repeating: 255, count: l * h * 4)
+        let lu = rgba.withUnsafeMutableBytes { tampon -> Bool in
+            guard let contexte = CGContext(data: tampon.baseAddress, width: l, height: h, bitsPerComponent: 8, bytesPerRow: l * 4,
+                                           space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            contexte.clear(CGRect(x: 0, y: 0, width: l, height: h))
+            contexte.draw(image, in: CGRect(x: 0, y: 0, width: l, height: h))
+            return true
+        }
+        guard lu, stride(from: 3, to: rgba.count, by: 4).contains(where: { rgba[$0] < 255 }) else { return (image, false) }
+        guard let contexte = CGContext(data: nil, width: l, height: h, bitsPerComponent: 8, bytesPerRow: l * 4,
+                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+            return (image, true)
+        }
+        contexte.interpolationQuality = .high
+        contexte.draw(fond, in: CGRect(x: 0, y: 0, width: l, height: h))
+        contexte.draw(image, in: CGRect(x: 0, y: 0, width: l, height: h))
+        return (contexte.makeImage() ?? image, true)
+    }
+
     /// Les pixels RGBA 8 bits sRGB d'une image dessinée à la taille donnée.
     static func pixelsRGBA8(_ image: CGImage, largeur: Int, hauteur: Int) -> [UInt8]? {
         var pixels = [UInt8](repeating: 0, count: largeur * hauteur * 4)

@@ -573,7 +573,8 @@ final class GeneratifTests: XCTestCase {
 
         // importerGeneree : le contrat.
         let importer = try XCTUnwrap(fake.calls.first { $0.command == "importerGeneree" }).params
-        XCTAssertEqual(Set(importer.keys), ["photo", "chemin", "nom", "consigne", "confirme"])
+        XCTAssertEqual(Set(importer.keys), ["photo", "chemin", "nom", "consigne", "etape", "confirme"])
+        XCTAssertEqual(importer["etape"]?.string, "Claude · Fibo 2", "l'étape du modèle employé")
         XCTAssertEqual(importer["photo"]?.int, 7)
         XCTAssertEqual(importer["nom"]?.string, "DSCF2402-Fibo")
         XCTAssertEqual(importer["chemin"]?.string, dossierExport + "/DSCF2402-Fibo.tif")
@@ -1400,7 +1401,7 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(flock(autre, LOCK_EX | LOCK_NB), 0)
         var resultat = editer(["instruction": "add a red square"])
         XCTAssertTrue(resultat.isError)
-        XCTAssertTrue(resultat.text.contains("Un autre calcul de Fibo 2 est en cours"), resultat.text)
+        XCTAssertTrue(resultat.text.contains("Un autre calcul de retouche générative (mflux) est en cours"), resultat.text)
         XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
         XCTAssertEqual(appelsDeMflux, 0)
         close(autre)

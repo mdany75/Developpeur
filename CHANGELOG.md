@@ -43,6 +43,20 @@
   importer, et prépare une planche à juger (le meilleur et une note pour chacun).
 
 ### Changé
+- **Un long trait de pinceau reste droit sous la Projection, Upright ou une déformation** : le
+  module coupe le trait en morceaux d'au plus 5 % de l'image avant de recaler ses positions (seuls
+  les points recalés suivaient la correction, et le trait se courbait entre eux). La recette pose
+  le trait de la Projection en cinq points, comme au constat de la 1.8, et une version de
+  Lightroom illisible fait échouer ses trois étapes au lieu de les sauter.
+- **Retouche générative par Qwen-Image 2.1 Turbo** : l'étape de l'Historique, le journal et le
+  nom du fichier nomment le modèle employé (« Claude · Qwen-Image 2.1 Turbo », `<photo>-Qwen.tif`),
+  plus Fibo 2 ; il tourne quantifié en 8 bits (`--quantize 8`, environ 33 Go sinon, trop avec
+  Lightroom ouvert) ; une sortie avec de la transparence est mise à plat sur la photo au lieu de
+  noircir la zone, et la réponse le dit ; « Grey area » se comprend quelle que soit la casse.
+- Le banc d'essai des modèles ne travaille que sur une copie virtuelle d'Essais que Claude n'a pas
+  retouchée (contrôles de la recette), la remet comme au départ à la fin (et le dit si elle n'y
+  revient pas), refuse `"model": null`, et sa planche dit ce que chaque modèle a reçu (fiche de
+  FIBO-vlm ou phrase seule).
 - L'étalonnage d'un masque est arrondi à l'entier par le serveur, comme Lightroom le range
   (0,5 devient 1).
 - Lightroom mis à jour pendant une session (par exemple de la 15.6 à la 16.0) : la version gardée

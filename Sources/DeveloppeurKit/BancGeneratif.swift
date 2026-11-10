@@ -9,7 +9,10 @@ import Foundation
 /// SeedVR2, recomposition) avec `ToolHandler.dossierBanc` posé : le résultat reste en JPEG dans le
 /// dossier de la planche, rien n'est importé, le catalogue ne change pas (les rendus témoins d'un
 /// masque laissent leurs étapes « Claude · essai » dans l'Historique, comme toujours). Sur une copie
-/// virtuelle de « Développeur › Essais » que Dany désigne.
+/// virtuelle de « Développeur › Essais » que Dany désigne, jamais retouchée par Claude : contrôlée
+/// avant tout calcul comme la photo d'essai de la recette (`Recette.sequence`), puis remise à la fin
+/// (revert_to_original, comme la recette : seul ce que Claude a fait pendant le banc est défait),
+/// relue identique au départ et remise dans Essais si elle en est sortie (revue du 10 novembre 2026).
 public struct BancGeneratif {
     /// Grand côté des images de la planche (photo entière) et des zones.
     static let coteImage = 2048
@@ -42,10 +45,11 @@ public struct BancGeneratif {
         guard let fibo = tools.fibo else {
             throw LightroomError.invalid("Fibo 2 n'est pas configuré : banc impossible.")
         }
-        guard arguments["photo_id"]?.int != nil else {
+        guard let photo = arguments["photo_id"]?.int else {
             throw LightroomError.invalid("Le banc d'essai exige photo_id : une copie virtuelle de « Développeur › Essais », remise à l'origine. Rien n'a été fait.")
         }
-        guard arguments["model"] == nil else {
+        // « model »: null compte : le banc passe chaque modèle lui-même.
+        guard arguments.index(forKey: "model") == nil else {
             throw LightroomError.invalid("Le banc d'essai passe chaque modèle lui-même : sans model (--modeles pour en choisir). Rien n'a été fait.")
         }
         let liste: [ModeleGeneratif]
@@ -61,6 +65,7 @@ public struct BancGeneratif {
         }
         var appel = arguments
         if appel["seed"] == nil { appel["seed"] = .number(Double(Self.graineParDefaut)) }
+        let depart = try controlerPhoto(photo)
         try FileManager.default.createDirectory(at: dossier, withIntermediateDirectories: true)
         tools.dossierBanc = dossier
         defer { tools.dossierBanc = nil }
@@ -89,14 +94,76 @@ public struct BancGeneratif {
             }
             passages.append(passage)
         }
+        tools.dossierBanc = nil
+        let remise = remettre(photo, depart)
         let planche = dossier.appendingPathComponent(Self.nomPlanche)
         try Data(Self.planche(passages, appel: appel).utf8).write(to: planche, options: .atomic)
         return [
-            "ok": .bool(passages.contains { $0.reponse != nil }),
+            "ok": .bool(passages.contains { $0.reponse != nil } && remise.ok),
             "planche": .string(planche.path),
             "graine": appel["seed"] ?? .null,
+            "photo": .string(remise.texte),
             "modeles": .array(passages.map(Self.decrire)),
         ]
+    }
+
+    // MARK: Photo d'essai
+
+    /// Ce qui doit revenir à la fin : réglages et masques, comme `Recette.Etat` les compare.
+    struct Depart: Equatable {
+        var reglages: JSONValue
+        var masques: JSONValue
+        var dansEssais: Bool
+    }
+
+    /// Un outil appelé pour le banc ; son erreur arrête le banc.
+    func outil(_ nom: String, _ arguments: [String: JSONValue]) throws -> JSONValue {
+        let resultat = tools.call(name: nom, arguments: arguments)
+        if resultat.isError { throw LightroomError.plugin("\(nom) : \(resultat.text)") }
+        return try JSONCoding.parse(resultat.text)
+    }
+
+    /// Les contrôles de la photo d'essai de la recette, avant tout calcul : une copie virtuelle (le
+    /// module doit le dire), rangée dans « Développeur › Essais », que Claude n'a pas encore retouchée
+    /// (le retour à l'origine de la fin effacerait ses retouches d'avant).
+    func controlerPhoto(_ id: Int) throws -> Depart {
+        let reglages = try outil("get_settings", ["photo_id": .number(Double(id))])
+        guard let virtuelle = reglages["photo"]?["copie_virtuelle"]?.bool else {
+            throw LightroomError.invalid("Le module Lightroom ne dit pas si la photo \(id) est une copie virtuelle : installer la même version que ce serveur. Rien n'a été fait.")
+        }
+        guard virtuelle else {
+            throw LightroomError.invalid("La photo \(id) est un original : le banc d'essai ne travaille que sur une copie virtuelle de « \(Recette.collectionDeRecette) ». Rien n'a été fait.")
+        }
+        let essais = try outil("find_photos", ["collection": .string(Recette.collectionDeRecette), "limit": 500])
+        guard let trouvee = essais["photos"]?.array?.first(where: { $0["id"]?.int == id }) else {
+            throw LightroomError.invalid("La photo \(id) n'est pas dans « \(Recette.collectionDeRecette) » : le banc d'essai ne travaille que sur une copie d'essai. Rien n'a été fait.")
+        }
+        guard trouvee["retouchee_par_claude"]?.bool != true else {
+            throw LightroomError.invalid("Claude a déjà retouché la photo \(id) : la remise à l'origine de la fin effacerait aussi ces retouches ; en prendre une autre (une nouvelle copie virtuelle, remise à l'origine). Rien n'a été fait.")
+        }
+        return Depart(reglages: reglages["reglages"] ?? .null, masques: reglages["masques"] ?? .array([]), dansEssais: true)
+    }
+
+    /// La photo remise comme au départ : revert_to_original (ce que Claude y a fait pendant le banc),
+    /// réglages et masques relus identiques, puis remise dans Essais, que le retour à l'origine défait
+    /// aussi (mémoire Bibliotheque). Les étapes « Claude · essai » restent des lignes de l'Historique
+    /// de Lightroom, qu'un module ne retire pas ; la photo, elle, est revenue.
+    func remettre(_ id: Int, _ depart: Depart) -> (ok: Bool, texte: String) {
+        do {
+            _ = try outil("revert_to_original", ["photo_ids": [.number(Double(id))]])
+            let relue = try outil("get_settings", ["photo_id": .number(Double(id))])
+            guard relue["reglages"] ?? .null == depart.reglages, relue["masques"] ?? .array([]) == depart.masques else {
+                return (false, "photo \(id) PAS revenue comme au départ après revert_to_original : la vérifier dans Lightroom (⌘Z, ou Développement › Réinitialiser).")
+            }
+            let essais = try outil("find_photos", ["collection": .string(Recette.collectionDeRecette), "limit": 500])
+            if !(essais["photos"]?.array ?? []).contains(where: { $0["id"]?.int == id }) {
+                _ = try outil("manage_collections", ["action": "add", "collection": .string(Recette.collectionDeRecette),
+                                                     "photo_ids": [.number(Double(id))], "step_name": "banc d'essai", "confirm": true])
+            }
+            return (true, "photo \(id) remise comme au départ (revert_to_original, réglages et masques relus)")
+        } catch {
+            return (false, "photo \(id) : remise impossible (\(error)) ; la vérifier dans Lightroom.")
+        }
     }
 
     static func decrire(_ p: Passage) -> JSONValue {
@@ -114,6 +181,14 @@ public struct BancGeneratif {
     }
 
     // MARK: Planche
+
+    /// Ce que le modèle a reçu comme consigne : Fibo 2, la fiche de FIBO-vlm quand elle a été rédigée
+    /// (sinon la phrase seule) ; tout autre modèle, la phrase seule (la fiche est propre à Fibo 2), ce
+    /// qui pèse dans le jugement de la planche.
+    static func consigneRecue(_ modele: ModeleGeneratif, _ reponse: JSONValue) -> String {
+        guard modele == .fibo2 else { return "la phrase seule (la fiche de FIBO-vlm est propre à Fibo 2)" }
+        return reponse["fiche_fibo_vlm"]?.bool == true ? "la fiche détaillée de FIBO-vlm" : "la phrase seule (sans fiche de FIBO-vlm)"
+    }
 
     static func echapper(_ texte: String) -> String { EssaiEspeces.echapper(texte) }
 
@@ -143,11 +218,11 @@ public struct BancGeneratif {
                     : img("avant", "avant") + img("image", "après")
                 let parts = (r["modifications"]?.array ?? []).compactMap { $0["part_changee_pct"]?.double }.map { Bilan.nombre($0, decimales: 1) + " %" }
                 let remarques = ["remarque_modele", "remarque_zones", "remarque", "remarque_lightroom"].compactMap { r[$0]?.string }
-                    + (r["modifications"]?.array ?? []).compactMap { $0["remarque_seedvr2"]?.string ?? $0["a_verifier"]?.string }
+                    + (r["modifications"]?.array ?? []).flatMap { m in ["remarque_seedvr2", "a_verifier", "remarque_transparence"].compactMap { m[$0]?.string } }
                 contenu = """
                 <div class="paire">\(images)</div>
                 <p class="lien"><a href="\(echapper(banc?["image"]?.string ?? ""))">photo entière après</a></p>
-                <dl><dt>durée</dt><dd>\(Int(p.secondes.rounded())) s (calcul \(r["duree_fibo_s"]?.int ?? 0) s)</dd><dt>part changée</dt><dd>\(parts.joined(separator: ", "))</dd><dt>qualité</dt><dd>\(echapper(r["qualite"]?.string ?? ""))</dd></dl>
+                <dl><dt>durée</dt><dd>\(Int(p.secondes.rounded())) s (calcul \(r["duree_fibo_s"]?.int ?? 0) s)</dd><dt>part changée</dt><dd>\(parts.joined(separator: ", "))</dd><dt>qualité</dt><dd>\(echapper(r["qualite"]?.string ?? ""))</dd><dt>consigne reçue</dt><dd>\(echapper(Self.consigneRecue(p.modele, r)))</dd></dl>
                 \(remarques.map { "<p class=\"remarque\">\(echapper($0))</p>" }.joined())
                 <label class="choix"><input type="radio" name="meilleur" value="\(p.modele.rawValue)"> le meilleur</label>
                 <textarea class="note" data-id="\(p.modele.rawValue)" placeholder="Note (raccord, fidélité, détail, visage…)"></textarea>

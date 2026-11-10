@@ -449,6 +449,24 @@ test("undo_last : une photo de Fibo 2 de la session sort du catalogue, son TIFF 
     egal(Commandes.executer('annuler', { photos = { photo.localIdentifier } }).resultats[1].sans_retouche, true)
 end)
 
+-- Revue du 10 novembre 2026 : une photo faite par Qwen-Image 2.1 portait l'étape « Claude · Fibo 2 ».
+-- Le serveur donne l'étape du modèle employé : écriture, journal, ligne de la liaison et undo_last la
+-- reprennent ; une étape qui n'est pas « Claude · … » reste « Claude · Fibo 2 ».
+test("importerGeneree : l'étape et le journal nomment le modèle employé (Qwen-Image 2.1 Turbo), undo_last aussi", function()
+    original()
+    local r = importer({ nom = 'DSCF2402-Qwen', etape = "Claude · Qwen-Image 2.1 Turbo" })
+    local nouvelle = S.ajoutees[1]
+    egal(r.fichier, 'DSCF2402-Qwen.tif')
+    egal(S.ecritures[1], "Claude · Qwen-Image 2.1 Turbo")
+    egal(journalDe(nouvelle)[1].etape, "Claude · Qwen-Image 2.1 Turbo : " .. CONSIGNE)
+    egal(A.contient(Liaison.journal, "Qwen-Image 2.1 Turbo : « DSCF2402-Qwen.tif » importée"), true)
+    local res = Commandes.executer('annuler', { photos = { nouvelle.localIdentifier } }).resultats[1]
+    egal(res.etape, "Claude · Qwen-Image 2.1 Turbo")
+    egal(tostring(res.remarque):find("La photo de Qwen-Image 2.1 Turbo est retirée", 1, true) ~= nil, true, tostring(res.remarque))
+    egal(select(1, Livraison.etapeGeneree({ etape = "Fibo" })), "Claude · Fibo 2", "pas une étape de Claude")
+    egal(select(1, Livraison.etapeGeneree({})), "Claude · Fibo 2")
+end)
+
 test("undo_last : les finitions de la photo de Fibo 2 se défont d'abord, puis la photo sort du catalogue", function()
     original()
     importer()

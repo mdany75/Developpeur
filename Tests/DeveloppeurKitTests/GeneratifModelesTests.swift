@@ -72,6 +72,13 @@ extension GeneratifTests {
             XCTAssertNil(plusTard.fiche.optionMasque, "sans masque")
         }
         XCTAssertEqual(ModeleGeneratif.idsBranches, ["auto", "fibo2", "qwen_image_21"])
+        XCTAssertEqual(qwen.quantification, 8, "--quantize 8 : environ 33 Go en bf16, Lightroom ouvert sur 48 Go")
+        XCTAssertNil(fibo.quantification)
+        XCTAssertEqual(ModeleGeneratif.fibo2.etape, "Claude · Fibo 2", "comme avant")
+        XCTAssertEqual(ModeleGeneratif.qwenImage21.etape, "Claude · Qwen-Image 2.1 Turbo")
+        XCTAssertEqual(ToolHandler.nomGenere(URL(fileURLWithPath: "/t/DSCF2402.tif"), modele: .qwenImage21), "DSCF2402-Qwen")
+        XCTAssertEqual(ToolHandler.nomGenere(URL(fileURLWithPath: "/t/DSCF2402-Fibo-2.tif"), modele: .qwenImage21), "DSCF2402-Qwen", "un suffixe, jamais deux")
+        XCTAssertEqual(ToolHandler.nomGenere(URL(fileURLWithPath: "/t/DSCF2402-Qwen.tif")), "DSCF2402-Fibo")
         XCTAssertNil(ModeleGeneratif(rawValue: "krea2"), "Krea 2 Turbo écarté : création seulement")
     }
 
@@ -82,6 +89,92 @@ extension GeneratifTests {
             XCTAssertEqual(ligne.modele, .fibo2, genre.rawValue)
             XCTAssertEqual(ligne.aDepartager, genre == .photoEntiere ? [] : [.qwenImage21], genre.rawValue)
         }
+    }
+
+    /// Revue du 10 novembre 2026 : le statut de chaque fiche suit la table. auto ne choisit, pour aucun
+    /// genre, un modèle « à départager » ni « plus tard » ; un modèle à départager est branché ; un
+    /// modèle « plus tard » n'est nulle part dans la table.
+    func testStatutDesFichesLieALaTable() throws {
+        for genre in Generatif.Genre.allCases {
+            let choix = try Generatif.choisirModele(nil, genre: genre, absent: { _ in nil })
+            XCTAssertEqual(choix.modele.fiche.statut, .parDefaut, genre.rawValue)
+            let ligne = try XCTUnwrap(Generatif.tableDesModeles[genre])
+            XCTAssertEqual(ligne.modele.fiche.statut, .parDefaut, genre.rawValue)
+            for m in ligne.aDepartager {
+                XCTAssertEqual(m.fiche.statut, .aDepartager, "\(genre.rawValue) : \(m.rawValue)")
+                XCTAssertTrue(m.fiche.branche, m.rawValue)
+            }
+        }
+        let dansLaTable = Set(Generatif.tableDesModeles.values.flatMap { [$0.modele] + $0.aDepartager })
+        for m in ModeleGeneratif.allCases {
+            switch m.fiche.statut {
+            case .parDefaut: XCTAssertTrue(m.fiche.branche, m.rawValue)
+            case .aDepartager: XCTAssertTrue(dansLaTable.contains(m), "\(m.rawValue) à départager mais absent de la table")
+            case .plusTard: XCTAssertFalse(dansLaTable.contains(m), m.rawValue); XCTAssertFalse(m.fiche.branche, m.rawValue)
+            }
+        }
+    }
+
+    /// « Grey area » de Fibo devient « masked area » pour Qwen, quelle que soit la casse.
+    func testZoneGriseDiteMasqueeSansCasse() {
+        XCTAssertEqual(Generatif.instructionPourQwen("Grey area: a red bag"), "masked area: a red bag")
+        XCTAssertEqual(Generatif.instructionPourQwen("Fill the GRAY AREA of <image_1>"), "Fill the masked area of image 1")
+        XCTAssertEqual(Generatif.instructionPourQwen("replace the gray area"), "replace the masked area")
+        XCTAssertEqual(Generatif.instructionPourQwen("a stingray area"), "a stingray area", "un mot entier seulement")
+    }
+
+    /// Revue du 10 novembre 2026 : une sortie PNG RGBA de Qwen avec un alpha sous 255 se dessinait sur
+    /// un tampon noir. Elle est mise à plat sur l'entrée, et la réponse le dit.
+    func testSortieTransparenteMiseAPlatSurLEntree() throws {
+        let l = 64, h = 32
+        func rgba(_ couleur: (Int, Int) -> (UInt8, UInt8, UInt8, UInt8)) -> CGImage {
+            var p = [UInt8](repeating: 0, count: l * h * 4)
+            for y in 0..<h { for x in 0..<l { let c = couleur(x, y), i = (y * l + x) * 4; (p[i], p[i + 1], p[i + 2], p[i + 3]) = c } }
+            return CGImage(width: l, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: l * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                           bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                           provider: CGDataProvider(data: Data(p) as CFData)!, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
+        }
+        // À gauche transparent, à droite rouge opaque ; l'entrée est verte.
+        let sortie = rgba { x, _ in x < l / 2 ? (0, 0, 0, 0) : (255, 0, 0, 255) }
+        let entree = Generatif.image8([UInt8](repeating: 0, count: l * h * 4).enumerated().map { $0.offset % 4 == 1 ? 200 : 0 }, largeur: l, hauteur: h)!
+        let noire = try XCTUnwrap(Generatif.pixelsRGBA8(sortie, largeur: l, hauteur: h))
+        XCTAssertEqual(Array(noire[(h / 2 * l + 4) * 4 ..< (h / 2 * l + 4) * 4 + 3]), [0, 0, 0], "sans mise à plat : noir à gauche (le défaut)")
+        let (plate, transparente) = Generatif.aplatir(sortie, sur: entree)
+        XCTAssertTrue(transparente)
+        let p = try XCTUnwrap(Generatif.pixelsRGBA8(plate, largeur: l, hauteur: h))
+        XCTAssertEqual(Array(p[(h / 2 * l + 4) * 4 ..< (h / 2 * l + 4) * 4 + 3]), [0, 200, 0], "transparent : l'entrée")
+        XCTAssertEqual(Array(p[(h / 2 * l + l - 4) * 4 ..< (h / 2 * l + l - 4) * 4 + 3]), [255, 0, 0], "opaque : la sortie")
+        // Opaque partout (ou sans alpha) : rendue telle quelle.
+        let opaque = rgba { _, _ in (10, 20, 30, 255) }
+        XCTAssertFalse(Generatif.aplatir(opaque, sur: entree).transparence)
+        XCTAssertFalse(Generatif.aplatir(entree, sur: opaque).transparence)
+    }
+
+    /// De bout en bout : un PNG RGBA de Qwen à moitié transparent ne noircit pas la photo, et la
+    /// réponse dit la transparence.
+    func testQwenSortieRGBANeNoircitPas() throws {
+        let region = CGRect(x: 0.05, y: 0.2, width: 0.3, height: 0.6)
+        let opaque = try XCTUnwrap(Generatif.lireImage(sortieQwen(region: region))?.image)
+        let l = opaque.width, h = opaque.height
+        var p = try XCTUnwrap(Generatif.pixelsRGBA8(opaque, largeur: l, hauteur: h))
+        for y in 0..<h { for x in 0..<(l / 2) { let i = (y * l + x) * 4; (p[i], p[i + 1], p[i + 2], p[i + 3]) = (0, 0, 0, 0) } }
+        let transparente = CGImage(width: l, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: l * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                   provider: CGDataProvider(data: Data(p) as CFData)!, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
+        let url = gardes.appendingPathComponent("sortie-qwen-rgba.png")
+        try Generatif.ecrirePNG(transparente, vers: url)
+        try fauxQwen(sortie: url)
+        try qwenDansLeCache()
+        let resultat = editer(["instruction": "replace the bag with a red one", "model": "qwen_image_21", "seed": 7, "upscale": false,
+                               "region": ["x": 0.05, "y": 0.2, "width": 0.3, "height": 0.6]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        let reponse = try JSONCoding.parse(resultat.text)
+        XCTAssertTrue(reponse["modifications"]?.array?.first?["remarque_transparence"]?.string?.contains("portait de la transparence") == true, resultat.text)
+        // La moitié gauche du recadrage, transparente : la photo d'origine (passée par l'entrée sRGB
+        // 8 bits : le rouge, hors de la gamme sRGB ici, ne revient pas au bit près), jamais du noir.
+        let avant = try XCTUnwrap(Self.pixels16(source)), apres = try XCTUnwrap(Self.pixels16(importe))
+        let x = Int(0.08 * Double(largeur)), y = hauteur / 2
+        for c in 1..<3 { XCTAssertEqual(Double(Self.pixel(apres, x, y)[c]), Double(Self.pixel(avant, x, y)[c]), accuracy: 1500, "canal \(c)") }
     }
 
     func testGenreDeLaRetouche() {
@@ -155,7 +248,7 @@ extension GeneratifTests {
         let e = URL(fileURLWithPath: "/t/entree-1.png"), m = URL(fileURLWithPath: "/t/masque-1.png"), s = URL(fileURLWithPath: "/t/sortie-1.png")
         XCTAssertEqual(Generatif.argumentsQwen(entree: e, masque: m, instruction: "remove the bin", taille: (1024, 768), graine: 42, sortie: s),
                        ["--model", "qwen-image-2.1-turbo", "--prompt", "remove the bin", "--image-paths", "/t/entree-1.png",
-                        "--mask-image", "/t/masque-1.png", "--steps", "8", "--low-ram", "--width", "1024", "--height", "768",
+                        "--mask-image", "/t/masque-1.png", "--steps", "8", "--quantize", "8", "--low-ram", "--width", "1024", "--height", "768",
                         "--seed", "42", "--output", "/t/sortie-1.png"])
         let r = URL(fileURLWithPath: "/t/reference.png")
         let avecRef = Generatif.argumentsQwen(entree: e, masque: m, instruction: "Replace the grey area of <image_1> with the beach of <image_2>",
@@ -184,10 +277,13 @@ extension GeneratifTests {
         XCTAssertEqual(Array(args.prefix(4)), ["--model", "qwen-image-2.1-turbo", "--prompt", "replace the bag with a red one"])
         XCTAssertEqual(valeur("--steps"), "8")
         XCTAssertEqual(URL(fileURLWithPath: try XCTUnwrap(valeur("--mask-image"))).lastPathComponent, "masque-1.png")
-        for propre in ["--mask-path", "--cfg-end", "--negative-prompt", "--vae-full-precision", "--prompt-file", "--guidance", "--quantize"] {
+        for propre in ["--mask-path", "--cfg-end", "--negative-prompt", "--vae-full-precision", "--prompt-file", "--guidance"] {
             XCTAssertFalse(args.contains(propre), propre)
         }
         XCTAssertTrue(args.contains("--low-ram"))
+        XCTAssertEqual(valeur("--quantize"), "8", "environ 33 Go en bf16 : trop avec Lightroom ouvert")
+        // La sortie de Qwen est un PNG (mflux écrit le format de --output ; « image.png » par défaut).
+        XCTAssertEqual(URL(fileURLWithPath: try XCTUnwrap(valeur("--output"))).pathExtension, "png")
         XCTAssertEqual(Int(try XCTUnwrap(valeur("--width")))! % 32, 0); XCTAssertEqual(Int(try XCTUnwrap(valeur("--height")))! % 32, 0)
         XCTAssertEqual(valeur("--seed"), "7")
         let masque = try XCTUnwrap(Self.pixels8(gardes.appendingPathComponent("masque.png")))
@@ -206,7 +302,13 @@ extension GeneratifTests {
         XCTAssertNil(reponse["modifications"]?.array?.first?["exclusion"])
         XCTAssertEqual(reponse["nouvelle_photo"]?["id"]?.int, 99)
         let importer = try XCTUnwrap(fake.calls.first { $0.command == "importerGeneree" }).params
-        XCTAssertEqual(importer["consigne"]?.string, "Qwen-Image 2.1 Turbo : un sac rouge — Dany veut un sac rouge.", "le journal nomme le modèle")
+        XCTAssertEqual(importer["consigne"]?.string, "un sac rouge — Dany veut un sac rouge.", "l'étape nomme le modèle, la consigne ne le redit pas")
+        // L'étape et le fichier nomment le modèle employé (revue du 10 novembre 2026), pas Fibo 2.
+        XCTAssertEqual(importer["etape"]?.string, "Claude · Qwen-Image 2.1 Turbo")
+        XCTAssertEqual(importer["nom"]?.string, "DSCF2402-Qwen")
+        XCTAssertEqual(fake.calls.first { $0.command == "exporter" }?.params["etape"]?.string, "Claude · Qwen-Image 2.1 Turbo")
+        XCTAssertFalse(resultat.text.contains("Fibo 2 a") || resultat.text.contains("sortie de Fibo 2"), resultat.text)
+        XCTAssertTrue(reponse["modifications"]?.array?.first?["resolution_zone"]?.string?.contains("sortie de Qwen-Image 2.1 Turbo") == true, resultat.text)
         XCTAssertTrue(fake.progressions.contains { $0["message"]?.string?.hasPrefix("Qwen-Image 2.1 Turbo : ") == true }, "la barre nomme le modèle")
         // Hors de la zone, la photo garde ses pixels.
         let avant = try XCTUnwrap(Self.pixels16(source)), apres = try XCTUnwrap(Self.pixels16(importe))
@@ -271,6 +373,14 @@ extension GeneratifTests {
 
     // MARK: Banc d'essai
 
+    /// La photo 7 en copie virtuelle d'Essais, jamais retouchée par Claude (ce que le banc contrôle).
+    func photoDEssai(virtuelle: JSONValue = true, dansEssais: Bool = true, retouchee: Bool = false) {
+        fake.replies["reglages"] = ["photo": ["id": 7, "fichier": "DSCF2402.RAF (Essai)", "copie_virtuelle": virtuelle],
+                                    "reglages": ["Exposure2012": 0], "masques": []]
+        fake.replies["chercher"] = ["photos": .array(dansEssais ? [["id": 7, "copie_virtuelle": virtuelle, "retouchee_par_claude": .bool(retouchee)]] : []),
+                                    "total": dansEssais ? 1 : 0]
+    }
+
     /// Le banc : la même retouche par chaque modèle branché et présent, même graine, rien d'importé, une
     /// planche HTML avec les images de chacun.
     func testBancDEssaiSansRienImporter() throws {
@@ -281,6 +391,7 @@ extension GeneratifTests {
         // fauxMflux a réécrit le script de Fibo : celui de Qwen (copié avant) garde les mêmes sorties numérotées.
         try qwenDansLeCache()
         let planche = dossier.appendingPathComponent("banc")
+        photoDEssai()
         let resultat = try BancGeneratif(tools: tools).lancer(arguments: ["photo_id": 7, "instruction": "add a red bag", "instruction_fr": "un sac rouge",
                                                                           "region": ["x": 0.05, "y": 0.2, "width": 0.3, "height": 0.6], "upscale": false],
                                                               dossier: planche)
@@ -309,11 +420,62 @@ extension GeneratifTests {
             XCTAssertTrue(html.contains(attendu), attendu)
         }
         XCTAssertFalse(html.contains("http://") || html.contains("https://"), "une page locale, sans rien chargé d'ailleurs")
+        // Ce que chaque modèle a reçu : la fiche de FIBO-vlm est propre à Fibo 2.
+        XCTAssertTrue(html.contains("la phrase seule (la fiche de FIBO-vlm est propre à Fibo 2)"), "Qwen")
+        XCTAssertTrue(html.contains("la phrase seule (sans fiche de FIBO-vlm)") || html.contains("la fiche détaillée de FIBO-vlm"), "Fibo 2")
+        // La photo remise à la fin, comme la recette : revert_to_original, puis relue.
+        XCTAssertEqual(fake.commands.filter { $0 == "revenir" }.count, 1, "\(fake.commands)")
+        XCTAssertTrue(resultat["photo"]?.string?.contains("remise comme au départ") == true, JSONCoding.line(resultat))
+    }
+
+    /// Revue du 10 novembre 2026 : le banc contrôle la photo avant tout calcul, comme la recette (une
+    /// copie virtuelle d'Essais que Claude n'a pas retouchée), et « model »: null compte comme un model.
+    func testBancRefuseUnePhotoQuiNEstPasUneCopieDEssai() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        let planche = dossier.appendingPathComponent("banc")
+        let appel: [String: JSONValue] = ["photo_id": 7, "instruction": "add a red square"]
+        for (cas, attendu) in [("original", "est un original"), ("hors d'Essais", "n'est pas dans"), ("retouchée", "Claude a déjà retouché"),
+                               ("module ancien", "installer la même version")] {
+            photoDEssai(virtuelle: cas == "original" ? false : cas == "module ancien" ? .null : true,
+                        dansEssais: cas != "hors d'Essais", retouchee: cas == "retouchée")
+            if cas == "module ancien" {
+                fake.replies["reglages"] = ["photo": ["id": 7, "fichier": "DSCF2402.RAF"], "reglages": [:], "masques": []]
+            }
+            XCTAssertThrowsError(try BancGeneratif(tools: tools).lancer(arguments: appel, dossier: planche), cas) { erreur in
+                XCTAssertTrue(erreur.localizedDescription.contains(attendu), "\(cas) : \(erreur.localizedDescription)")
+            }
+        }
+        XCTAssertEqual(appelsDeMflux, 0, "aucun calcul")
+        XCTAssertFalse(fake.commands.contains { ["exporter", "essayer", "revenir"].contains($0) }, "\(fake.commands)")
+        photoDEssai()
+        XCTAssertThrowsError(try BancGeneratif(tools: tools).lancer(arguments: ["photo_id": 7, "model": .null], dossier: planche)) { erreur in
+            XCTAssertTrue(erreur.localizedDescription.contains("sans model"), erreur.localizedDescription)
+        }
+    }
+
+    /// Une photo pas revenue comme au départ : le banc le dit (ok faux), il ne s'en tait pas.
+    func testBancDitUnePhotoPasRevenue() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        photoDEssai()
+        var lectures = 0
+        let avant = fake.onSend
+        fake.onSend = { [unowned self] commande, params in
+            avant?(commande, params)
+            if commande == "reglages" {
+                lectures += 1
+                if lectures > 1 { self.fake.replies["reglages"] = ["photo": ["id": 7, "copie_virtuelle": true], "reglages": ["Exposure2012": 1], "masques": []] }
+            }
+        }
+        let resultat = try BancGeneratif(tools: tools).lancer(arguments: ["photo_id": 7, "instruction": "add a red square"],
+                                                              modeles: ["fibo2"], dossier: dossier.appendingPathComponent("banc"))
+        XCTAssertEqual(resultat["ok"]?.bool, false, JSONCoding.line(resultat))
+        XCTAssertTrue(resultat["photo"]?.string?.contains("PAS revenue") == true, JSONCoding.line(resultat))
     }
 
     /// Un modèle absent : dit sur la planche, les autres passent ; le banc exige photo_id et refuse model.
     func testBancAvecUnModeleAbsentEtRefus() throws {
         fauxMflux(sortie: sortiePreparee(carreRouge))
+        photoDEssai()
         let planche = dossier.appendingPathComponent("banc")
         let resultat = try BancGeneratif(tools: tools).lancer(arguments: ["photo_id": 7, "instruction": "add a red square", "instruction_fr": "carré"],
                                                               dossier: planche)

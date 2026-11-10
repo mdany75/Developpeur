@@ -106,7 +106,7 @@
 --   retirerReimportees {chemins|lister} → recette : retire du catalogue les fichiers que le module
 --                                          vient d'y réimporter (même session, 30 min), ou les
 --                                          liste (inscrits)
---   importerGeneree {photo, chemin, nom, consigne, confirme} → retouche générative (Fibo 2,
+--   importerGeneree {photo, chemin, nom, consigne, etape?, confirme} → retouche générative (Fibo 2,
 --                                          generative_edit) : le TIFF final de Temporaire/Fibo copié
 --                                          à côté de l'original (« <nom>.tif », sinon « -2 »…),
 --                                          ajouté au catalogue, empilé au-dessus de lui, et devenu la

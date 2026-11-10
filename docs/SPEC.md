@@ -68,14 +68,16 @@ défait ensuite.
 
 - Recette, étape « TIFF réimporté, empilé avec l'original » : réussie le 10 novembre 2026 au matin (88/88), puis en échec trois fois sous la charge d'un tri assisté de 20 000 photos (réimporté en retard, puis au catalogue sans pile après 2 min ; fichier retiré et mis à la Corbeille chaque fois). La 1.8 est publiée sur l'accord de Dany ; refaire la recette une fois le tri fini.
 - Réimportation arrivée après le retrait de la recette (`pas_au_catalogue`, fichier mis à la Corbeille avant que Lightroom, occupé, ne l'ajoute) : ce que fait Lightroom (fenêtre d'erreur ou photo manquante) — dans la recette, Lightroom chargé ([Réimportation, aperçus dynamiques](#réimportation-aperçus-dynamiques)).
-- Les trois étapes de la recette de la 16 (Lueur, étalonnage dans un masque radial, Projection et trait de pinceau droit) : jamais encore passées dans Lightroom ; le seuil de L* de la Lueur (0,2) et la mesure de la bande aux bords sont à confirmer — dans la recette ([Lightroom Classic 16](#lightroom-classic-16-18)).
+- Les trois étapes de la recette de la 16 (Lueur, étalonnage dans un masque radial, Projection et trait de pinceau droit, à cinq points) : jamais encore passées dans Lightroom ; le seuil de L* de la Lueur (0,2) et la mesure de la bande aux bords sont à confirmer — dans la recette ([Lightroom Classic 16](#lightroom-classic-16-18)).
+- Un long trait coupé avant le recalage (`Geometrie.trait`, 1.9) : un trait de deux points sous la Projection 100 reste droit au rendu, et le nombre de touches d'un pinceau ne change pas — à la main dans Lightroom, sur une copie d'Essais ([Lightroom Classic 16](#lightroom-classic-16-18)).
 - La remarque d'un style de Lueur sans quantité, et l'étalonnage d'un masque arrondi (0,5 envoyé 1) relu tel quel — dans la recette ou à la main ([Lightroom Classic 16](#lightroom-classic-16-18)).
 - Photo hors ligne (original et aperçu dynamique absents) : `applyDevelopSettings` de la 16 la saute avec une fenêtre ; ce que voit Claude — à la main, avec Dany ([Lightroom Classic 16](#lightroom-classic-16-18)).
 
 **Retouche générative : choix du modèle (1.9)**
 
 - Banc d'essai jamais lancé : `--generatif-banc` sur une copie d'Essais, jugé par Dany ; la table « genre → modèle » à régler d'après son jugement ([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)).
-- Qwen-Image 2.1 Turbo jamais lancé par Développeur : rien de changé hors du masque, raccord, durée, mémoire en pointe Lightroom ouvert, sortie RGBA, barre à 8 étapes, chargement de l'instantané sans `model_index.json` — au banc ([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)).
+- Qwen-Image 2.1 Turbo jamais lancé par Développeur : rien de changé hors du masque, raccord, durée, mémoire en pointe Lightroom ouvert avec `--quantize 8`, sortie RGBA (transparence mise à plat sur l'entrée : `remarque_transparence` attendue absente), barre à 8 étapes, chargement de l'instantané sans `model_index.json` — au banc ([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)).
+- Le banc d'essai remet la photo (revert_to_original, relue identique, remise dans Essais) ; étapes « Claude · Qwen-Image 2.1 Turbo » et fichier « -Qwen.tif » d'une retouche par Qwen importée — au banc et à la main ([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)).
 
 **Liaison et commandes longues**
 
@@ -3289,6 +3291,13 @@ Constaté le 10 novembre 2026 sur la copie RAW 53918083 (« Essai mesures 16 »)
   pas des rendus du recalage. Constaté avec le module 1.8 chargé (copie JPEG 54208151, « Essai
   Projection 1.8 ») : le même trait sous la Projection 100 reste droit (de 0,184 à 0,209 de la
   hauteur, comme sans Projection ; 0,170 à 0,236 avec la 1.7) ; recette 1.8 réussie, 88 étapes.
+  Ce constat avait cinq points sur le trait : le module ne recale que les points qu'il pose, puis
+  va droit dans le fichier (`Locaux.touches`), et sous la Projection un long segment se courbe
+  entre deux points (revue du 10 novembre 2026 : un trait de deux points à 0,02 et 0,98 donnait
+  0,117 au centre dans la simulation). Depuis la 1.9, `Geometrie.trait` coupe chaque segment dans
+  l'aperçu tous les 0,05 au plus (`Geometrie.PAS_TRAIT`) avant le recalage, quand une grille est
+  donnée (pinceau, objet désigné par un trait, affinage du flou d'objectif) ; sans grille, rien
+  ne change. La simulation imite la courbure (`S.projection`, `ModuleRecette16`).
 - **Étalonnage dans un masque** (`LocalColorGrade*`) : rangé à l'échelle des curseurs globaux, en
   entiers (0,5 devient 1). Un radial couvrant toute l'image, teinte 240 et saturation 50 (puis 100),
   rend au pixel près comme le même étalonnage global (moyennes 47,6/48,5/61,9 et 32,9/42,0/71,7).
@@ -3314,12 +3323,14 @@ Constaté le 10 novembre 2026 sur la copie RAW 53918083 (« Essai mesures 16 »)
   (`ToolHandler.entierDansLightroom`), comme Lightroom le range ; la lueur d'un masque (0 à 1) ne
   l'est pas.
 - Recette (`Recette+16.swift`), sautée avec sa raison sous une version plus ancienne que la 16.0
-  (`get_status`) : « Lueur (Glow 40, style 2) relue en entiers, rendu changé, annulée » (copie RAW ;
+  (`get_status`) ; une version illisible fait échouer l'étape (1.9, revue du 10 novembre 2026 : la
+  recette aurait réussi sans rien vérifier) : « Lueur (Glow 40, style 2) relue en entiers, rendu changé, annulée » (copie RAW ;
   `Glow` et `GlowStyle` relus par `get_settings` avec `all_keys`, L* moyen de l'aperçu changé d'au
   moins 0,2) ; « étalonnage dans un masque radial (ombres 220, 30), relu en entiers, annulé » (copie
   RAW ; `LocalColorGradeShadowHue` 220 et `LocalColorGradeShadowSat` 30 dans `reglages_locaux`) ;
   « Projection 100 : trait de pinceau à 0,2 de la hauteur, droit au centre et aux bords, annulés »
-  (copie `--jpeg`, sans profil d'objectif ; trait de 0,02 à 0,98 de la largeur, `size` 0,01,
+  (copie `--jpeg`, sans profil d'objectif ; trait de cinq points, à 0,03, 0,25, 0,5, 0,75 et 0,97
+  de la largeur, comme au constat de la 1.8 (deux points jusqu'à la revue du 10 novembre 2026), `size` 0,01,
   `feather` 0, Exposure −2 ; la bande assombrie mesurée par `bandeAssombrie` dans les colonnes 4 à
   14 %, 45 à 55 % et 86 à 96 % de la largeur, à moins de 0,02 de la hauteur de 0,2). Chaque étape
   vérifie la photo revenue comme au départ. Le module simulé de `Recette16Tests` imite la 16.0
@@ -10366,10 +10377,23 @@ recolle exactement les pixels hors du masque. Les marques `<image_1>`, `<image_2
 environ 1 Mpx, côtés multiples de 32 (`tailleCible(…, multiple: 32)` ; sous 1 024 px, le README de
 mflux dit que Turbo change le détail fin en grille), même pour un petit recadrage : la recomposition
 remet la zone à la taille du recadrage, SeedVR2 décide comme pour Fibo 2. Le journal de la nouvelle
-photo nomme le modèle (« Qwen-Image 2.1 Turbo : <consigne> ») ; la barre aussi (« Qwen-Image 2.1
-Turbo : sac, 40 % ») ; les étapes « Claude · Fibo 2 » de l'exportation et de l'importation, le nom
-`<photo>-Fibo.tif` et le dossier `Temporaire/Fibo` restent ceux de la retouche générative, quel que
-soit le modèle (aucun Lua changé). Ni `--quantize` ni `--verify` : à décider sur mesure, au banc.
+photo nomme le modèle (« Claude · Qwen-Image 2.1 Turbo : <consigne> », par l'étape ; la consigne ne
+le redit plus) ; la barre aussi (« Qwen-Image 2.1
+Turbo : sac, 40 % »). Depuis la revue du 10 novembre 2026, l'étape de l'exportation, de
+l'importation et du journal nomme le modèle employé (`ModeleGeneratif.etape` : « Claude ·
+Qwen-Image 2.1 Turbo », « Claude · Fibo 2 » pour Fibo 2), envoyée au module (`etape` d'`exporter` et
+d'`importerGeneree` ; `Livraison.etapeGeneree` ne reprend qu'une étape « Claude · … », sinon
+« Claude · Fibo 2 ») et gardée pour `undo_last` ; le nom de la nouvelle photo prend le suffixe du
+modèle (`<photo>-Qwen.tif`, `ModeleGeneratif.suffixe`, jamais deux suffixes) ; les erreurs et la
+réponse (`resolution_zone`, `remarque`) disent aussi son nom. Le dossier `Temporaire/Fibo` reste
+celui de la retouche générative. `--quantize 8` (`Fiche.quantification`, option lue dans le `--help`
+de mflux-generate-qwen-2.1-edit installé : `--quantize, -q {3,5,4,6,8}`) : environ 33 Go en bf16,
+trop sur un Mac de 48 Go avec Lightroom ouvert (gel du 29 octobre 2026). Pas de `--verify`. La
+sortie est un PNG (`sortie-<n>.png`, mflux écrit le format de `--output`) ; un PNG RGBA avec un
+alpha sous 255 est mis à plat sur l'entrée (`Generatif.aplatir`, réécrit avant SeedVR2) au lieu de
+noircir la zone, et la modification porte `remarque_transparence`. « Grey area » devient « masked
+area » quelle que soit la casse. Le statut de chaque fiche suit la table (test : `auto` ne choisit
+jamais un modèle « à départager » ni « plus tard »).
 
 **Banc d'essai** (`BancGeneratif.swift`, `mcp-developpeur --generatif-banc`, développement) : la même
 retouche (même photo, consigne, zone, graine 42 par défaut) par chaque modèle branché et présent,
@@ -10380,7 +10404,14 @@ ses étapes « Claude · essai »). Planche `planche-generatif.html` : la consig
 carte par modèle (avant et après de la zone, durée, part changée, remarques), « le meilleur » et une
 note par modèle, et le JSON du jugement à copier pour Claude. `--catalogue` seul : les modèles et
 leur présence, une ligne JSON, sans Lightroom ni calcul. Sur une copie virtuelle d'Essais remise à
-l'origine (`photo_id` exigé ; `model` refusé : le banc passe chaque modèle).
+l'origine (`photo_id` exigé ; `model` refusé, `null` compris : le banc passe chaque modèle). Avant
+tout calcul, les contrôles de la photo d'essai de la recette : copie virtuelle (le module doit le
+dire), dans « Développeur › Essais », jamais retouchée par Claude ; à la fin, `revert_to_original`
+(comme la recette), réglages et masques relus identiques au départ (sinon `ok` faux, et `photo` le
+dit), puis remise dans Essais si elle en est sortie. Les lignes « Claude · essai » restent dans
+l'Historique (un module ne retire pas une étape de l'Historique). La planche dit ce que chaque
+modèle a reçu : Fibo 2 la fiche de FIBO-vlm (ou la phrase seule), tout autre modèle la phrase
+seule.
 
 **À constater** (repris dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette)) :
 le banc jamais lancé ; Qwen-Image 2.1 Turbo jamais lancé par Développeur (raccord hors du masque,

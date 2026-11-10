@@ -12,7 +12,10 @@ Sortie du CLAUDE.md principal (qui y renvoie). À lire avant de toucher à `gene
   part à un autre modèle. Un modèle autre que Fibo 2 absent du cache est refusé avant tout envoi. La
   table ne change que d'après le jugement de Dany sur le banc d'essai (`--generatif-banc`,
   `BancGeneratif.swift`, rien d'importé). Détail : `docs/SPEC.md`, Choix du modèle. Le titre de
-  l'outil et les étapes « Claude · Fibo 2 » restent ceux de la retouche générative.
+  l'outil reste celui de la retouche générative ; l'étape (« Claude · <modèle> »), le suffixe du
+  fichier (`-Fibo`, `-Qwen`) et les textes nomment le modèle réellement employé (revue du 10 novembre
+  2026). Qwen-Image 2.1 tourne en `--quantize 8` ; une sortie RGBA est mise à plat sur l'entrée
+  (`Generatif.aplatir`). Le banc contrôle la photo d'essai comme la recette et la remet à la fin.
 
 - **Retouche générative par Fibo 2** (`generative_edit`, le 36e outil, titre « Retouche générative
   (Fibo 2) », demandé par Dany le 29 octobre 2026 : « si tu ne peux pas le faire dans Lightroom
@@ -59,7 +62,8 @@ Sortie du CLAUDE.md principal (qui y renvoie). À lire avant de toucher à `gene
   options, constaté) et ses dictionnaires Exif, IPTC, GPS et TIFF, nommé `<base>-Fibo` (jamais
   doublé). Puis la commande `importerGeneree` du module
   (`Livraison.lua`), contrat identique des deux côtés : paramètres `{ photo, chemin, nom, consigne,
-  confirme }` (la `reason` jointe à `consigne` après « — ») ; refus en pause, en « Proposer
+  etape, confirme }` (la `reason` jointe à `consigne` après « — » ; `etape`, « Claude · <modèle> » du
+  modèle employé, revue du 10 novembre 2026) ; refus en pause, en « Proposer
   d'abord » sans `confirme`, et d'un chemin hors de `<racine>/Temporaire/Fibo` (`Livraison.dansFibo` :
   ni « . », ni « .. », ni segment vide), qui n'est pas un `.tif`/`.tiff` ou qui manque, et d'une photo
   protégée (`verifierProtection`, comme à l'exportation) ; destination le dossier de l'original
@@ -156,8 +160,8 @@ Sortie du CLAUDE.md principal (qui y renvoie). À lire avant de toucher à `gene
   fenêtre Claude, Claude Code en terminal : chacun sa `FileOutils`) : `flock` sur
   `<racine>/Temporaire/fibo-en-cours.verrou` (hors de `Temporaire/Fibo`, que le ménage efface ; le
   noyau le rend à la mort du processus), pris d'abord et tenu tout l'appel
-  (`Fibo.prendreVerrou`), sinon refus avant tout envoi (« Un autre calcul de Fibo 2 est en
-  cours… ») ; puis un mflux lancé hors du serveur (Fibo 2 Studio, le Terminal), que le verrou ne voit pas : `Fibo.autreCalcul` (`pgrep -f "mflux-(generate|upscale)"`, injectable, jamais le vrai dans les tests), refus « Fibo 2 calcule déjà sur ce Mac… » avant tout envoi (constaté le 29 octobre 2026 : un calcul de Fibo 2 Studio en même temps que l'essai a fait geler le Mac). **Plus de garde de
+  (`Fibo.prendreVerrou`), sinon refus avant tout envoi (« Un autre calcul de retouche générative
+  (mflux) est en cours… ») ; puis un mflux lancé hors du serveur (Fibo 2 Studio, le Terminal), que le verrou ne voit pas : `Fibo.autreCalcul` (`pgrep -f "mflux-(generate|upscale)"`, injectable, jamais le vrai dans les tests), refus « Fibo 2 calcule déjà sur ce Mac… » avant tout envoi (constaté le 29 octobre 2026 : un calcul de Fibo 2 Studio en même temps que l'essai a fait geler le Mac). **Plus de garde de
   mémoire** (retirée le 29 octobre 2026 au soir, à la demande de Dany : « le Mac créera du swap au
   besoin ») : ni refus ni saut faute de mémoire libre, ni au départ, ni avant une modification, ni
   pour SeedVR2 (lancé dès que ses autres conditions sont remplies), et la mémoire du Mac n'est plus
