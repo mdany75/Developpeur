@@ -66,6 +66,7 @@ défait ensuite.
 
 **Lightroom Classic 16 (1.8)**
 
+- Recette, étape « TIFF réimporté, empilé avec l'original » : réussie le 10 novembre 2026 au matin (88/88), puis en échec trois fois sous la charge d'un tri assisté de 20 000 photos (réimporté en retard, puis au catalogue sans pile après 2 min ; fichier retiré et mis à la Corbeille chaque fois). La 1.8 est publiée sur l'accord de Dany ; refaire la recette une fois le tri fini.
 - Réimportation arrivée après le retrait de la recette (`pas_au_catalogue`, fichier mis à la Corbeille avant que Lightroom, occupé, ne l'ajoute) : ce que fait Lightroom (fenêtre d'erreur ou photo manquante) — dans la recette, Lightroom chargé ([Réimportation, aperçus dynamiques](#réimportation-aperçus-dynamiques)).
 - Photo hors ligne (original et aperçu dynamique absents) : `applyDevelopSettings` de la 16 la saute avec une fenêtre ; ce que voit Claude — à la main, avec Dany ([Lightroom Classic 16](#lightroom-classic-16-18)).
 
