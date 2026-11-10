@@ -103,8 +103,9 @@
 --                                          calculera avec ce modèle
 --   apercusDynamiques {photos?|selection?, retirer?} → aperçus dynamiques créés (crees,
 --                                          existants, echecs) ou retirés
---   retirerReimportees {chemins}        → recette : retire du catalogue les fichiers que le module
---                                          vient d'y réimporter (même session, 30 min)
+--   retirerReimportees {chemins|lister} → recette : retire du catalogue les fichiers que le module
+--                                          vient d'y réimporter (même session, 30 min), ou les
+--                                          liste (inscrits)
 --   importerGeneree {photo, chemin, nom, consigne, confirme} → retouche générative (Fibo 2,
 --                                          generative_edit) : le TIFF final de Temporaire/Fibo copié
 --                                          à côté de l'original (« <nom>.tif », sinon « -2 »…),

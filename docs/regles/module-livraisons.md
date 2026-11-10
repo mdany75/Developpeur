@@ -27,7 +27,10 @@ photos réimportées.
   Lightroom ajoute le fichier réimporté, puis l'empile, après le rendu, et très occupé bien plus
   tard (constaté le 10 novembre 2026) : le module attend `Livraison.ATTENTE_REIMPORT` (40 s, sous
   les 50 s de `FileOutils`), inscrit chaque fichier dès l'exportation et marque
-  `pas_encore_au_catalogue` ou `pas_encore_empilee` ; jamais « ajouté, empilé » sans l'avoir lu.
+  `pas_encore_au_catalogue` ou `pas_encore_empilee` ; jamais « ajouté, empilé » sans l'avoir lu,
+  ni « il l'ajoutera » (rien n'a été vu : « vérifier plus tard avec find_photos »). La recette ne
+  met jamais à la Corbeille un fichier dont le retrait du catalogue a échoué ;
+  `retirerReimportees { lister = true }` donne les chemins inscrits, sans rien retirer.
 - La fenêtre de choix du dossier (`choisirDossier`, `runOpenPanel`) s'ouvre dans sa propre tâche :
   la commande répond sans attendre l'utilisateur (40 s au plus, puis `en_attente`).
 - Un aperçu attend le calcul des masques IA (`attendreCalculsIA`) : sinon Lightroom ouvre la

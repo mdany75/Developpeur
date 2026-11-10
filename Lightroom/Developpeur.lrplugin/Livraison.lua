@@ -822,7 +822,23 @@ end
 -- le disque : la recette l'efface ensuite. Un fichier livré que Lightroom, occupé, n'a pas encore
 -- ajouté au catalogue (constaté le 10 novembre 2026) n'a rien à retirer : il va dans
 -- pas_au_catalogue et reste inscrit (un appel suivant le retire s'il arrive entre-temps).
+-- Avec lister = true, rien n'est retiré : la liste des chemins inscrits (inscrits), que la recette
+-- compare avant et après une exportation qui a échoué, pour retirer quand même ce qui a été livré.
 function Livraison.retirerReimportees(params)
+    if params.lister == true then
+        local inscrits, maintenant = {}, LrDate.currentTime()
+        for chemin, quand in pairs(reimporteesSession) do
+            if maintenant - quand <= DUREE_RETRAIT then
+                inscrits[#inscrits + 1] = chemin
+            end
+        end
+        table.sort(inscrits)
+        local liste = Json.tableau()
+        for _, chemin in ipairs(inscrits) do
+            liste[#liste + 1] = chemin
+        end
+        return { inscrits = liste }
+    end
     local cat = Photos.catalogue()
     local LrSelection = import 'LrSelection'
     local retires, absents = Json.tableau(), Json.tableau()

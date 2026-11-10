@@ -158,7 +158,8 @@ final class Version25Tests: XCTestCase {
         XCTAssertEqual(try reglagesEnvoyes()["reimporter"]?.string, "pile")
         let reponse = try JSONCoding.parse(result.text)
         XCTAssertEqual(reponse["reimportees"]?.array?.first?["id"]?.int, 777)
-        XCTAssertTrue(reponse["a_savoir"]?.string?.contains("undo_last ne les retire pas") == true)
+        XCTAssertTrue(reponse["a_savoir"]?.string?.contains("1 fichier ajouté au catalogue, empilé avec son original. Au catalogue, il y reste (undo_last ne le retire pas") == true,
+                      reponse["a_savoir"]?.string ?? "")
         XCTAssertEqual(reponse["dossier"]?.string, "le dossier de chaque original")
         XCTAssertTrue(livrer(["photo_ids": [1], "reimport": "stack", "subfolder": "x"]).isError)
         XCTAssertTrue(livrer(["photo_ids": [1], "reimport": "catalog"]).text.contains("folder"), "catalog : le dossier reste exigé")
@@ -184,9 +185,11 @@ final class Version25Tests: XCTestCase {
         XCTAssertEqual(reponse["en_attente"]?.array?.compactMap(\.string), ["/Volumes/Photos/2025/Gaspesie/DSCF3.tif"])
         XCTAssertEqual(reponse["pas_encore_empilees"]?.array?.compactMap(\.string), ["/Volumes/Photos/2025/Gaspesie/DSCF2.tif"])
         let aSavoir = try XCTUnwrap(reponse["a_savoir"]?.string)
-        XCTAssertTrue(aSavoir.contains("1 fichier ajouté au catalogue, empilé avec leur original"), aSavoir)
-        XCTAssertTrue(aSavoir.contains("pas encore empilé"), aSavoir)
-        XCTAssertTrue(aSavoir.contains("n'a pas encore ajouté au catalogue (en_attente) : il les ajoutera plus tard, empilés avec leur original ; les voir avec find_photos"), aSavoir)
+        XCTAssertTrue(aSavoir.contains("1 fichier ajouté au catalogue, empilé avec son original."), aSavoir)
+        XCTAssertTrue(aSavoir.contains("1 fichier ajouté au catalogue, mais pas encore empilé avec son original (Lightroom occupé ; pas_encore_empilees) : vérifier plus tard avec find_photos."), aSavoir)
+        XCTAssertTrue(aSavoir.contains("1 fichier livré, pas encore ajouté au catalogue (Lightroom occupé ; en_attente) : vérifier plus tard avec find_photos."), aSavoir)
+        XCTAssertFalse(aSavoir.contains("ajoutera"), "rien de promis : \(aSavoir)")
+        XCTAssertFalse(aSavoir.contains("leur original"), "accord : \(aSavoir)")
 
         // Rien encore au catalogue : a_savoir ne dit plus de fichier ajouté ni empilé.
         fake.onSend = { [unowned fake] command, _ in
@@ -200,73 +203,174 @@ final class Version25Tests: XCTestCase {
         XCTAssertEqual(seul["en_attente"]?.array?.count, 1)
         let texte = try XCTUnwrap(seul["a_savoir"]?.string)
         XCTAssertFalse(texte.contains("ajouté au catalogue,"), texte)
-        XCTAssertFalse(texte.contains("empilé avec leur original."), texte)
+        XCTAssertFalse(texte.contains("empilé avec"), texte)
+        XCTAssertFalse(texte.contains("Au catalogue, ils y restent"), "rien n'y est encore : \(texte)")
+        XCTAssertTrue(texte.contains("1 fichier livré, pas encore ajouté au catalogue (Lightroom occupé ; en_attente) : vérifier plus tard avec find_photos."), texte)
+        XCTAssertTrue(texte.contains("Une fois au catalogue, il y restera (undo_last ne le retire pas"), texte)
         XCTAssertNil(seul["pas_encore_empilees"])
+    }
+
+    /// Un fichier livré sans `reimportee` ni marque (module d'une autre version) : rien n'a été lu,
+    /// il est en attente, jamais passé sous silence. Les listes sont bornées comme `fichiers`.
+    func testReimportWithoutMarkIsWaitingAndListsAreBounded() throws {
+        fake.onSend = { [unowned fake] command, _ in
+            guard command == "exporter" else { return }
+            var fichiers: [JSONValue] = [["photo": ["fichier": "DSCF0.RAF"], "chemin": "/Volumes/Photos/a/DSCF0.tif", "octets": 1000]]
+            for i in 1...60 {
+                fichiers.append(["photo": .object(["fichier": .string("DSCF\(i).RAF")]), "chemin": .string("/Volumes/Photos/a/DSCF\(i).tif"), "octets": 1000,
+                                 "reimportee": .number(Double(1000 + i)), "pas_encore_empilee": true])
+            }
+            for i in 61...120 {
+                fichiers.append(["photo": .object(["fichier": .string("DSCF\(i).RAF")]), "chemin": .string("/Volumes/Photos/a/DSCF\(i).tif"), "octets": 1000,
+                                 "pas_encore_au_catalogue": true])
+            }
+            fake?.replies["exporter"] = ["dossier": "/Volumes/Photos/a", "reimportees": true, "empilees": true, "fichiers": .array(fichiers)]
+        }
+        let un = try JSONCoding.parse(livrer(["photo_ids": [1], "format": "tiff", "reimport": "stack"]).text)
+        XCTAssertEqual(un["en_attente"]?.array?.first?.string, "/Volumes/Photos/a/DSCF0.tif", "sans marque : en attente")
+        XCTAssertEqual(un["en_attente"]?.array?.count, 50)
+        XCTAssertEqual(un["en_attente_non_listes"]?.int, 11)
+        XCTAssertEqual(un["pas_encore_empilees"]?.array?.count, 50)
+        XCTAssertEqual(un["pas_encore_empilees_non_listes"]?.int, 10)
+        let texte = try XCTUnwrap(un["a_savoir"]?.string)
+        XCTAssertTrue(texte.contains("61 fichiers livrés, pas encore ajoutés au catalogue"), texte)
+        XCTAssertTrue(texte.contains("60 fichiers ajoutés au catalogue, mais pas encore empilés avec leurs originaux"), texte)
+        XCTAssertTrue(texte.contains("Au catalogue, ils y restent (undo_last ne les retire pas"), texte)
     }
 
     // MARK: Recette du TIFF réimporté
 
-    private func recetteTiff(chercher: @escaping (Int) throws -> JSONValue, retrait: JSONValue) -> (Recette, [String]) {
+    /// Le chemin livré (jamais sur le disque), la recette, et les fichiers mis à sa fausse Corbeille.
+    private final class Corbeille { var chemins: [String] = [] }
+
+    private func recetteTiff(chercher: @escaping (Int) throws -> JSONValue, retrait: @escaping (String) throws -> JSONValue,
+                             exporter: ((String) throws -> JSONValue)? = nil) -> (Recette, [String], Corbeille) {
         let chemin = "/Volumes/Photos/introuvable-\(UUID().uuidString)/DSCF2402.tif"
         fake.replies["reglages"] = ["photo": ["id": 5, "fichier": "DSCF2402.RAF (Copie 1)", "copie_virtuelle": true],
                                     "reglages": ["Temperature": 5000], "masques": [], "profil": "Adobe Color", "recadrage": ["angle": 0]]
-        fake.replies["retirerReimportees"] = retrait
         var appels = 0
-        fake.onSend = { [unowned fake] command, _ in
+        var exporte = false
+        fake.onSend = { [unowned fake] command, params in
+            func repondre(_ calcul: () throws -> JSONValue) {
+                do { fake?.replies[command] = try calcul(); fake?.errors[command] = nil }
+                catch { fake?.errors[command] = error }
+            }
             switch command {
             case "exporter":
-                fake?.replies["exporter"] = ["dossier": "/Volumes/Photos/x", "reimportees": true, "empilees": true, "fichiers": [
-                    ["photo": ["fichier": "DSCF2402.RAF"], "chemin": .string(chemin), "octets": 1000, "pas_encore_au_catalogue": true]]]
+                exporte = true
+                repondre {
+                    if let exporter { return try exporter(chemin) }
+                    return ["dossier": "/Volumes/Photos/x", "reimportees": true, "empilees": true, "fichiers": [
+                        ["photo": ["fichier": "DSCF2402.RAF"], "chemin": .string(chemin), "octets": 1000, "pas_encore_au_catalogue": true]]]
+                }
             case "chercher":
                 appels += 1
-                do { fake?.replies["chercher"] = try chercher(appels); fake?.errors["chercher"] = nil }
-                catch { fake?.errors["chercher"] = error }
+                repondre { try chercher(appels) }
+            case "retirerReimportees":
+                if params["lister"]?.bool == true {
+                    repondre { ["inscrits": exporte ? ["/Volumes/Photos/autre.tif", .string(chemin)] : ["/Volumes/Photos/autre.tif"]] }
+                } else {
+                    repondre { try retrait(chemin) }
+                }
             default: break
             }
         }
         let recette = Recette(lightroom: fake)
-        var pauses = 0
-        recette.attendre = { _ in pauses += 1 }
-        return (recette, [chemin])
+        recette.attendre = { _ in }
+        let corbeille = Corbeille()
+        recette.corbeille = { corbeille.chemins.append($0) }
+        return (recette, [chemin], corbeille)
+    }
+
+    private func retire(_ chemin: String) -> JSONValue { ["retires": [.string(chemin)], "pas_au_catalogue": []] }
+    private func retraits() -> [[String]] {
+        fake.calls.filter { $0.command == "retirerReimportees" && $0.params["lister"] == nil }.map { $0.params["chemins"]?.array?.compactMap(\.string) ?? [] }
     }
 
     func testRecetteWaitsForTheLateReimportThenRemovesIt() throws {
-        let (recette, chemins) = recetteTiff(chercher: { appel in
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { appel in
             appel < 4 ? ["photos": []] : ["photos": [["id": 901, "fichier": "DSCF2402.tif", "pile": ["dessus": 5, "photos": 2]]]]
-        }, retrait: ["retires": ["x"], "pas_au_catalogue": []])
+        }, retrait: retire)
         let depart = try recette.etat(5)
         XCTAssertNoThrow(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
         XCTAssertTrue(recette.etapes.last?.reussie == true, recette.etapes.last?.detail ?? "")
         XCTAssertEqual(fake.calls.filter { $0.command == "chercher" }.count, 4, "find_photos répété jusqu'à la photo empilée")
-        XCTAssertEqual(fake.calls.last { $0.command == "retirerReimportees" }?.params["chemins"]?.array?.compactMap(\.string), chemins)
+        XCTAssertEqual(retraits(), [chemins])
+        XCTAssertEqual(corbeille.chemins, chemins, "le fichier livré va à la Corbeille")
     }
 
     func testRecetteRemovesTheFileEvenWhenTheReimportNeverCame() throws {
-        let (recette, chemins) = recetteTiff(chercher: { _ in ["photos": []] }, retrait: ["retires": [], "pas_au_catalogue": ["x"]])
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { _ in ["photos": []] },
+                                                        retrait: { ["retires": [], "pas_au_catalogue": [.string($0)]] })
         let depart = try recette.etat(5)
         XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
         let detail = recette.etapes.last?.detail ?? ""
         XCTAssertTrue(detail.contains("pas encore au catalogue après 2 min"), detail)
+        XCTAssertTrue(detail.contains("le retirer du catalogue à la main s'il apparaît"), detail)
         XCTAssertEqual(fake.calls.filter { $0.command == "chercher" }.count, 25, "deux minutes, toutes les 5 s")
-        XCTAssertEqual(fake.calls.last { $0.command == "retirerReimportees" }?.params["chemins"]?.array?.compactMap(\.string), chemins)
+        XCTAssertEqual(retraits(), [chemins])
+        XCTAssertEqual(corbeille.chemins, chemins, "pas au catalogue : le fichier va quand même à la Corbeille")
     }
 
     func testRecetteRemovesTheFileEvenAfterAnErrorAndSaysWhatWasMissing() throws {
-        let (recette, chemins) = recetteTiff(chercher: { appel in
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { appel in
             if appel < 3 { return ["photos": [["id": 901, "fichier": "DSCF2402.tif", "pile": .null]]] }
             if appel == 3 { throw LightroomError.plugin("Lightroom ne répond pas") }
             return ["photos": []]
-        }, retrait: ["retires": ["x"], "pas_au_catalogue": []])
+        }, retrait: retire)
         let depart = try recette.etat(5)
         XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
         XCTAssertTrue(recette.etapes.last?.detail.contains("Lightroom ne répond pas") == true, recette.etapes.last?.detail ?? "")
-        XCTAssertEqual(fake.calls.last { $0.command == "retirerReimportees" }?.params["chemins"]?.array?.compactMap(\.string), chemins)
+        XCTAssertEqual(retraits(), [chemins])
+        XCTAssertEqual(corbeille.chemins, chemins)
 
         // Trouvée, jamais empilée : l'échec le dit.
-        let (autre, _) = recetteTiff(chercher: { _ in ["photos": [["id": 901, "fichier": "DSCF2402.tif"]]] },
-                                     retrait: ["retires": ["x"], "pas_au_catalogue": []])
+        let (autre, _, _) = recetteTiff(chercher: { _ in ["photos": [["id": 901, "fichier": "DSCF2402.tif"]]] }, retrait: retire)
         XCTAssertThrowsError(try autre.etapeTiffReimporte(5, "RAW 5", depart: depart))
         XCTAssertTrue(autre.etapes.last?.detail.contains("pas empilé avec l'original") == true, autre.etapes.last?.detail ?? "")
+    }
+
+    /// Le retrait du catalogue échoue : le fichier reste sur le disque (à la Corbeille, la photo
+    /// resterait au catalogue avec un fichier introuvable, empilée avec l'original), et l'échec dit
+    /// quoi faire à la main.
+    func testRecetteKeepsTheFileWhenTheRemovalFailedAndSaysWhatToDo() throws {
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { _ in ["photos": [["id": 901, "fichier": "DSCF2402.tif", "pile": ["photos": 2]]]] },
+                                                        retrait: { _ in throw LightroomError.plugin("Lightroom n'a pas retiré la photo") })
+        let depart = try recette.etat(5)
+        XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
+        let detail = recette.etapes.last?.detail ?? ""
+        XCTAssertEqual(corbeille.chemins, [], "jamais à la Corbeille sans le retrait")
+        XCTAssertTrue(detail.contains("pas retiré du catalogue"), detail)
+        XCTAssertTrue(detail.contains("Photo › Retirer du catalogue"), detail)
+        XCTAssertTrue(detail.contains(chemins[0]), "le chemin à mettre à la Corbeille à la main : \(detail)")
+    }
+
+    /// La photo arrive entre la dernière lecture de find_photos et le retrait : le retrait la
+    /// trouve et l'enlève ; le message le dit, au lieu de « pas encore au catalogue ».
+    func testRecetteSaysTheReimportCameLateAndWasRemoved() throws {
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { _ in ["photos": []] }, retrait: retire)
+        let depart = try recette.etat(5)
+        XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
+        let detail = recette.etapes.last?.detail ?? ""
+        XCTAssertTrue(detail.contains("arrivé au catalogue après les 2 min d'attente"), detail)
+        XCTAssertTrue(detail.contains("retiré du catalogue et mis à la Corbeille"), detail)
+        XCTAssertFalse(detail.contains("pas encore au catalogue"), detail)
+        XCTAssertEqual(corbeille.chemins, chemins)
+    }
+
+    /// export_photos échoue après le rendu (délai, réponse perdue) : le fichier que le module a
+    /// inscrit pendant l'appel est retiré du catalogue et mis à la Corbeille ; un fichier inscrit
+    /// avant l'appel n'est jamais touché.
+    func testRecetteCleansUpWhenExportFailsAfterTheRendering() throws {
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { _ in ["photos": []] }, retrait: retire,
+                                                        exporter: { _ in throw LightroomError.plugin("délai dépassé") })
+        let depart = try recette.etat(5)
+        XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
+        let detail = recette.etapes.last?.detail ?? ""
+        XCTAssertTrue(detail.contains("délai dépassé"), detail)
+        XCTAssertTrue(detail.contains("DSCF2402.tif : fichier retiré du catalogue et mis à la Corbeille"), detail)
+        XCTAssertEqual(retraits(), [chemins], "seul le fichier inscrit pendant l'appel")
+        XCTAssertEqual(corbeille.chemins, chemins)
     }
 
     // MARK: Dossier, noms exacts

@@ -9362,12 +9362,23 @@ empilée). Depuis : le module attend 40 s (au lieu de 10) la photo, et son empil
 demandé ; il inscrit chaque fichier livré à réimporter dès l'exportation (`retirerReimportees` en
 retire aussi un arrivé tard ; un fichier pas encore là revient dans `pas_au_catalogue`) ; il marque
 `pas_encore_au_catalogue` ou `pas_encore_empilee`. Le serveur sépare dans `a_savoir` les fichiers
-ajoutés (et empilés) de ceux que Lightroom n'a pas encore ajoutés (« il les ajoutera plus tard,
-empilés avec leur original ; les voir avec find_photos »), avec leurs chemins dans `en_attente` (et
-`pas_encore_empilees`). La recette attend la photo réimportée et empilée (`find_photos` toutes les
-5 s, 2 minutes au plus), puis, réussie ou non, retire le fichier du catalogue et le met à la
-Corbeille ; l'échec dit ce qui manquait. Simulé (`S.delaiReimport`, `S.delaiEmpilement`) :
-`essais-reimportation.lua` ; serveur et recette : `Version25Tests`.
+ajoutés (et empilés avec leur original) de ceux que Lightroom n'a pas encore ajoutés, sans rien
+promettre de ce qui n'a pas été lu (« pas encore ajouté au catalogue (Lightroom occupé) : vérifier
+plus tard avec find_photos »), avec leurs chemins dans `en_attente` (et `pas_encore_empilees`),
+50 au plus chacune comme `fichiers` (le reste compté : `en_attente_non_listes`,
+`pas_encore_empilees_non_listes`) ; un fichier sans `reimportee` ni marque (module d'une autre
+version) compte en attente. La recette attend la photo réimportée et empilée (`find_photos` toutes
+les 5 s, 2 minutes au plus), puis, réussie ou non, retire le fichier du catalogue et le met à la
+Corbeille (`Recette.corbeille`, injectée dans les tests) ; l'échec dit ce qui manquait, et dit
+« arrivé au catalogue après les 2 min » quand le retrait trouve une photo que `find_photos` n'avait
+pas vue. Si le retrait échoue, le fichier reste sur le disque (à la Corbeille, la photo resterait au
+catalogue avec un fichier introuvable) et l'échec dit quoi faire à la main. Si `export_photos`
+échoue après le rendu, la recette compare les fichiers inscrits par le module avant et après
+l'appel (`retirerReimportees` avec `lister`) et fait le même ménage pour ceux de l'appel. Simulé
+(`S.delaiReimport`, `S.delaiEmpilement`) : `essais-reimportation.lua` (un chemin par essai :
+l'inscription vit tout le temps des essais), avec la livraison sans réimportation (aucune attente)
+et vers le catalogue sans pile (aucune attente d'empilement) ; serveur et recette :
+`Version25Tests`.
 
 Aperçus dynamiques : `catalog:buildSmartPreviews(photos)` rend `created`, `existed`, `failed`
 (Lightroom montre sa barre de progression) ; `photo:deleteSmartPreview()` rend `deleted`. Le

@@ -16,24 +16,37 @@ extension ToolHandler {
     /// Ce que dit export_photos d'une réimportation. Lightroom ajoute les fichiers réimportés au
     /// catalogue après le rendu, puis les empile ; très occupé, bien plus tard que les 40 s
     /// d'attente du module (constaté le 10 novembre 2026, Lightroom Classic 16.0 : la réponse
-    /// disait « ajoutés, empilés » pour un TIFF qui n'était pas au catalogue). Chaque groupe dit ce
-    /// qui est vrai de lui seul.
+    /// disait « ajoutés, empilés » pour un TIFF qui n'était pas au catalogue, ni plusieurs minutes
+    /// après). Chaque groupe dit ce qui est vrai de lui seul, et rien de ce qui n'a pas été lu :
+    /// jamais « il les ajoutera », seulement de quoi vérifier plus tard.
     static func aSavoirReimportees(ajoutes: Int, nonEmpilees: Int, enAttente: Int, empiler: Bool) -> String {
-        func n(_ nombre: Int, _ mot: String) -> String { "\(nombre) \(mot)\(nombre > 1 ? "s" : "")" }
+        func s(_ nombre: Int, _ singulier: String, _ pluriel: String) -> String { nombre > 1 ? pluriel : singulier }
         var phrases: [String] = []
         let empiles = ajoutes - nonEmpilees
         if empiler {
-            if empiles > 0 { phrases.append("\(n(empiles, "fichier")) ajouté\(empiles > 1 ? "s" : "") au catalogue, empilé\(empiles > 1 ? "s" : "") avec leur original.") }
+            if empiles > 0 {
+                phrases.append("\(empiles) \(s(empiles, "fichier ajouté au catalogue, empilé avec son original", "fichiers ajoutés au catalogue, empilés chacun avec son original")).")
+            }
             if nonEmpilees > 0 {
-                phrases.append("\(n(nonEmpilees, "fichier")) ajouté\(nonEmpilees > 1 ? "s" : "") au catalogue, mais pas encore empilé\(nonEmpilees > 1 ? "s" : "") (pas_encore_empilees) : Lightroom, occupé, les empilera avec leur original plus tard.")
+                phrases.append("\(nonEmpilees) \(s(nonEmpilees, "fichier ajouté au catalogue, mais pas encore empilé avec son original", "fichiers ajoutés au catalogue, mais pas encore empilés avec leurs originaux")) (Lightroom occupé ; pas_encore_empilees) : vérifier plus tard avec find_photos.")
             }
         } else if ajoutes > 0 {
-            phrases.append("\(n(ajoutes, "fichier")) ajouté\(ajoutes > 1 ? "s" : "") au catalogue.")
+            phrases.append("\(ajoutes) \(s(ajoutes, "fichier ajouté", "fichiers ajoutés")) au catalogue.")
         }
         if enAttente > 0 {
-            phrases.append("\(n(enAttente, "fichier")) livré\(enAttente > 1 ? "s" : "") que Lightroom, occupé, n'a pas encore ajouté\(enAttente > 1 ? "s" : "") au catalogue (en_attente) : il les ajoutera plus tard\(empiler ? ", empilés avec leur original" : "") ; les voir avec find_photos.")
+            phrases.append("\(enAttente) \(s(enAttente, "fichier livré, pas encore ajouté", "fichiers livrés, pas encore ajoutés")) au catalogue (Lightroom occupé ; en_attente) : vérifier plus tard avec find_photos.")
         }
-        phrases.append("Au catalogue, ils y restent (undo_last ne les retire pas ; Photo › Retirer du catalogue, à la main).")
+        let total = ajoutes + enAttente
+        let retrait = "(undo_last ne \(s(total, "le", "les")) retire pas ; Photo › Retirer du catalogue, à la main)"
+        if total == 0 {
+            phrases.append("Aucun fichier livré : rien n'est ajouté au catalogue.")
+        } else if enAttente == 0 {
+            phrases.append("Au catalogue, \(s(total, "il y reste", "ils y restent")) \(retrait).")
+        } else if ajoutes == 0 {
+            phrases.append("Une fois au catalogue, \(s(total, "il y restera", "ils y resteront")) \(retrait).")
+        } else {
+            phrases.append("Au catalogue, ils y restent \(retrait).")
+        }
         return phrases.joined(separator: " ")
     }
 
@@ -334,7 +347,9 @@ extension ToolHandler {
                             nonEmpilees.append(.string(chemin))
                         }
                         reimportees.append(.object(reimportee))
-                    } else if item["pas_encore_au_catalogue"]?.bool == true {
+                    } else {
+                        // Pas encore au catalogue (pas_encore_au_catalogue), ou sans marque (module
+                        // d'une autre version) : rien de lu, donc en attente.
                         enAttente.append(.string(chemin))
                     }
                 } else {
@@ -363,8 +378,11 @@ extension ToolHandler {
             resultat["reimportees"] = .array(reimportees)
             resultat["a_savoir"] = .string(Self.aSavoirReimportees(ajoutes: reimportees.count, nonEmpilees: nonEmpilees.count,
                                                                    enAttente: enAttente.count, empiler: empiler))
-            if !enAttente.isEmpty { resultat["en_attente"] = .array(enAttente) }
-            if !nonEmpilees.isEmpty { resultat["pas_encore_empilees"] = .array(nonEmpilees) }
+            // Bornées comme fichiers : 50 chemins au plus, le reste compté.
+            if !enAttente.isEmpty { resultat["en_attente"] = .array(Array(enAttente.prefix(50))) }
+            if enAttente.count > 50 { resultat["en_attente_non_listes"] = .number(Double(enAttente.count - 50)) }
+            if !nonEmpilees.isEmpty { resultat["pas_encore_empilees"] = .array(Array(nonEmpilees.prefix(50))) }
+            if nonEmpilees.count > 50 { resultat["pas_encore_empilees_non_listes"] = .number(Double(nonEmpilees.count - 50)) }
         }
         if let limite = reglages["poids_max_ko"]?.double, !lourds.isEmpty {
             resultat["au_dessus_du_poids"] = .string("\(lourds.count) fichier\(lourds.count > 1 ? "s" : "") au-dessus de \(Int(limite)) Ko (\(lourds.prefix(5).joined(separator: ", "))) : Lightroom livre alors le plus petit fichier possible à cette taille ; réduire long_edge pour tenir la limite.")
