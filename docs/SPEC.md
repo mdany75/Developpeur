@@ -66,6 +66,7 @@ défait ensuite.
 
 **Lightroom Classic 16 (1.8)**
 
+- Réimportation arrivée après le retrait de la recette (`pas_au_catalogue`, fichier mis à la Corbeille avant que Lightroom, occupé, ne l'ajoute) : ce que fait Lightroom (fenêtre d'erreur ou photo manquante) — dans la recette, Lightroom chargé ([Réimportation, aperçus dynamiques](#réimportation-aperçus-dynamiques)).
 - Photo hors ligne (original et aperçu dynamique absents) : `applyDevelopSettings` de la 16 la saute avec une fenêtre ; ce que voit Claude — à la main, avec Dany ([Lightroom Classic 16](#lightroom-classic-16-18)).
 
 **Liaison et commandes longues**
@@ -333,7 +334,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `choisirDossier` | `titre?`, `depart?`, `attente?` | `dossier`, ou `annule`, ou `en_attente` (la fenêtre attend l'utilisateur ; la commande suivante relit son choix) |
 | `nomsFichiers` | `photos?` ou `selection?`, `modele` (nom), `texte_perso?`, `sequence?` | `modele`, `noms` (20 au plus : photo, `nom` sans l'extension, ou `erreur`) |
 | `apercusDynamiques` | `photos?` ou `selection?`, `retirer?` | `crees`, `existants`, `echecs`, `sans_original`, `retires`, `absents`, `taille_mo` |
-| `retirerReimportees` | `chemins` | `retires`, `pas_au_catalogue` (inscrits, pas encore ajoutés par Lightroom : rien à retirer, ils restent inscrits) : recette seulement ; fichiers que le module vient de réimporter (inscrits dès l'exportation, même session, 30 min) |
+| `retirerReimportees` | `chemins`, ou `lister` = true | `retires`, `pas_au_catalogue` ; avec `lister`, `inscrits` seulement, rien de retiré (inscrits, pas encore ajoutés par Lightroom : rien à retirer, ils restent inscrits) : recette seulement ; fichiers que le module vient de réimporter (inscrits dès l'exportation, même session, 30 min) |
 | `importerGeneree` (29 octobre 2026) | `photo` (id de la photo d'origine ; sans lui, la photo active), `chemin` (le TIFF final, sous `<racine>/Temporaire/Fibo/`), `nom` (nom de base proposé, sans extension), `consigne` (le texte français des modifications, et la raison, pour le journal), `confirme` | `{id, fichier, chemin, empilee, active}` (plus `essai` pour une photo d'essai, `copie_virtuelle` et `photo_fibo` sous « Copies virtuelles seulement ») : la photo de Fibo 2 copiée dans le dossier de l'original et ajoutée au catalogue, empilée au-dessus de lui (une photo d'essai : dans Développeur › Essais, sans pile) ; rejouée une seule fois, et seulement si elle n'a pas été livrée (`.unreachable`), jamais après un délai ni une coupure (voir Retouche générative par Fibo 2) |
 | `masques` | `photo?`, `action` (`lister`, `masquer`, `afficher`, `retirer`, `dupliquer`, `recalculer`, `affiner`, `retirer_vides`), `masque?`, `inverser?`, `nom?`, `contour?`, `decalage?`, `etape`, `raison?`, `confirme` | `lister` : `photo`, `masques` ; sinon `resultats` comme `appliquer`, et `masques` (la liste après l'écriture) ; voir Masques : pistes de la 2.1 |
 | `progression` | `id`, `titre?`, `fait?`, `total?`, `message?`, `fin?` | `annulee` (croix de la barre de Lightroom), `fermee` à la fin |

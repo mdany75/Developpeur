@@ -73,13 +73,44 @@
 <main class="page">
   <header class="entete">
     <h1>Feuille de route de Développeur</h1>
-    <p class="sous">Seulement ce qui reste à faire, dans l'ordre. Mise à jour du 2 novembre 2026, 22 h : la 1.6.5 est publiée et retirée d'ici ; ce qui est livré (jusqu'à la 1.6.5) et les idées écartées sont retirés ; ce qui est livré reste dans le <code>CHANGELOG.md</code> et les Releases GitHub.</p>
+    <p class="sous">Seulement ce qui reste à faire, dans l'ordre. Mise à jour du 10 novembre 2026 : la 1.8 (Lightroom Classic 16 : Lueur, Projection, étalonnage dans les masques) est publiée et retirée d'ici ; la 1.9 commence ; ce qui est livré et les idées écartées sont retirés ; ce qui est livré reste dans le <code>CHANGELOG.md</code> et les Releases GitHub.</p>
   </header>
 
   <div class="etapes">
 
     <section class="etape">
-      <div class="etape-tete"><span class="num">1</span><h2>À faire avec toi</h2><span class="quand">ce qui demande ton œil ou ta décision</span></div>
+      <div class="etape-tete"><span class="num">1</span><h2>La 1.9, en cours</h2><span class="quand">demandée le 10 novembre 2026</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Ce que fait une invite, avant de la lancer</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Ta demande</span></div>
+          <p>Un menu dans la configuration du module montre tout ce que fait une invite (Retouche pro, Portrait, Paysage, Noir et blanc…) : ses étapes et ses options. Le même résumé s'affiche avant de la lancer, avec Oui ou Non.</p>
+        </article>
+        <article class="chantier">
+          <h3>Fenêtre Claude : Mes demandes retiré, Classer en haut</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Ta demande</span></div>
+          <p>Tu ne te sers pas de Mes demandes : le menu et son bouton partent. Le bouton Classer monte en haut, à côté de Repartir à neuf.</p>
+        </article>
+        <article class="chantier">
+          <h3>Claude retire les passants</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Ta demande</span></div>
+          <p>Suppression des distractions › Personnes, lancée par Claude avec le génératif d'Adobe (le SDK le permet). Constatée d'abord sur une copie d'Essais : durée, résultat, annulation. Puis voir si l'outil Supprimer avec l'IA générative peut servir aux taches de Claude.</p>
+        </article>
+        <article class="chantier">
+          <h3>Le meilleur modèle génératif pour chaque retouche</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Ton œil, à la fin</span></div>
+          <p>Fibo 2 reste le modèle par défaut. Qwen-Image 2.1 Turbo, le seul autre modèle de Fibo 2 Studio qui accepte un vrai masque, s'ajoute. Banc d'essai sur une copie d'Essais (même photo, même consigne) que tu juges, puis le meilleur est inscrit par genre de retouche. Qwen-Image-Edit-2511 et FLUX 3 Klein restent à essayer pour les retouches sans masque ; SeedVR2 pour restaurer une photo entière.</p>
+        </article>
+        <article class="chantier">
+          <h3>La recette vérifie les nouveautés de Lightroom 16</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span></div>
+          <p>Trois étapes : Lueur posée, relue et annulée ; un trait de pinceau qui reste droit sous la Projection ; un étalonnage dans un masque relu. Et trois finitions : un style de Lueur seul dit ignoré, l'étalonnage local arrondi à l'entier, la version de Lightroom relue après une mise à jour.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="etape">
+      <div class="etape-tete"><span class="num">2</span><h2>À faire avec toi</h2><span class="quand">ce qui demande ton œil ou ta décision</span></div>
       <div class="chantiers">
         <article class="chantier">
           <h3>Recherche par le sens : déclarer les seuils fixés ?</h3>
@@ -104,14 +135,29 @@
         <article class="chantier">
           <h3>À regarder dans Lightroom</h3>
           <div class="marques"><span class="pastille interet">Un coup d'œil</span></div>
-          <p>La boîte Ajuster… quand elle montre six boutons (lisible, pas trop large) ; un vrai tirage sur une copie très recadrée (l'avertissement de résolution) ; le témoin de la peau de <code>match_look</code> (5, provisoire) sur un portrait ; le bouton « Proposer et appliquer » en mode « Proposer d'abord » sur une photo seule ; le journal du Suivi pendant une vraie analyse (<code>suivi.json</code> garde sa date) ; Fibo 2 sur une personne recopiée assez grande pour que Claude la signale.</p>
+          <p>La boîte Ajuster… quand elle montre six boutons (lisible, pas trop large) ; un vrai tirage sur une copie très recadrée (l'avertissement de résolution) ; le témoin de la peau de <code>match_look</code> (5, provisoire) sur un portrait ; la copie « Claude » de XH2S0447.RAF (id 53855633), créée par erreur le 10 novembre, à retirer ; le bouton « Proposer et appliquer » en mode « Proposer d'abord » sur une photo seule ; le journal du Suivi pendant une vraie analyse (<code>suivi.json</code> garde sa date) ; Fibo 2 sur une personne recopiée assez grande pour que Claude la signale.</p>
         </article>
       </div>
     </section>
 
     <section class="etape">
-      <div class="etape-tete"><span class="num">2</span><h2>Ensuite</h2><span class="quand">plus grands</span></div>
+      <div class="etape-tete"><span class="num">3</span><h2>Ensuite</h2><span class="quand">plus grands</span></div>
       <div class="chantiers">
+        <article class="chantier">
+          <h3>Copier une retouche par le Copier-Coller de Lightroom 16</h3>
+          <div class="marques"><span class="pastille moyenne">Grande</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Avec <code>photo:copySettings</code> et <code>pasteSettings</code>, une série recevrait aussi la poussière, les personnes retirées et le flou d'objectif, que Lightroom refait pour chaque photo. Fonctions non documentées : à constater d'abord.</p>
+        </article>
+        <article class="chantier">
+          <h3>Plage de profondeur sur toutes les photos</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Lightroom 16 estime la profondeur de n'importe quelle photo ; Développeur ne la propose encore que pour les photos Portrait d'iPhone.</p>
+        </article>
+        <article class="chantier">
+          <h3>Séries plus rapides, masques IA sans attente</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 2/5</span></div>
+          <p><code>catalog:applyDevelopSettings</code> pour toute une série en un appel ; sauter le détour par <code>updateAISettings</code> si la 16 calcule elle-même l'IA posée par un module (à mesurer).</p>
+        </article>
         <article class="chantier">
           <h3>Garder l'espèce de chaque photo dans l'index du Suivi</h3>
           <div class="marques"><span class="pastille moyenne">Grande</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 5/5</span></div>
