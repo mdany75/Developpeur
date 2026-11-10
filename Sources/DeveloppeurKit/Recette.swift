@@ -54,6 +54,12 @@ public final class Recette {
     /// Attente entre deux lectures d'une capture (1.3, avant/après d'une étape) : les tests ne
     /// dorment pas.
     var attendre: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
+    /// Mise à la Corbeille d'un fichier livré par la recette (jamais effacé) : les tests en posent
+    /// une fausse, qui note les chemins ; un fichier absent n'a rien à y mettre.
+    var corbeille: (String) throws -> Void = { chemin in
+        guard FileManager.default.fileExists(atPath: chemin) else { return }
+        try FileManager.default.trashItem(at: URL(fileURLWithPath: chemin), resultingItemURL: nil)
+    }
 
     public init(lightroom: LightroomServing, images: URL? = nil, originaux: Bool = false,
                 rapport: @escaping (Etape) -> Void = { _ in }) {
@@ -906,20 +912,109 @@ public final class Recette {
             try verifier(retire["retires"]?.array?.count == 1, "pas retiré : \(JSONCoding.line(retire))")
             return "créé (\(Self.nombre(cree["taille_mo"]?.double ?? 0)) Mo), puis retiré"
         }
+        try etapeTiffReimporte(id, photo, depart: depart)
+    }
+
+    /// Attente de la photo réimportée et empilée (find_photos répété) : Lightroom, très occupé,
+    /// l'ajoute au catalogue et l'empile bien après la réponse d'export_photos (constaté le
+    /// 10 novembre 2026, Lightroom Classic 16.0, pendant un tri assisté de 20 000 photos).
+    static let attenteReimportation: TimeInterval = 120
+    static let pauseReimportation: TimeInterval = 5
+
+    /// TIFF réimporté et empilé avec l'original, puis retiré du catalogue et mis à la Corbeille.
+    /// Dans tous les cas, même en échec, le fichier livré à côté de l'original de Dany est retiré
+    /// du catalogue (retirerReimportees) et mis à la Corbeille : rien n'y reste. Sauf quand le
+    /// retrait échoue : le fichier reste alors sur le disque (à la Corbeille, la photo resterait au
+    /// catalogue avec un fichier introuvable, empilée avec l'original), et l'échec dit quoi faire à
+    /// la main. Quand export_photos échoue après le rendu, les fichiers que le module a inscrits
+    /// pendant l'appel (retirerReimportees, lister) sont retirés de même.
+    func etapeTiffReimporte(_ id: Int, _ photo: String, depart: Etat) throws {
         try etape(photo, "TIFF réimporté, empilé avec l'original, puis retiré du catalogue et mis à la Corbeille") {
-            let (reponse, _) = try appel("export_photos", ["photo_ids": [photoID], "format": "tiff", "long_edge": 600, "reimport": "stack", "confirm": true])
-            guard let fichier = reponse["fichiers"]?.array?.first?["fichier"]?.string, let nouvelle = reponse["reimportees"]?.array?.first?["id"]?.int else {
-                throw Echec(description: "rien de réimporté : \(JSONCoding.line(reponse))")
+            let inscritsAvant = try? inscritsReimportes()
+            let reponse: JSONValue
+            do {
+                (reponse, _) = try appel("export_photos", ["photo_ids": [.number(Double(id))], "format": "tiff", "long_edge": 600, "reimport": "stack", "confirm": true])
+            } catch {
+                throw Echec(description: "export_photos : \(error)" + menageApresEchec(inscritsAvant))
             }
-            let dossierOriginal = (fichier as NSString).deletingLastPathComponent
-            let (pile, _) = try appel("find_photos", ["folder": .string(dossierOriginal), "text": .string(((fichier as NSString).lastPathComponent as NSString).deletingPathExtension), "limit": 20])
-            let empilee = (pile["photos"]?.array ?? []).first { $0["id"]?.int == nouvelle }?["pile"]
-            _ = try tools.lightroom.send("retirerReimportees", ["chemins": [.string(fichier)]], timeout: 60)
-            try FileManager.default.trashItem(at: URL(fileURLWithPath: fichier), resultingItemURL: nil)
+            guard let fichier = reponse["fichiers"]?.array?.first?["fichier"]?.string else {
+                throw Echec(description: "rien d'exporté : \(JSONCoding.line(reponse))" + menageApresEchec(inscritsAvant))
+            }
+            let nom = (fichier as NSString).lastPathComponent
+            var nouvelle = reponse["reimportees"]?.array?.first?["id"]?.int
+            var empilee: JSONValue?
+            var erreurAttente: Error?
+            do {
+                let dossierOriginal = (fichier as NSString).deletingLastPathComponent
+                let essais = max(Int((Self.attenteReimportation / Self.pauseReimportation).rounded(.up)), 1)
+                for essai in 0...essais {
+                    if essai > 0 { attendre(Self.pauseReimportation) }
+                    let (pile, _) = try appel("find_photos", ["folder": .string(dossierOriginal), "text": .string((nom as NSString).deletingPathExtension), "limit": 20])
+                    let trouvee = (pile["photos"]?.array ?? []).first { nouvelle != nil ? $0["id"]?.int == nouvelle : $0["fichier"]?.string == nom }
+                    if let trouvee {
+                        nouvelle = trouvee["id"]?.int
+                        if let lue = trouvee["pile"], lue != .null { empilee = lue; break }
+                    }
+                }
+            } catch {
+                erreurAttente = error
+            }
+            let menage = menageTiff(fichier)
+            if let erreurAttente { throw Echec(description: "\(erreurAttente) ; " + menage.texte) }
+            guard menage.probleme == nil else { throw Echec(description: "\(nom) : " + (menage.probleme ?? "")) }
             try verifierEgal(try etat(id), depart)
-            try verifier(empilee != nil && empilee != .null, "pas empilée avec l'original")
-            return "\((fichier as NSString).lastPathComponent) empilé (\(empilee?["photos"]?.int ?? 0) photos dans la pile), puis retiré et mis à la Corbeille"
+            let minutes = Self.nombre(Self.attenteReimportation / 60)
+            if nouvelle == nil && menage.retire {
+                throw Echec(description: "\(nom) arrivé au catalogue après les \(minutes) min d'attente (Lightroom occupé), "
+                            + "entre la dernière lecture et le retrait ; retiré du catalogue et mis à la Corbeille")
+            }
+            try verifier(nouvelle != nil && menage.retire,
+                         "\(nom) pas encore au catalogue après \(minutes) min (Lightroom occupé) ; fichier mis à la Corbeille, "
+                         + "Lightroom pourra encore l'ajouter : le retirer du catalogue à la main s'il apparaît")
+            try verifier(empilee != nil, "\(nom) au catalogue, mais pas empilé avec l'original après \(minutes) min ; retiré et mis à la Corbeille")
+            return "\(nom) empilé (\(empilee?["photos"]?.int ?? 0) photos dans la pile), puis retiré et mis à la Corbeille"
         }
+    }
+
+    /// Les chemins que le module a inscrits comme réimportés par lui (retirerReimportees, lister).
+    func inscritsReimportes() throws -> Set<String> {
+        let reponse = try tools.lightroom.send("retirerReimportees", ["lister": true], timeout: 60)
+        return Set((reponse["inscrits"]?.array ?? []).compactMap(\.string))
+    }
+
+    /// Le ménage d'un fichier livré par la recette : retiré du catalogue (s'il y est), puis à la
+    /// Corbeille, mais seulement si le retrait a réussi. `retire` : la photo était au catalogue et
+    /// en est retirée ; `probleme` : ce qui n'a pas pu se faire, et quoi faire à la main.
+    func menageTiff(_ fichier: String) -> (retire: Bool, probleme: String?, texte: String) {
+        let retrait: JSONValue
+        do {
+            retrait = try tools.lightroom.send("retirerReimportees", ["chemins": [.string(fichier)]], timeout: 60)
+        } catch {
+            let probleme = "pas retiré du catalogue (\(error)) ; fichier laissé sur le disque : dans Lightroom, le retirer à la main "
+                + "(Photo › Retirer du catalogue), puis mettre « \(fichier) » à la Corbeille"
+            return (false, probleme, probleme)
+        }
+        let retire = retrait["retires"]?.array?.contains { $0.string == fichier } == true
+        do {
+            try corbeille(fichier)
+        } catch {
+            let probleme = (retire ? "retiré du catalogue, mais " : "") + "pas mis à la Corbeille (\(error.localizedDescription)) : "
+                + "mettre « \(fichier) » à la Corbeille à la main"
+            return (retire, probleme, probleme)
+        }
+        return (retire, nil, retire ? "fichier retiré du catalogue et mis à la Corbeille" : "fichier pas au catalogue, mis à la Corbeille")
+    }
+
+    /// Après un export_photos en échec : les fichiers inscrits pendant l'appel (le rendu a pu se
+    /// faire), retirés et mis à la Corbeille. Rien à dire si rien n'a été livré.
+    func menageApresEchec(_ avant: Set<String>?) -> String {
+        guard let avant else { return " ; liste des fichiers réimportés illisible : vérifier à la main qu'aucun TIFF n'est resté à côté de l'original" }
+        guard let apres = try? inscritsReimportes() else {
+            return " ; liste des fichiers réimportés illisible : vérifier à la main qu'aucun TIFF n'est resté à côté de l'original"
+        }
+        let livres = apres.subtracting(avant).sorted()
+        guard !livres.isEmpty else { return "" }
+        return " ; " + livres.map { "\(($0 as NSString).lastPathComponent) : \(menageTiff($0).texte)" }.joined(separator: " ; ")
     }
 
     /// Version 2.0 : harmonisation chiffrée, en plan (rien n'est écrit), du JPEG sur le RAW.

@@ -60,6 +60,12 @@ réussie), et Claude sait employer trois nouveautés de la 16.
 - La barre de titre de la Demande rapide dit la version installée, comme la fenêtre Claude :
   « Développeur IA v1.8 · Demande rapide ».
 
+### Corrigé
+- Une photo exportée puis réimportée dans le catalogue pendant que Lightroom est très occupé (un
+  long tri, par exemple) : Claude dit maintenant qu'elle n'est pas encore au catalogue (Lightroom
+  occupé) et qu'il faut vérifier plus tard, au lieu de la dire déjà ajoutée et empilée avec son
+  original.
+
 ### Après l'installation
 - Quittez et relancez Lightroom, puis Claude Desktop, et ouvrez une nouvelle session de Claude
   Code.

@@ -587,6 +587,30 @@ for _, champ in ipairs({ 'headline', 'rightsUsageTerms', 'copyrightInfoUrl', 'cr
     S.CHAMPS_IPTC[champ] = true
 end
 
+-- Ce que Lightroom fait plus tard, de lui-même (réimportation et empilement d'une livraison) :
+-- fait dès que l'horloge de la simulation atteint son heure (S.arrivees, à chaque LrTasks.sleep,
+-- findPhotoByPath et getRawMetadata), aussitôt avec un délai nul.
+function S.plusTard(delai, action)
+    S.enAttente = S.enAttente or {}
+    S.enAttente[#S.enAttente + 1] = { a = S.horloge + (tonumber(delai) or 0), action = action }
+    S.arrivees()
+end
+
+function S.arrivees()
+    if not S.enAttente then return end
+    local i = 1
+    while i <= #S.enAttente do
+        local tache = S.enAttente[i]
+        if tache.a <= S.horloge then
+            table.remove(S.enAttente, i)
+            tache.action()
+            i = 1
+        else
+            i = i + 1
+        end
+    end
+end
+
 function S.Photo(id, reglages, meta, brut)
     local photo = {
         localIdentifier = id,
@@ -722,6 +746,7 @@ function S.Photo(id, reglages, meta, brut)
     -- libellés actif (S.jeuLibelles ; « none » sans libellé, « custom » hors du jeu : supposé).
     function photo:getRawMetadata(cle)
         lisible(self, 'photo')
+        S.arrivees()
         if RAW_REFUSEES[cle] then
             error("getRawMetadata : clé inconnue " .. cle, 2)
         end
@@ -1494,6 +1519,7 @@ function catalogue:getPublishServices() return S.services end
 
 -- Photo par son chemin (brut.path) : celles que l'exportation réimporte y sont ajoutées.
 function catalogue:findPhotoByPath(chemin)
+    S.arrivees()
     for _, photo in pairs(S.photos) do
         if photo.brut.path == chemin and not photo.retireeDuCatalogue then return photo end
     end
@@ -2240,6 +2266,7 @@ local modules = {
                 rendre()
             end
             S.horloge = S.horloge + (tonumber(secondes) or 0)
+            S.arrivees()
             if #S.surveillances > 0 and package.loaded.Progression and not package.loaded.Progression.surveiller() then
                 S.surveillances = {}
             end
@@ -2441,13 +2468,30 @@ local modules = {
             end
             S.fichiers[chemin] = 'fichier livré de ' .. tostring(photo.meta.fileName)
             S.exportsLivres[#S.exportsLivres + 1] = chemin
-            -- Réimporté : Lightroom l'ajoute au catalogue après le rendu ; empilé avec l'original
-            -- seulement dans son dossier (ExportLocationSection : canStackWithOriginal).
+            -- Réimporté : Lightroom l'ajoute au catalogue après le rendu (AgExportRendition : post),
+            -- S.delaiReimport secondes plus tard, puis l'empile avec l'original S.delaiEmpilement
+            -- secondes après, seulement dans son dossier (ExportLocationSection :
+            -- canStackWithOriginal). Constaté le 10 novembre 2026 (Lightroom Classic 16.0, très
+            -- occupé par un tri assisté) : plusieurs minutes après la réponse, le TIFF n'était pas
+            -- encore au catalogue ; une heure avant, la photo trouvée n'était pas encore empilée.
             if reglages.LR_reimportExportedPhoto then
-                local nouvelle = S.Photo(nouvelId(), {}, { fileName = chemin:match('[^/]+$') }, { path = chemin })
-                if reglages.LR_reimport_stackWithOriginal and reglages.LR_export_destinationType == 'sourceFolder' then
-                    nouvelle.empileeAvec = photo.brut.masterPhoto or photo
-                end
+                local original = photo.brut.masterPhoto or photo
+                local empiler = reglages.LR_reimport_stackWithOriginal and reglages.LR_export_destinationType == 'sourceFolder'
+                S.plusTard(S.delaiReimport, function()
+                    local nouvelle = S.Photo(nouvelId(), {}, { fileName = chemin:match('[^/]+$') }, { path = chemin })
+                    if empiler then
+                        S.plusTard(S.delaiEmpilement, function()
+                            nouvelle.empileeAvec = original
+                            local membres = (tonumber(original.brut.countStackInFolderMembers) or 1) + 1
+                            for rang, membre in ipairs({ original, nouvelle }) do
+                                membre.brut.isInStackInFolder = true
+                                membre.brut.topOfStackInFolderContainingPhoto = original
+                                membre.brut.countStackInFolderMembers = membres
+                                membre.brut.stackPositionInFolder = rang == 1 and 1 or membres
+                            end
+                        end)
+                    end
+                end)
             end
             return chemin
         end
@@ -2596,6 +2640,10 @@ function S.reinitialiser()
     -- Photos d'un dossier qu'on vient d'afficher : sélectionnables seulement à partir de cette heure.
     S.visiblesDes = {}
     S.delaiSource = 0.5
+    S.enAttente = {}
+    -- Réimportation d'une livraison : ajoutée au catalogue, puis empilée, plus tard que le rendu.
+    S.delaiReimport = 1
+    S.delaiEmpilement = 0.5
     S.appelsAmelioration = {}
     S.appelsReflets = {}
     S.bezels = {}

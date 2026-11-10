@@ -59,7 +59,7 @@
 <body>
 <div class="page">
 <h1>Analyse du connecteur et du module Développeur</h1>
-<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée dans le code de la 1.6.5, le 2 novembre 2026, puis mise à jour pour la 1.6.6 le même soir et pour la 1.6.7 et la 1.7 le 3 novembre 2026. Il ne reste ici que ce qui est encore à faire : ce qui est corrigé est retiré (il reste dans le CHANGELOG et l'historique git de cette page).</p>
+<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée dans le code de la 1.6.5, le 2 novembre 2026, puis mise à jour pour la 1.6.6 le même soir pour la 1.6.7 et la 1.7 le 3 novembre 2026, et relue pour la 1.8 le 10 novembre 2026 (Lightroom Classic 16 : la 1.8 ajoute la Lueur, la Projection et l'étalonnage dans les masques, mais ne règle aucun des points ci-dessous). Il ne reste ici que ce qui est encore à faire : ce qui est corrigé est retiré (il reste dans le CHANGELOG et l'historique git de cette page).</p>
 
 <div class="encadre"><b>Verdict.</b> La base est solide : 585 tests Swift, des tests Lua sur un SDK simulé, un jeton de liaison bien conçu, une couverture très large des réglages du module Développeur. Les gains viennent maintenant de trois endroits : <b>alléger ce que le modèle lit</b> (26 610 caractères de descriptions), <b>fiabiliser le pont</b> avec Lightroom, et <b>protéger la photo de l'empilement</b> de réglages.</div>
 

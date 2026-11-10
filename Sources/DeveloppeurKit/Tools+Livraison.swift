@@ -13,6 +13,43 @@ extension ToolHandler {
     static let maxExportedPhotos = 500
     static let exportTimeout: TimeInterval = 900
 
+    /// Ce que dit export_photos d'une réimportation. Lightroom ajoute les fichiers réimportés au
+    /// catalogue après le rendu, puis les empile ; très occupé, bien plus tard que les 40 s
+    /// d'attente du module (constaté le 10 novembre 2026, Lightroom Classic 16.0 : la réponse
+    /// disait « ajoutés, empilés » pour un TIFF qui n'était pas au catalogue, ni plusieurs minutes
+    /// après). Chaque groupe dit ce qui est vrai de lui seul, et rien de ce qui n'a pas été lu :
+    /// jamais « il les ajoutera », seulement de quoi vérifier plus tard.
+    static func aSavoirReimportees(ajoutes: Int, nonEmpilees: Int, enAttente: Int, empiler: Bool) -> String {
+        func s(_ nombre: Int, _ singulier: String, _ pluriel: String) -> String { nombre > 1 ? pluriel : singulier }
+        var phrases: [String] = []
+        let empiles = ajoutes - nonEmpilees
+        if empiler {
+            if empiles > 0 {
+                phrases.append("\(empiles) \(s(empiles, "fichier ajouté au catalogue, empilé avec son original", "fichiers ajoutés au catalogue, empilés chacun avec son original")).")
+            }
+            if nonEmpilees > 0 {
+                phrases.append("\(nonEmpilees) \(s(nonEmpilees, "fichier ajouté au catalogue, mais pas encore empilé avec son original", "fichiers ajoutés au catalogue, mais pas encore empilés avec leurs originaux")) (Lightroom occupé ; pas_encore_empilees) : vérifier plus tard avec find_photos.")
+            }
+        } else if ajoutes > 0 {
+            phrases.append("\(ajoutes) \(s(ajoutes, "fichier ajouté", "fichiers ajoutés")) au catalogue.")
+        }
+        if enAttente > 0 {
+            phrases.append("\(enAttente) \(s(enAttente, "fichier livré, pas encore ajouté", "fichiers livrés, pas encore ajoutés")) au catalogue (Lightroom occupé ; en_attente) : vérifier plus tard avec find_photos.")
+        }
+        let total = ajoutes + enAttente
+        let retrait = "(undo_last ne \(s(total, "le", "les")) retire pas ; Photo › Retirer du catalogue, à la main)"
+        if total == 0 {
+            phrases.append("Aucun fichier livré : rien n'est ajouté au catalogue.")
+        } else if enAttente == 0 {
+            phrases.append("Au catalogue, \(s(total, "il y reste", "ils y restent")) \(retrait).")
+        } else if ajoutes == 0 {
+            phrases.append("Une fois au catalogue, \(s(total, "il y restera", "ils y resteront")) \(retrait).")
+        } else {
+            phrases.append("Au catalogue, ils y restent \(retrait).")
+        }
+        return phrases.joined(separator: " ")
+    }
+
     /// Une livraison type : les réglages d'un service de publication « Disque dur » de
     /// l'utilisateur (lus dans Lightroom), ou, sans ces services, l'un des deux profils par défaut.
     /// Chaque réglage donné à l'appel l'emporte.
@@ -264,6 +301,8 @@ extension ToolHandler {
         commun["confirme"] = .bool(args.bool("confirm") ?? false)
 
         var fichiers: [JSONValue] = [], echecs: [JSONValue] = [], reimportees: [JSONValue] = []
+        // Réimportés que Lightroom, occupé, n'a pas encore ajoutés au catalogue (ou pas encore empilés).
+        var enAttente: [JSONValue] = [], nonEmpilees: [JSONValue] = []
         var octets = 0.0
         var depuisApercus = 0
         var lourds: [String] = []
@@ -301,7 +340,18 @@ extension ToolHandler {
                         depuisApercus += 1
                     }
                     fichiers.append(.object(fichier))
-                    if let id = item["reimportee"]?.int { reimportees.append(["fichier": .string(chemin), "id": .number(Double(id))]) }
+                    if let id = item["reimportee"]?.int {
+                        var reimportee: [String: JSONValue] = ["fichier": .string(chemin), "id": .number(Double(id))]
+                        if item["pas_encore_empilee"]?.bool == true {
+                            reimportee["pas_encore_empilee"] = true
+                            nonEmpilees.append(.string(chemin))
+                        }
+                        reimportees.append(.object(reimportee))
+                    } else {
+                        // Pas encore au catalogue (pas_encore_au_catalogue), ou sans marque (module
+                        // d'une autre version) : rien de lu, donc en attente.
+                        enAttente.append(.string(chemin))
+                    }
                 } else {
                     echecs.append(["photo": item["photo"]?["fichier"] ?? .null, "raison": item["erreur"] ?? .null])
                 }
@@ -326,7 +376,13 @@ extension ToolHandler {
         }
         if reglages["reimporter"] != nil {
             resultat["reimportees"] = .array(reimportees)
-            resultat["a_savoir"] = .string("Fichiers ajoutés au catalogue\(empiler ? ", empilés avec leur original" : "") : ils y restent (undo_last ne les retire pas ; Photo › Retirer du catalogue, à la main).")
+            resultat["a_savoir"] = .string(Self.aSavoirReimportees(ajoutes: reimportees.count, nonEmpilees: nonEmpilees.count,
+                                                                   enAttente: enAttente.count, empiler: empiler))
+            // Bornées comme fichiers : 50 chemins au plus, le reste compté.
+            if !enAttente.isEmpty { resultat["en_attente"] = .array(Array(enAttente.prefix(50))) }
+            if enAttente.count > 50 { resultat["en_attente_non_listes"] = .number(Double(enAttente.count - 50)) }
+            if !nonEmpilees.isEmpty { resultat["pas_encore_empilees"] = .array(Array(nonEmpilees.prefix(50))) }
+            if nonEmpilees.count > 50 { resultat["pas_encore_empilees_non_listes"] = .number(Double(nonEmpilees.count - 50)) }
         }
         if let limite = reglages["poids_max_ko"]?.double, !lourds.isEmpty {
             resultat["au_dessus_du_poids"] = .string("\(lourds.count) fichier\(lourds.count > 1 ? "s" : "") au-dessus de \(Int(limite)) Ko (\(lourds.prefix(5).joined(separator: ", "))) : Lightroom livre alors le plus petit fichier possible à cette taille ; réduire long_edge pour tenir la limite.")
