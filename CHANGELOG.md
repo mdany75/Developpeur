@@ -31,6 +31,17 @@
   quantité au-dessus de 0 a sa remarque : « le style de la Lueur n'est gardé que si sa quantité
   (Glow) est au-dessus de 0 » (constaté le 10 novembre 2026).
 
+- **Le bon modèle pour chaque retouche générative** : `generative_edit` connaît maintenant les
+  modèles de retouche de mflux installés sur ce Mac (Fibo 2, Qwen-Image 2.1 Turbo, et, pour plus
+  tard, Qwen-Image-Edit-2511 et FLUX 3 Klein). Par défaut, Claude choisit le modèle d'après le genre
+  de retouche (retirer, changer, remplir d'après une autre photo, toute la photo) : c'est encore
+  Fibo 2 partout, tant que vous n'avez pas départagé. Sur votre demande, Claude peut employer
+  Qwen-Image 2.1 Turbo (8 étapes, plus rapide, recolle exactement la photo hors de la zone). La
+  réponse dit le modèle employé et pourquoi ; un modèle absent du Mac est refusé avec sa raison.
+- **Banc d'essai des modèles** (pour le développement) : `mcp-developpeur --generatif-banc` fait la
+  même retouche, avec la même graine, par chaque modèle présent, sur une copie d'Essais, sans rien
+  importer, et prépare une planche à juger (le meilleur et une note pour chacun).
+
 ### Changé
 - L'étalonnage d'un masque est arrondi à l'entier par le serveur, comme Lightroom le range
   (0,5 devient 1).

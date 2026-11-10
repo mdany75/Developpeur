@@ -72,6 +72,11 @@ défait ensuite.
 - La remarque d'un style de Lueur sans quantité, et l'étalonnage d'un masque arrondi (0,5 envoyé 1) relu tel quel — dans la recette ou à la main ([Lightroom Classic 16](#lightroom-classic-16-18)).
 - Photo hors ligne (original et aperçu dynamique absents) : `applyDevelopSettings` de la 16 la saute avec une fenêtre ; ce que voit Claude — à la main, avec Dany ([Lightroom Classic 16](#lightroom-classic-16-18)).
 
+**Retouche générative : choix du modèle (1.9)**
+
+- Banc d'essai jamais lancé : `--generatif-banc` sur une copie d'Essais, jugé par Dany ; la table « genre → modèle » à régler d'après son jugement ([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)).
+- Qwen-Image 2.1 Turbo jamais lancé par Développeur : rien de changé hors du masque, raccord, durée, mémoire en pointe Lightroom ouvert, sortie RGBA, barre à 8 étapes, chargement de l'instantané sans `model_index.json` — au banc ([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)).
+
 **Liaison et commandes longues**
 
 - Réponse perdue reprise par le serveur, une seule écriture à l'Historique — à la main dans Lightroom ([Réponse perdue](#réponse-perdue-reprise-au-module-après-la-151)).
@@ -9461,13 +9466,14 @@ l'aperçu, sans le dire). Un aperçu fait 0,3 Mo pour ce JPEG de 1489 × 2227 px
 
 Demandée par Dany le 29 octobre 2026 : « si tu ne peux pas le faire dans Lightroom (remplacer un
 pantalon par une jupe), exporte, fais faire par Fibo 2, importe l'image dans Lightroom et fais le
-reste de la correction par le MCP ». Le seul chemin génératif du Développeur, **seulement sur
+reste de la correction par le MCP ». La retouche générative du Développeur, **seulement sur
 demande**, jamais d'initiative : la description de l'outil, `ServerInfo.instructions` (« Changer un
 objet, un vêtement : generative_edit, sur sa demande. ») et une puce des garde-fous de
 `Consignes.texte` le disent. Ni Photoshop, ni service d'Adobe : Fibo 2 (Bria, modèles
 `briaai/Fibo-2.0-dev` et `briaai/Fibo-2.0-edit-turbo`, licence CC BY-NC, accès à demander sur
-Hugging Face) tourne sur ce Mac par mflux 0.24 (`~/.local/bin/mflux-generate-fibo2-edit`). Les
-taches de Claude restent `patchmatch`.
+Hugging Face) tourne sur ce Mac par mflux 0.24 (`~/.local/bin/mflux-generate-fibo2-edit`). Depuis
+le 10 novembre 2026, d'autres modèles de mflux peuvent prendre sa place
+([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)) ; Fibo 2 reste le modèle par défaut.
 
 ### L'outil (`Tools+Generatif.swift`)
 
@@ -10303,6 +10309,84 @@ d'Essais de DSCF2402.RAF, 53806874 à 53807110, Lightroom Classic 15.6) :
 Puis `undo_last` sur les cinq photos de Fibo 2 : retirées, TIFF à la Corbeille ; copies remises à
 l'origine. Constats de rendu de Fibo 2 : ni `swift test` (faux mflux) ni la simulation ne peuvent
 les imiter, aucun code n'en dépend ; la recette ne lance pas Fibo 2 (cinq minutes par rendu).
+
+### Choix du modèle (`model`, 10 novembre 2026)
+
+Demandé par Dany le 10 novembre 2026 : « maintenant que tu as plusieurs autres modèles de retouche,
+regarde dans Fibo 2 Studio, emploie le bon modèle, celui qui te donne le meilleur résultat ». L'étude
+du même jour (mflux 0.24.0, `--help` de chaque commande, Fibo 2 Studio 2.16, aucune génération)
+conclut : Fibo 2 par défaut pour toute retouche dans une zone ; Qwen-Image 2.1 Turbo comme deuxième
+modèle avec masque, à départager par un banc d'essai que Dany juge ; Qwen-Image-Edit-2511 et FLUX 3
+Klein pour plus tard (sans masque ; mémoire à mesurer) ; Krea 2 Turbo écarté (création seulement) ;
+SeedVR2 reste l'agrandissement de la zone. Fibo 2 n'est donc plus le seul modèle génératif.
+
+**Forme des données** (`GeneratifModeles.swift`, pur) :
+
+- `ModeleGeneratif` (`fibo2`, `qwen_image_21`, `qwen_edit_2511`, `flux3_klein`) et sa `Fiche` : nom
+  pour Dany, commande de mflux, options qui choisissent le modèle, dépôt et révision épinglée par
+  mflux 0.24 (`ModelRevisions.PINNED`), dossiers exigés de l'instantané, étapes, multiple des côtés,
+  option du masque (blanc = refaire), références acceptées, statut (`par défaut`, `à départager`,
+  `plus tard`), branché ou non, téléchargé au premier usage ou non, licence, ce qu'il fait le mieux.
+
+  | id | commande | modèle | étapes | côtés | masque | statut |
+  |---|---|---|---|---|---|---|
+  | `fibo2` | `mflux-generate-fibo2-edit` | (Fibo-2.0-dev ; Turbo en `fast`) | 30, 50 ou 4 | ×16 | `--mask-path` | par défaut |
+  | `qwen_image_21` | `mflux-generate-qwen-2.1-edit` | `--model qwen-image-2.1-turbo` (révision fc13ba19…) | 8, sans guidage | ×32 | `--mask-image` | à départager |
+  | `qwen_edit_2511` | `mflux-generate-qwen-edit` | `--model qwen-image-edit-2511` | 20 | ×16 | aucun | plus tard (non branché) |
+  | `flux3_klein` | `mflux-generate-flux3-edit` | `flux3-image-klein` | 16 | ×16 | aucun | plus tard (non branché) |
+
+- Présence sur ce Mac, lue sans charger le modèle (`raisonAbsent`) : la commande à côté de celle de
+  Fibo 2, puis l'instantané épinglé dans le cache Hugging Face (`~/.cache/huggingface/hub`, lien vers
+  `/Volumes/Photos/Divers/IA Model/hub`) avec chaque dossier exigé non vide, sans fichier
+  `.incomplete`. Fibo 2 garde son comportement : sa commande seulement, le modèle se télécharge au
+  premier usage. Un autre modèle absent est refusé avant tout envoi (jamais 30 Go téléchargés au
+  milieu d'un appel), avec la commande `hf download … --revision …` à lancer.
+- Genre de retouche (`Generatif.genre`), lu dans l'appel, jamais demandé : sans zone,
+  `photo_entiere` ; avec une référence, `remplir_avec_reference` ; sinon `retirer` (remove, erase,
+  delete, get rid of…) ou `changer`.
+- Table « genre → modèle » (`Generatif.tableDesModeles`) : **Fibo 2 pour chaque genre**, Qwen-Image
+  2.1 Turbo marqué « à départager » pour les trois genres avec zone (aucun pour la photo entière).
+  `auto` ne prendra Qwen qu'une fois la table changée d'après le jugement du banc.
+
+**Paramètre `model`** de `generative_edit` : `auto` (défaut : la table), `fibo2` ou `qwen_image_21`
+(les deux autres : refusés, « pas encore branché »). La réponse porte `modele` : `id`, `nom`, `choisi`
+(« auto » ou « demandé »), `genre`, `pourquoi`. Avec `auto`, un modèle de la table absent laisse la
+place à Fibo 2, et `pourquoi` le dit. Description de l'outil : une phrase (« model : auto (défaut),
+le meilleur modèle pour ce genre de retouche. ») ; le reste dans la description du paramètre.
+
+**Qwen-Image 2.1 Turbo** (`Generatif.argumentsQwen`) : `--model qwen-image-2.1-turbo --prompt <phrase>
+--image-paths <entrée> [<référence>] [--mask-image <masque>] --steps 8 --low-ram --width --height
+--seed --output`. Rien de propre à Fibo 2 n'est envoyé : ni fiche de FIBO-vlm (`--prompt-file`), ni
+`--negative-prompt` (sans effet à guidage 1), ni `--guidance` (Turbo refuse tout autre que 1), ni
+`--cfg-end`, ni `--vae-full-precision` ; `quality`, `structured_prompt` = true, `avoid` et `guidance`
+donnés sont dits sans effet (`remarque_modele`). L'entrée n'est jamais grisée (le gris est propre à
+Fibo 2 avec une référence) : le masque vaut pour la première image, avec ou sans référence, et mflux
+recolle exactement les pixels hors du masque. Les marques `<image_1>`, `<image_2>` deviennent « image
+1 », « image 2 », et « grey area » « masked area » (`instructionPourQwen`). L'entrée fait toujours
+environ 1 Mpx, côtés multiples de 32 (`tailleCible(…, multiple: 32)` ; sous 1 024 px, le README de
+mflux dit que Turbo change le détail fin en grille), même pour un petit recadrage : la recomposition
+remet la zone à la taille du recadrage, SeedVR2 décide comme pour Fibo 2. Le journal de la nouvelle
+photo nomme le modèle (« Qwen-Image 2.1 Turbo : <consigne> ») ; la barre aussi (« Qwen-Image 2.1
+Turbo : sac, 40 % ») ; les étapes « Claude · Fibo 2 » de l'exportation et de l'importation, le nom
+`<photo>-Fibo.tif` et le dossier `Temporaire/Fibo` restent ceux de la retouche générative, quel que
+soit le modèle (aucun Lua changé). Ni `--quantize` ni `--verify` : à décider sur mesure, au banc.
+
+**Banc d'essai** (`BancGeneratif.swift`, `mcp-developpeur --generatif-banc`, développement) : la même
+retouche (même photo, consigne, zone, graine 42 par défaut) par chaque modèle branché et présent,
+l'un après l'autre (verrou d'un calcul à la fois), chacun par un vrai `generative_edit` avec
+`ToolHandler.dossierBanc` posé : le résultat reste en JPEG (photo entière, 2 048 px ; zone avant et
+après, 1 600 px), **rien n'est importé**, le catalogue ne change pas (un masque de Lightroom laisse
+ses étapes « Claude · essai »). Planche `planche-generatif.html` : la consigne, la photo avant, une
+carte par modèle (avant et après de la zone, durée, part changée, remarques), « le meilleur » et une
+note par modèle, et le JSON du jugement à copier pour Claude. `--catalogue` seul : les modèles et
+leur présence, une ligne JSON, sans Lightroom ni calcul. Sur une copie virtuelle d'Essais remise à
+l'origine (`photo_id` exigé ; `model` refusé : le banc passe chaque modèle).
+
+**À constater** (repris dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette)) :
+le banc jamais lancé ; Qwen-Image 2.1 Turbo jamais lancé par Développeur (raccord hors du masque,
+durée, mémoire en pointe Lightroom ouvert, sortie RGBA lue comme RGB, barre tqdm à 8 étapes,
+chargement sans `model_index.json` dans l'instantané) ; puis la table à régler d'après le jugement
+de Dany.
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 

@@ -699,7 +699,15 @@ cadre.
 Ce que Lightroom ne sait pas faire, comme remplacer un pantalon par une jupe, ajouter, retirer ou
 changer un objet, Claude peut le faire faire par Fibo 2 (le modèle d'édition de Bria), sur ce Mac,
 sans rien envoyer sur Internet : outil `generative_edit`. Claude ne s'en sert **que si vous le
-demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développeur.
+demandez**, jamais de lui-même.
+
+- **Le bon modèle** : Fibo 2 est le modèle par défaut. Développeur connaît aussi Qwen-Image 2.1 Turbo
+  (8 étapes, plus rapide, recolle exactement la photo hors de la zone) : Claude l'emploie si vous le
+  demandez. D'après ce que vous voulez faire (retirer, changer, remplir d'après une autre photo, toute
+  la photo), Claude prend le meilleur modèle connu, aujourd'hui Fibo 2 partout, et vous dit lequel et
+  pourquoi. Un modèle absent du Mac est refusé avec sa raison (par exemple la commande `hf download`
+  à lancer). Pour départager les modèles, le banc d'essai fait la même retouche par chacun, sur une
+  copie d'Essais, sans rien importer, et prépare une planche à juger (voir Tests).
 
 - **Comment le demander** : dites ce qui doit changer (« remplace son pantalon par une jupe bleu
   marine aux genoux »). Claude écrit la consigne pour Fibo 2 en anglais (plus fidèle), précise sur
@@ -1570,10 +1578,23 @@ scripts/tester-module.sh
 
 
 Aucun test ne touche Lightroom, Claude, vos photos ni les fichiers de Claude, et aucun ne consomme
-de quota ; aucun ne lance le vrai Fibo 2 ni le vrai SeedVR2 (de faux scripts tiennent lieu de mflux et de SeedVR2). Un test relit seulement, s'il les trouve, les doses de la peau rangées dans l'application
+de quota ; aucun ne lance le vrai Fibo 2, ni Qwen-Image 2.1, ni le vrai SeedVR2 (de faux scripts tiennent lieu de mflux et de SeedVR2). Un test relit seulement, s'il les trouve, les doses de la peau rangées dans l'application
 Lightroom Classic ; aucun ne lit votre écran, sauf sur demande :
 `DEVELOPPEUR_ECRAN_REEL=1 swift test`. Les deux suites tournent aussi à chaque envoi sur `main`
 (GitHub Actions).
+
+Banc d'essai des modèles de la retouche générative (développement, Lightroom ouvert, liaison
+démarrée, sur une copie virtuelle de « Développeur › Essais » remise à l'origine) :
+
+```bash
+swift build -c release
+./.build/release/mcp-developpeur --generatif-banc '{"photo_id": <id de la copie>, "instruction": "remove the bin on the left, keep everything else unchanged", "instruction_fr": "retirer la poubelle à gauche", "region": {"x": 0.1, "y": 0.5, "width": 0.2, "height": 0.3}}' --planche ~/Desktop/banc > banc.json 2> banc.log
+```
+
+Chaque modèle présent fait la même retouche, avec la graine 42 (`seed` pour une autre), l'un après
+l'autre ; rien n'est importé. Ouvrez ensuite `planche-generatif.html`, choisissez le meilleur rendu,
+notez chaque modèle et copiez le jugement pour Claude. `--modeles fibo2,qwen_image_21` en choisit ;
+`--catalogue` seul dit les modèles et leur présence sur ce Mac, sans Lightroom ni calcul.
 
 
 ## Organisation

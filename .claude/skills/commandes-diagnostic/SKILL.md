@@ -208,6 +208,18 @@ navigateur : Dany clique Juste ou Faux sous chaque photo, puis « Copier le juge
 JSON ; `--especes-essai --jugement <fichier.json>` (seul : ni modèle ni Lightroom) dit, pour la porte,
 le score et l'écart au 2e, le seuil qui sépare le mieux justes et faux, comparé au seuil provisoire.
 
+## Banc des modèles génératifs (1.9)
+
+`./.build/release/mcp-developpeur --generatif-banc '{"photo_id": <copie d'Essais>, "instruction": "…",
+"instruction_fr": "…", "mask": {"kind": "object", …} | "region": {…}}' [--modeles fibo2,qwen_image_21]
+[--planche <dossier>] > banc.json 2> banc.log`, en arrière-plan : la même retouche de `generative_edit`
+par chaque modèle branché et présent, graine 42 par défaut, rien d'importé (les rendus témoins d'un
+masque laissent leurs étapes « Claude · essai » : copie remise à l'origine ensuite). La planche
+`planche-generatif.html` se juge par Dany (le meilleur, une note par modèle, JSON à copier).
+`--generatif-banc --catalogue` : les modèles, leur commande, leur instantané dans le cache et leur
+présence, sans Lightroom ni calcul. Jamais deux calculs ensemble (le verrou de Fibo vaut pour tous).
+« Proposer d'abord » : ajouter `"confirm": true` à l'appel.
+
 ## Relevé du carnet
 
 `./.build/debug/mcp-developpeur --constats <id>… [<fichier.jpg>…]` (pour fixer les seuils du carnet

@@ -420,8 +420,12 @@ final class GeneratifTests: XCTestCase {
         }
         XCTAssertEqual(outil["inputSchema"]?["required"], [], "instruction ou edits")
         let proprietes = try XCTUnwrap(outil["inputSchema"]?["properties"]?.object)
-        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "mask", "edits", "reference", "upscale", "quality",
+        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "mask", "edits", "reference", "model", "upscale", "quality",
                                               "structured_prompt", "avoid", "guidance", "seed", "confirm", "reason"])
+        // Le choix du modèle (10 novembre 2026) : une phrase courte, et l'énumération des ids branchés.
+        XCTAssertTrue(description.contains("model : auto (défaut), le meilleur modèle pour ce genre de retouche."), description)
+        XCTAssertEqual(proprietes["model"]?["enum"], ["auto", "fibo2", "qwen_image_21"])
+        XCTAssertTrue(proprietes["model"]?["description"]?.string?.contains("Un modèle absent de ce Mac est refusé") == true)
         XCTAssertEqual(proprietes["quality"]?["enum"], ["balanced", "normal", "fast"])
         XCTAssertTrue(proprietes["quality"]?["description"]?.string?.hasPrefix("balanced (défaut)") == true)
         XCTAssertEqual(proprietes["edits"]?["maxItems"]?.int, 4)

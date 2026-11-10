@@ -124,6 +124,10 @@ public final class ToolHandler {
     /// `lireEcran` : seul main.swift le pose (serve() et --call), avec `Fibo()` ; les tests passent un
     /// faux exécutable et des dossiers temporaires, jamais le vrai mflux.
     public var fibo: Fibo?
+    /// Le banc d'essai de la retouche générative (`--generatif-banc`, développement seulement) : posé,
+    /// generative_edit garde son résultat en JPEG dans ce dossier, pour la planche, et n'importe rien.
+    /// Nil par défaut ; seul `BancGeneratif` le pose, le temps d'un appel.
+    public var dossierBanc: URL?
     /// La recherche par le sens (1.6, find_photos avec query ou similar_to ; get_status) : l'encodeur
     /// MobileCLIP et la racine des index. Nil par défaut (la recherche par le sens refuse alors sans
     /// rien lancer) : seul main.swift le pose (serve() et --call) ; les essais passent un faux encodeur

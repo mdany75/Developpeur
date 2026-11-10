@@ -1136,8 +1136,8 @@ public enum Generatif {
     }
 
     /// Le texte de la barre : « Fibo 2 : jupe (1 sur 2), 24 % — environ 3 min restantes ».
-    static func texteProgression(_ quoi: String, rang: Int?, sur: Int, pourcentage: Int, detail: String?) -> String {
-        var texte = "Fibo 2 : " + quoi
+    static func texteProgression(_ quoi: String, rang: Int?, sur: Int, pourcentage: Int, detail: String?, modele: String = "Fibo 2") -> String {
+        var texte = modele + " : " + quoi
         if let rang, sur > 1 { texte += " (\(rang) sur \(sur))" }
         texte += ", \(pourcentage) %"
         if let detail { texte += " — " + detail }
@@ -1192,7 +1192,9 @@ public enum Generatif {
     /// Une erreur de mflux, en mots simples, d'après son journal. Un accès refusé se reconnaît à des
     /// motifs précis (« 401 Client Error », « Unauthorized »…), jamais à « 401 » ou « 403 » seuls,
     /// qu'une barre de téléchargement écrit aussi (« 401M/9.95G »).
-    static func expliquer(journal: String, code: Int32, rapide: Bool) -> String {
+    /// `modele` : le modèle lancé (Fibo 2 par défaut ; un autre est nommé, avec son dépôt).
+    static func expliquer(journal: String, code: Int32, rapide: Bool, modele: ModeleGeneratif = .fibo2) -> String {
+        guard modele == .fibo2 else { return expliquerAutre(journal: journal, code: code, fiche: modele.fiche) }
         let depot = rapide ? depotRapide : depotNormal
         if ["requires approval", "GatedRepo", "Unauthorized", "Forbidden"].contains(where: journal.contains)
             || journal.range(of: #"\b40[13] Client Error\b"#, options: .regularExpression) != nil {
@@ -1206,6 +1208,20 @@ public enum Generatif {
         }
         let fin = journal.split(separator: "\n").suffix(3).joined(separator: "\n")
         return "Fibo 2 (mflux) s'est arrêté avec une erreur (code \(code))." + (fin.isEmpty ? "" : "\n" + fin)
+    }
+
+    /// L'erreur d'un autre modèle que Fibo 2 : son nom et son dépôt ; jamais de téléchargement conseillé
+    /// à l'aveugle (le modèle est déjà vérifié dans le cache avant le lancement).
+    static func expliquerAutre(journal: String, code: Int32, fiche: ModeleGeneratif.Fiche) -> String {
+        if ["requires approval", "GatedRepo", "Unauthorized", "Forbidden"].contains(where: journal.contains)
+            || journal.range(of: #"\b40[13] Client Error\b"#, options: .regularExpression) != nil {
+            return "\(fiche.nom) : accès au modèle refusé. Demander l'accès sur huggingface.co/\(fiche.depot), puis vérifier la connexion avec « hf auth login » dans le Terminal."
+        }
+        if ["RevisionNotFound", "LocalEntryNotFound"].contains(where: journal.contains) {
+            return "\(fiche.nom) : le modèle n'est pas complet sur ce Mac. Le télécharger une fois dans le Terminal : hf download \(fiche.depot) --revision \(fiche.revision)"
+        }
+        let fin = journal.split(separator: "\n").suffix(3).joined(separator: "\n")
+        return "\(fiche.nom) (mflux) s'est arrêté avec une erreur (code \(code))." + (fin.isEmpty ? "" : "\n" + fin)
     }
 
     // MARK: Masques

@@ -3,10 +3,21 @@
 Sortie du CLAUDE.md principal (qui y renvoie). À lire avant de toucher à `generative_edit`,
 `Generatif.swift` ou au module de la retouche générative.
 
+- **Choix du modèle** (demandé par Dany le 10 novembre 2026 : « emploie le bon modèle, celui qui te
+  donne le meilleur résultat ») : `GeneratifModeles.swift` porte le catalogue (`ModeleGeneratif`,
+  sa `Fiche` lue dans le `--help` et le code de mflux 0.24.0, jamais en lançant une génération) et
+  la table « genre → modèle » (`Generatif.tableDesModeles`, Fibo 2 partout ; Qwen-Image 2.1 Turbo
+  « à départager ») ; `generative_edit` prend `model` (`auto` par défaut, `fibo2`, `qwen_image_21`).
+  Rien de propre à Fibo 2 (fiche de FIBO-vlm, exclusion, guidage, `--cfg-end`, gris de la zone) ne
+  part à un autre modèle. Un modèle autre que Fibo 2 absent du cache est refusé avant tout envoi. La
+  table ne change que d'après le jugement de Dany sur le banc d'essai (`--generatif-banc`,
+  `BancGeneratif.swift`, rien d'importé). Détail : `docs/SPEC.md`, Choix du modèle. Le titre de
+  l'outil et les étapes « Claude · Fibo 2 » restent ceux de la retouche générative.
+
 - **Retouche générative par Fibo 2** (`generative_edit`, le 36e outil, titre « Retouche générative
   (Fibo 2) », demandé par Dany le 29 octobre 2026 : « si tu ne peux pas le faire dans Lightroom
   (remplacer un pantalon par une jupe), exporte, fais faire par Fibo 2, importe et fais le reste par
-  le MCP ») : le seul chemin génératif du projet, **seulement sur demande de Dany, jamais
+  le MCP ») : la retouche générative du projet (Fibo 2 par défaut, voir Choix du modèle ci-dessus), **seulement sur demande de Dany, jamais
   d'initiative** (description de l'outil, `ServerInfo.instructions` : « Changer un objet, un
   vêtement : generative_edit, sur sa demande. », et une puce des garde-fous de `Consignes.texte`).
   Fibo 2 tourne sur ce Mac par mflux (`~/.local/bin/mflux-generate-fibo2-edit`, mflux 0.24 ;

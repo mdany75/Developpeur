@@ -83,6 +83,13 @@ func usage(erreur: Bool = false) {
                 HTML (planche-especes.html dans --planche, sinon le dossier --images, sinon un dossier temporaire) :
                 boutons juste et faux, JSON du jugement à copier ; --jugement le relit et dit les seuils qui
                 sépareraient le mieux justes et faux (seul : sans modèle ni Lightroom)
+            mcp-developpeur --generatif-banc '{"photo_id": …, "instruction": …, "instruction_fr": …, "mask": {…}}'
+                [--modeles fibo2,qwen_image_21] [--planche <dossier>] [--catalogue]
+                développement : la même retouche de generative_edit (même photo, consigne, zone et graine, 42 par
+                défaut) par chaque modèle branché et présent sur ce Mac, l'un après l'autre ; rien n'est importé.
+                Planche HTML à juger (planche-generatif.html dans --planche, sinon un dossier temporaire) ; une copie
+                virtuelle de « Développeur › Essais » seulement ; --catalogue seul : les modèles et leur présence
+                (une ligne JSON, sans Lightroom ni calcul)
             mcp-developpeur --graphiques '<json>' <dossier>
                 le Suivi : les tuiles et les neuf graphiques d'une période d'après suivi.json (et carnet.json), lus
                 seulement, dessinés en PNG 2x dans le dossier, puis une ligne JSON avec les rectangles des barres
@@ -670,6 +677,45 @@ case "--especes-essai":
         resultat["ouverture_s"] = .number((ouvert.secondes * 10).rounded() / 10)
         if let jugement { resultat["jugement"] = jugement }
         print(line: JSONCoding.line(.object(resultat)))
+    } catch {
+        print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)]))
+        exit(1)
+    }
+case "--generatif-banc":
+    // Développement (10 novembre 2026) : le banc d'essai des modèles de la retouche générative
+    // (BancGeneratif), sur une copie d'Essais que Dany désigne ; une ligne JSON, l'avancement sur stderr.
+    var appelBanc: [String: JSONValue]?
+    var modelesBanc: [String]?
+    var dossierBanc: URL?
+    var catalogueSeul = false
+    var resteBanc = arguments.dropFirst()
+    func suivantBanc() -> String {
+        guard let valeur = resteBanc.first else { usage(); exit(2) }
+        resteBanc = resteBanc.dropFirst()
+        return valeur
+    }
+    while let option = resteBanc.first {
+        resteBanc = resteBanc.dropFirst()
+        switch option {
+        case "--modeles": modelesBanc = suivantBanc().split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        case "--planche": dossierBanc = URL(fileURLWithPath: suivantBanc())
+        case "--catalogue": catalogueSeul = true
+        default:
+            guard !option.hasPrefix("--"), let lu = try? JSONCoding.parse(option), let objet = lu.object else { usage(); exit(2) }
+            appelBanc = objet
+        }
+    }
+    let fiboBanc = Fibo()
+    if catalogueSeul {
+        print(line: JSONCoding.line(["modeles": Generatif.catalogue(fibo: fiboBanc)]))
+        exit(0)
+    }
+    guard let appelBanc else { usage(); exit(2) }
+    let dossierPlanche = dossierBanc ?? FileManager.default.temporaryDirectory.appendingPathComponent("generatif-banc-\(ProcessInfo.processInfo.processIdentifier)")
+    do {
+        let resultat = try BancGeneratif(tools: outils()) { log($0) }.lancer(arguments: appelBanc, modeles: modelesBanc, dossier: dossierPlanche)
+        print(line: JSONCoding.line(resultat))
+        exit(resultat["ok"]?.bool == true ? 0 : 1)
     } catch {
         print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)]))
         exit(1)
