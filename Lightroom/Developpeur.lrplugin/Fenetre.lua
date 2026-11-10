@@ -4232,11 +4232,7 @@ end
 -- 1er novembre 2026, avec le nom du module « Développeur IA pour Lightroom ») ; « Développeur IA »
 -- seul si la version ne se lit pas.
 function Fenetre.titreFenetre()
-    local version = Composants.module()
-    if type(version) ~= 'string' or not version:match('^%d') then
-        return "Développeur IA"
-    end
-    return "Développeur IA v" .. version
+    return Composants.titre()
 end
 
 function Fenetre.desabonner()

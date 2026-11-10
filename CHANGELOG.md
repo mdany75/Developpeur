@@ -24,6 +24,8 @@ réussie), et Claude sait employer trois nouveautés de la 16.
   pinceaux, objets, plages de couleurs et personnes ont été vérifiées dans la 16.
 - Sous une version plus ancienne que la 16, ces nouveaux réglages sont refusés avec leur raison,
   sans rien écrire.
+- La barre de titre de la Demande rapide dit la version installée, comme la fenêtre Claude :
+  « Développeur IA v1.8 · Demande rapide ».
 
 ### Après l'installation
 - Quittez et relancez Lightroom, puis Claude Desktop, et ouvrez une nouvelle session de Claude

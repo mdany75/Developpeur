@@ -19,6 +19,7 @@ local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
 local Chemins = require 'Chemins'
+local Composants = require 'Composants'
 local Consignes = require 'Consignes'
 local Dispositions = require 'Dispositions'
 local Fil = require 'Fil'
@@ -454,7 +455,9 @@ function FenetreRapide.afficher()
         local contenu = f:view(pieces)
         LrTasks.startAsyncTask(boucle)
         LrDialogs.presentFloatingDialog(_PLUGIN, {
-            title = "Claude · Demande rapide",
+            -- « Développeur IA v1.8 · Demande rapide », comme la fenêtre Claude (demandé par Dany le
+            -- 10 novembre 2026).
+            title = Composants.titre() .. " · Demande rapide",
             contents = contenu,
             -- Le nom change avec la taille du contenu : une taille gardée d'avant ne revient pas.
             save_frame = 'DeveloppeurRapide-16',

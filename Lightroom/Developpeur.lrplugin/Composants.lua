@@ -58,6 +58,16 @@ function Composants.module()
     return v and Composants.formater(v.major, v.minor, v.revision) or '?'
 end
 
+-- Le début des barres de titre de la fenêtre Claude et de la Demande rapide : « Développeur IA v1.8 »,
+-- avec la version de ce module ; « Développeur IA » seul si elle ne se lit pas.
+function Composants.titre()
+    local version = Composants.module()
+    if type(version) ~= 'string' or not version:match('^%d') then
+        return "Développeur IA"
+    end
+    return "Développeur IA v" .. version
+end
+
 -- Le connecteur : sa réponse à --version (cinq secondes au plus).
 function Composants.connecteur(chemin)
     if not Fichiers.existe(chemin) then

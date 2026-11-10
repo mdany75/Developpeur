@@ -80,8 +80,9 @@ bilan, peau, doses, lumière, teint, tri, notation, masques, mise au point) ;
   professionnelle. Rien d'orienté client, mariage ou concours (galeries, collections publiées,
   profils Client ou Concours), et plus de Photoshop (ni agrandissement génératif, ni crédits
   Firefly, ni ouverture dans Photoshop) : `MCPServerTests` et `Version25Tests` le vérifient ;
-  `NotationTests`, le standard de notation. Seule retouche générative permise : Fibo 2, en local,
-  sur demande de Dany ; les taches de Claude restent `patchmatch`.
+  `NotationTests`, le standard de notation. La retouche générative n'est pas limitée (Dany, 10
+  novembre 2026) : Fibo 2 en local (`generative_edit`), et le génératif d'Adobe dans Lightroom
+  (Suppression des distractions › Personnes, Supprimer avec l'IA générative) quand il sert.
 - **Ne jamais retoucher de vraies photos pendant les tests** : `swift test` passe par
   `FakeLightroom` et un faux module TCP ; `scripts/tester-module.sh` par les `Simulation.lua` des
   deux suites, avec `faux-claude.sh` à la place de Claude Code (ni Claude, ni quota, dossier personnel temporaire). Un essai dans
@@ -120,8 +121,9 @@ bilan, peau, doses, lumière, teint, tri, notation, masques, mise au point) ;
   fait. Le nom affiché du module est « Développeur IA pour Lightroom » (`LrPluginName`, Gestionnaire
   de modules externes), sans changer d'identifiant (`LrToolkitIdentifier`, dossiers, clé, collection
   « Développeur › Essais ») ; la barre de titre de la fenêtre Claude dit « Développeur IA » suivi du
-  numéro installé (« Développeur IA v1.5 » : `Fenetre.titreFenetre`, d'après `Composants.module()` ;
-  « Développeur IA » seul si la version ne se lit pas) ; son menu (« Ouvrir la fenêtre Claude »,
+  numéro installé (« Développeur IA v1.5 » : `Fenetre.titreFenetre`, d'après `Composants.titre()` ;
+  « Développeur IA » seul si la version ne se lit pas), celle de la Demande rapide « Développeur IA
+  v1.8 · Demande rapide » (1.8) ; son menu (« Ouvrir la fenêtre Claude »,
   ⌃⌥C, visé par `Raccourcis.lua`) et la documentation disent toujours « fenêtre Claude ».
 - Le préfixe « Claude · » des noms de masques (serveur) et d'étapes (module) n'est jamais doublé :
   un nom donné qui le porte déjà le perd d'abord.

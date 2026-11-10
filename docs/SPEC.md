@@ -66,9 +66,7 @@ défait ensuite.
 
 **Lightroom Classic 16 (1.8)**
 
-- Recalage de la Projection par le module 1.8 chargé : trait de pinceau droit sur une copie à `ReshapeAmount` 100, et `--recalage` — dans la recette ou à la main ([Lightroom Classic 16](#lightroom-classic-16-18)).
 - Photo hors ligne (original et aperçu dynamique absents) : `applyDevelopSettings` de la 16 la saute avec une fenêtre ; ce que voit Claude — à la main, avec Dany ([Lightroom Classic 16](#lightroom-classic-16-18)).
-- Raccourcis ⌃⌥C et ⌘⌃⌥C sous la 16 (trois espaces devant le titre, relevés dans la 15.6) — à la main dans Lightroom.
 
 **Liaison et commandes longues**
 
@@ -1507,7 +1505,8 @@ le numéro gardé). Ils changent encore le correctif :
   depuis le 1er novembre 2026 (« Développeur IA » seul), avec le nom du module « Développeur IA
   pour Lightroom » (`LrPluginName`), sans changer d'identifiant (`LrToolkitIdentifier`, dossiers
   d'installation, clé `MCP-Developpeur`, nom `developpeur`, « Développeur › Essais ») ; la Demande
-  rapide garde « Claude · Demande rapide ».
+  rapide garde « Claude · Demande rapide » jusqu'à la 1.8, puis « Développeur IA v1.8 · Demande
+  rapide » (`Composants.titre`, demandé par Dany le 10 novembre 2026).
 - `Fenetre.FORME` reste 5 : la taille de la fenêtre ne change pas.
 
 **Agrandir** (retours de Dany du 25 octobre 2026) : l'image en grand remplit `Fenetre.GRANDE`,
@@ -2807,7 +2806,8 @@ part. Lightroom met trois espaces devant chaque entrée d'un module dans Module 
 cherche le titre exact : le raccourci est donc écrit avec ces trois espaces (`Raccourcis.RETRAIT`).
 Sans eux, il restait sans effet (constaté). Constaté le 19 octobre 2026 (Lightroom Classic 15.6) :
 écrit avec les espaces puis Lightroom relancé, le menu affiche ⌃⌥C et la touche ouvre la fenêtre ;
-un simple rechargement du module ne suffit pas.
+un simple rechargement du module ne suffit pas. Constaté par Dany le 10 novembre 2026 dans
+Lightroom Classic 16.0 : ⌃⌥C et ⌘⌃⌥C ouvrent toujours leurs fenêtres (mêmes titres à trois espaces).
 
 ### Constaté dans Lightroom Classic 15.6 (19 octobre 2026)
 
@@ -3237,7 +3237,9 @@ Constaté le 10 novembre 2026 sur la copie RAW 53918083 (« Essai mesures 16 »)
   `Carnet.clesGeometrie`, `Bilan.clesGeometrie`, `changeGeometrie` (un cadre demandé dans la même
   retouche attend la nouvelle grille) et la case « Contraindre le recadrage » ; la simulation la
   déforme (`transformee`). Une photo qui ne range pas `ReshapeAmount` (Lightroom 15.x) ne la reçoit
-  pas des rendus du recalage.
+  pas des rendus du recalage. Constaté avec le module 1.8 chargé (copie JPEG 54208151, « Essai
+  Projection 1.8 ») : le même trait sous la Projection 100 reste droit (de 0,184 à 0,209 de la
+  hauteur, comme sans Projection ; 0,170 à 0,236 avec la 1.7) ; recette 1.8 réussie, 88 étapes.
 - **Étalonnage dans un masque** (`LocalColorGrade*`) : rangé à l'échelle des curseurs globaux, en
   entiers (0,5 devient 1). Un radial couvrant toute l'image, teinte 240 et saturation 50 (puis 100),
   rend au pixel près comme le même étalonnage global (moyennes 47,6/48,5/61,9 et 32,9/42,0/71,7).
