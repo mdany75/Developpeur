@@ -3,7 +3,7 @@ import Foundation
 /// La recette de Lightroom Classic 16 (1.8) : la Lueur et l'étalonnage d'un masque sur la copie
 /// RAW, la Projection sur la copie JPEG (sans profil d'objectif). Chaque étape est défaite, et la
 /// photo vérifiée revenue comme au départ. Sous une version plus ancienne que la 16.0, les étapes
-/// sont sautées avec leur raison (ces réglages y seraient refusés). Constats de référence :
+/// sont sautées avec leur raison (ces réglages y seraient refusés) ; une version illisible les fait échouer. Constats de référence :
 /// docs/SPEC.md, Lightroom Classic 16 (1.8).
 extension Recette {
     /// Version de Lightroom Classic qui connaît la Lueur, la Projection et l'étalonnage local.
@@ -12,19 +12,26 @@ extension Recette {
     static let ecartLueurMin = 0.2
     /// Hauteur du trait de pinceau de l'étape de la Projection, et écart permis (part de la hauteur).
     static let hauteurTraitProjection = 0.2, ecartTraitProjection = 0.02
+    /// Abscisses des points du trait : cinq, comme au constat réussi de la 1.8 (le module ne recale
+    /// que les points qu'il pose, et depuis la 1.9 coupe aussi les longs traits : Geometrie.trait).
+    static let pointsTraitProjection = [0.03, 0.25, 0.5, 0.75, 0.97]
     /// Colonnes où la bande du trait se mesure : bords et centre (parts de la largeur).
     static let colonnesProjection: [(nom: String, colonnes: ClosedRange<Double>)] = [
         ("bord gauche", 0.04...0.14), ("centre", 0.45...0.55), ("bord droit", 0.86...0.96),
     ]
 
-    /// La raison de sauter une étape de la 16 (Lightroom plus ancien ou version illisible), ou nil.
+    /// La raison de sauter une étape de la 16 (Lightroom plus ancien), ou nil. Une version illisible
+    /// est un échec, jamais un saut (revue du 10 novembre 2026 : la recette aurait réussi sans rien
+    /// vérifier).
     func sautAvant16() throws -> String? {
         let version = try appel("get_status", [:]).0["lightroom"]?.string ?? ""
-        return Self.raisonDeSauter16(version)
+        return try Self.raisonDeSauter16(version)
     }
 
-    static func raisonDeSauter16(_ version: String) -> String? {
-        if version.isEmpty { return "sautée : version de Lightroom Classic illisible (get_status)" }
+    static func raisonDeSauter16(_ version: String) throws -> String? {
+        if version.trimmingCharacters(in: .whitespaces).isEmpty {
+            throw Echec(description: "version de Lightroom Classic illisible (get_status) : étape de la \(version16) non vérifiée")
+        }
         guard ToolHandler.versionInferieure(version, version16) else { return nil }
         return "sautée : Lightroom Classic \(version) (Lueur, Projection et étalonnage local depuis la \(version16))"
     }
@@ -82,7 +89,8 @@ extension Recette {
             let projection = Self.valeur(try etat(id), "ReshapeAmount")
             let (_, imagesAvant) = try appel("view_photo", ["photo_id": photoID, "size": 1024])
             try ecrire("add_mask", id, ["masks": [["kind": "brush", "name": "Recette pinceau Projection", "adjustments": ["Exposure": -2],
-                                                   "strokes": [["points": [[0.02, .number(y)], [0.98, .number(y)]], "size": 0.01, "feather": 0]]]]])
+                                                   "strokes": [["points": .array(Self.pointsTraitProjection.map { [.number($0), .number(y)] }),
+                                                                 "size": 0.01, "feather": 0]]]]])
             let (vue, imagesApres) = try appel("view_photo", ["photo_id": photoID, "size": 1024])
             if let first = imagesApres.first { garder(first, "recette-projection.jpg") }
             _ = try appel("undo_last", ["photo_ids": [photoID]])

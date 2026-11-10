@@ -1648,6 +1648,46 @@ test("masquer : pinceau et objet comme Lightroom les range, positions dans le fi
     egal(objet.MaskDigest, 'calculé pour 4', "calculé tout de suite (updateAISettings)")
 end)
 
+-- Revue du 10 novembre 2026 : sous la Projection, un trait de deux points recalé à ses bouts seulement
+-- allait droit dans le fichier et se courbait au rendu (0,117 au centre au lieu de 0,2). Le module
+-- coupe le trait dans l'aperçu (Geometrie.trait, au plus 0,05) avant le recalage : chaque touche,
+-- ramenée dans l'aperçu par la déformation de la simulation, reste sur la droite demandée.
+test("masquer : un long trait sous la Projection est coupé avant le recalage et reste droit au rendu", function()
+    local photo = photoFuji()
+    photo.reglages.LensProfileEnable = 0
+    photo.reglages.ReshapeAmount = 100
+    photo.deformation = S.projection(1)
+    S.active = photo
+    local empreinte = Commandes.executer('geometrie', {}).photos[1].empreinte
+    Commandes.executer('masquer', { masques = {
+        { type = 'pinceau', nom = 'Claude · Trait', auto = false, locaux = { LocalExposure2012 = -2 },
+            traits = { { points = { { 0.02, 0.2 }, { 0.98, 0.2 } }, rayon = 0.005, durete = 1 } } },
+    }, etape = 'pinceau', recalages = { ['4'] = grilleDe(S.deformation(photo), empreinte) } })
+    local dabs = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1].Masks[1].Dabs
+    local deformation, pire, touches = S.deformation(photo), 0, 0
+    for _, d in ipairs(dabs) do
+        local x, y = d:match('^d (%S+) (%S+)$')
+        if x then
+            x, y = tonumber(x), tonumber(y)
+            -- Du fichier au rendu : la déformation va du rendu au fichier, on la défait (même colonne).
+            local v = y
+            for _ = 1, 30 do
+                local _, oy = deformation(x, v)
+                v = v + (y - oy)
+            end
+            pire, touches = math.max(pire, math.abs(v - 0.2)), touches + 1
+        end
+    end
+    egal(touches > 100, true, "touches posées : " .. touches)
+    egal(pire < 0.003, true, "trait courbé au rendu : écart " .. pire)
+    -- Sans grille (aucune correction à suivre), le trait garde ses deux points.
+    local ctx = Geometrie.contexte(6240, 4160, 'AB', {})
+    egal(#Geometrie.trait(ctx, { { 0.02, 0.2 }, { 0.98, 0.2 } }), 2)
+    ctx = Geometrie.contexte(6240, 4160, 'AB', {}, grilleDe(S.projection(1)))
+    local coupe = Geometrie.trait(ctx, { { 0.02, 0.2 }, { 0.98, 0.2 } })
+    egal(#coupe, 21, "0,96 en morceaux de 0,05 au plus")
+end)
+
 test("masquer : un masque IA que Lightroom n'a pas su calculer est dit, et n'attend plus rien", function()
     -- Constaté le 17 octobre 2026 : un objet désigné par un trait large rangé ErrorReason = 1, sans MaskDigest.
     local photo = photoFuji()

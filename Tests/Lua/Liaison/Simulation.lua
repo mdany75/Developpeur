@@ -199,6 +199,16 @@ function S.trapeze(force)
     end
 end
 
+-- Projection de Lightroom Classic 16 : l'image d'origine s'écarte verticalement du centre vers les
+-- bords (de l'aperçu à l'origine), de sorte qu'une ligne droite du fichier se courbe au rendu, comme
+-- le trait constaté le 10 novembre 2026 (0,17 au centre, 0,24 aux bords sous la Projection 100) : un
+-- trait recalé à ses seuls points donnés, puis droit dans le fichier, se courbe entre eux.
+function S.projection(force)
+    return function(u, v)
+        return u, 0.5 + (v - 0.5) * (1 + force * 0.3 * (2 * u - 1) ^ 2)
+    end
+end
+
 local VERS_AFFICHAGE = {
     AB = function(s, t) return s, t end,
     BC = function(s, t) return 1 - t, s end,

@@ -413,18 +413,18 @@ local function noterTransformation(plan, ctx)
     end
 end
 
--- Points d'un trait donné dans l'aperçu, ramenés dans le repère du fichier, avec son rayon rapporté
--- au grand côté du fichier (comme le pinceau des masques), et leur centre.
+-- Points d'un trait donné dans l'aperçu, ramenés dans le repère du fichier (coupés sous une
+-- correction non linéaire : Geometrie.trait), avec son rayon rapporté au grand côté du fichier
+-- (comme le pinceau des masques), et le centre des points donnés.
 local function traitsFichier(ctx, traits, options)
     local grand = math.max(ctx.lf, ctx.hf)
     local liste, sx, sy, n = {}, 0, 0, 0
     for _, t in ipairs(type(traits) == 'table' and traits or {}) do
-        local points = {}
         for _, p in ipairs(type(t.points) == 'table' and t.points or {}) do
             local x, y = Geometrie.point(ctx, tonumber(p[1]), tonumber(p[2]))
-            points[#points + 1] = { x, y }
             sx, sy, n = sx + x, sy + y, n + 1
         end
+        local points = Geometrie.trait(ctx, t.points)
         local rayon = Geometrie.pixels(ctx, tonumber(t.rayon) or 0.02) / grand
         local trait = { points = points, rayon = rayon, flux = tonumber(t.flux) or 1, durete = tonumber(t.durete) or 0 }
         if options then
@@ -1069,12 +1069,11 @@ local function composant(ctx, m, nom)
         local grand = math.max(ctx.lf, ctx.hf)
         local traits, sx, sy, n = {}, 0, 0, 0
         for _, t in ipairs(type(m.traits) == 'table' and m.traits or {}) do
-            local points = {}
             for _, p in ipairs(type(t.points) == 'table' and t.points or {}) do
                 local x, y = Geometrie.point(ctx, tonumber(p[1]), tonumber(p[2]))
-                points[#points + 1] = { x, y }
                 sx, sy, n = sx + x, sy + y, n + 1
             end
+            local points = Geometrie.trait(ctx, t.points)
             local rayon = Geometrie.pixels(ctx, tonumber(t.rayon) or 0.02) / grand
             traits[#traits + 1] = { points = points, rayon = rayon, flux = tonumber(t.flux) or 1, durete = tonumber(t.durete) or 0 }
         end

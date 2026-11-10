@@ -19,7 +19,25 @@ final class ModuleRecette16: LightroomServing {
     var traitCourbe = false
     var etalonnageLocalPerdu = false
     var lueurSansEffet = false
+    /// Le module coupe les longs traits avant le recalage (Geometrie.trait, 1.9) ; faux : un module
+    /// qui ne recale que les points reçus.
+    var coupe = true
     static let largeur = 600, hauteur = 400
+
+    /// Les points d'un trait coupés tous les 0,05 au plus, comme Geometrie.trait.
+    static func couper(_ points: [(Double, Double)]) -> [(Double, Double)] {
+        var liste: [(Double, Double)] = []
+        for (i, p) in points.enumerated() {
+            if i > 0 {
+                let a = points[i - 1], n = Int((hypot(p.0 - a.0, p.1 - a.1) / 0.05 - 1e-9).rounded(.up))
+                for j in stride(from: 1, to: n, by: 1) {
+                    liste.append((a.0 + (p.0 - a.0) * Double(j) / Double(n), a.1 + (p.1 - a.1) * Double(j) / Double(n)))
+                }
+            }
+            liste.append(p)
+        }
+        return liste
+    }
 
     func noms(_ commande: String) -> Int { commandes.filter { $0.nom == commande }.count }
 
@@ -35,9 +53,20 @@ final class ModuleRecette16: LightroomServing {
                     return (px, py)
                 }
                 guard let debut = points.first, let fin = points.last, x >= debut.0, x <= fin.0 else { continue }
-                // Sans recalage, la Projection courbe le trait (constaté : 0,17 au centre, 0,24 aux bords).
-                var centre = debut.1
-                if traitCourbe, (reglages["ReshapeAmount"] ?? 0) > 0 { centre += -0.03 + 0.09 * pow(2 * x - 1, 2) }
+                // Le module recale chaque point qu'il pose, puis va droit dans le fichier : sous la
+                // Projection, le trait se courbe entre deux points (de g(x) moins sa corde), d'autant
+                // plus que les points sont espacés. Le module coupe le trait tous les 0,05 au plus
+                // (Geometrie.trait) ; sans coupe, deux points à 0,02 et 0,98 donnent 0,117 au centre.
+                let projection = (reglages["ReshapeAmount"] ?? 0) > 0
+                func g(_ u: Double) -> Double { 0.09 * pow(2 * u - 1, 2) }
+                let poses = coupe ? Self.couper(points) : points
+                guard let k = poses.indices.dropFirst().first(where: { x <= poses[$0].0 }) else { continue }
+                let a = poses[k - 1], b = poses[k]
+                let t = b.0 > a.0 ? (x - a.0) / (b.0 - a.0) : 0
+                var centre = a.1 + (b.1 - a.1) * t
+                if projection { centre += g(x) - (g(a.0) + (g(b.0) - g(a.0)) * t) }
+                // Sans recalage, la Projection courbe le trait entier (constaté : 0,17 au centre, 0,24 aux bords).
+                if traitCourbe, projection { centre = debut.1 - 0.03 + g(x) }
                 let rayon = (trait["rayon"]?.double ?? 0.02) * Double(Self.largeur) / Double(Self.hauteur)
                 if abs(y - centre) <= rayon { v *= pow(2, exposition) }
             }
@@ -154,10 +183,21 @@ final class Recette16Tests: XCTestCase {
         let trait = try XCTUnwrap(module.commandes.first { $0.nom == "masquer" }?.params["masques"]?.array?.first?["traits"]?.array?.first)
         XCTAssertEqual(trait["rayon"]?.double, 0.01)
         XCTAssertEqual(trait["durete"]?.double, 1)
-        XCTAssertEqual(trait["points"]?.array?.compactMap { $0.array?.last?.double }, [0.2, 0.2])
+        XCTAssertEqual(trait["points"]?.array?.compactMap { $0.array?.last?.double }, [0.2, 0.2, 0.2, 0.2, 0.2])
+        XCTAssertEqual(trait["points"]?.array?.compactMap { $0.array?.first?.double }, [0.03, 0.25, 0.5, 0.75, 0.97])
         XCTAssertEqual(module.noms("annuler"), 2)
         XCTAssertEqual(module.reglages, depart)
         XCTAssertTrue(module.masques.isEmpty)
+    }
+
+    /// Revue du 10 novembre 2026 : le trait de la recette a cinq points, comme au constat réussi de
+    /// la 1.8 ; avec deux, un module qui ne recale que les points reçus le courbait (0,117 au centre).
+    func testProjectionCinqPointsDroitsMemeSansCoupeDuModule() throws {
+        let module = ModuleRecette16()
+        module.coupe = false
+        let recette = Recette(lightroom: module)
+        try recette.etapeProjection(7, "JPEG 7")
+        XCTAssertTrue(recette.reussie, details(recette))
     }
 
     /// Le constat de la 1.7 (0,170 au centre, 0,236 aux bords) : un trait courbé fait échouer l'étape.
@@ -185,8 +225,20 @@ final class Recette16Tests: XCTestCase {
             XCTAssertTrue(etape.detail.hasPrefix("sautée : Lightroom Classic 15.6"), etape.detail)
         }
         XCTAssertFalse(module.commandes.contains { ["appliquer", "masquer", "annuler"].contains($0.nom) }, "rien d'écrit")
-        XCTAssertEqual(Recette.raisonDeSauter16(""), "sautée : version de Lightroom Classic illisible (get_status)")
-        XCTAssertNil(Recette.raisonDeSauter16("16.1"))
+        XCTAssertNil(try Recette.raisonDeSauter16("16.1"))
+    }
+
+    /// Revue du 10 novembre 2026 : une version illisible faisait « sauter » les étapes, et la recette
+    /// réussissait sans rien vérifier. C'est un échec, sans rien écrire.
+    func testVersionIllisibleEstUnEchec() {
+        XCTAssertThrowsError(try Recette.raisonDeSauter16(""))
+        let module = ModuleRecette16()
+        module.version = ""
+        let recette = Recette(lightroom: module)
+        XCTAssertThrowsError(try recette.etapeProjection(7, "JPEG 7"))
+        XCTAssertFalse(recette.reussie)
+        XCTAssertTrue(recette.etapes.first?.detail.contains("version de Lightroom Classic illisible") == true, details(recette))
+        XCTAssertFalse(module.commandes.contains { ["appliquer", "masquer"].contains($0.nom) }, "rien d'écrit")
     }
 
     /// Les colonnes de la mesure de la bande : un trait limité au bord gauche ne se voit pas au centre.

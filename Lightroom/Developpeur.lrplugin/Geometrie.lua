@@ -117,6 +117,34 @@ function Geometrie.point(ctx, p, q)
     return ctx.versFichierEntier(u, v)
 end
 
+-- Points d'un trait de l'aperçu ({ {p, q}… }) dans le repère du fichier. Le recalage n'est exact
+-- qu'aux points donnés, et les touches du pinceau (Locaux.touches) vont en ligne droite dans le
+-- fichier : sous une correction non linéaire (Projection, Upright, déformation), un long segment
+-- s'y courbe au rendu (revue du 10 novembre 2026 : un trait de deux points à 0,2 de la hauteur,
+-- courbé sous la Projection, quand cinq points le gardaient droit). Avec la grille, chaque segment
+-- se coupe donc d'abord dans l'aperçu en morceaux d'au plus PAS_TRAIT (part de l'image).
+Geometrie.PAS_TRAIT = 0.05
+
+function Geometrie.trait(ctx, points)
+    local liste = {}
+    local precedent
+    for _, p in ipairs(type(points) == 'table' and points or {}) do
+        local u, v = tonumber(p[1]), tonumber(p[2])
+        if precedent and ctx.recalage then
+            local du, dv = u - precedent[1], v - precedent[2]
+            local n = math.ceil(math.sqrt(du * du + dv * dv) / Geometrie.PAS_TRAIT - 1e-9)
+            for k = 1, n - 1 do
+                local x, y = Geometrie.point(ctx, precedent[1] + du * k / n, precedent[2] + dv * k / n)
+                liste[#liste + 1] = { x, y }
+            end
+        end
+        local x, y = Geometrie.point(ctx, u, v)
+        liste[#liste + 1] = { x, y }
+        precedent = { u, v }
+    end
+    return liste
+end
+
 -- Point du fichier (0 à 1) → point de l'aperçu (0 à 1), à l'inverse de Geometrie.point : de quoi
 -- désigner une retouche déjà posée (retouch_spots avec list). Avec la grille de recalage, elle se
 -- défait par approximations successives (le déplacement est lisse, de quelques dizaines de pixels
