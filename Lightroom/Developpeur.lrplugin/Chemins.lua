@@ -39,6 +39,8 @@
 --                                              entrées changées depuis, rejouées à la relecture)
 --       mes-demandes.json                      les demandes de l'ancien menu Mes demandes (retiré
 --                                              après la 1.8) : gardé tel quel, jamais lu ni effacé
+--       invites.json                           le réglage des invites des boutons (Oui ou Non par
+--                                              étape, Consignes.lua ; après la 1.8)
 --       Etapes/                                avant/après de chaque étape de Claude (1.3)
 --   ~/Library/Logs/Developpeur/conversation.log   (à côté de module.log, le journal de la liaison)
 
@@ -75,7 +77,7 @@ function Chemins.temporaire() return LrPathUtils.child(Chemins.locale(), 'Tempor
 -- racine locale y reste. Le serveur tient la même liste (guide de style, rendus, Index, Modeles).
 Chemins.NOMS_DONNEES = {
     'guide-de-style.md', 'Conversations', 'suivi.json', 'suivi.journal', 'carnet.json', 'notation.json',
-    'mes-demandes.json', 'publication.json', 'consommation.json', 'rendus.json', 'Etapes', 'Index', 'Modeles',
+    'mes-demandes.json', 'invites.json', 'publication.json', 'consommation.json', 'rendus.json', 'Etapes', 'Index', 'Modeles',
     'Claude Code',
 }
 -- Les copies illisibles mises de côté, rangées avec leur fichier.

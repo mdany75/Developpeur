@@ -3702,7 +3702,8 @@ function Fenetre.obtenir()
     Fenetre.voirSelection(info.cle)
     -- Grisé dès le clic : un second clic avant le départ de la demande n'en envoie pas une autre.
     poser(p, 'peutObtenir', false)
-    Fenetre.envoyer(Consignes.obtenir.demande, nil, Consignes.obtenir.fil)
+    -- La proposition suit le réglage de l'invite Proposer et appliquer (Consignes.demandeObtenir).
+    Fenetre.envoyer(Consignes.demandeObtenir(), nil, Consignes.obtenir.fil)
     return true
 end
 

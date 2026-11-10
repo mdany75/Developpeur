@@ -291,7 +291,8 @@ function Vues.boutonClasser(f, F, D)
     return F.bouton(f, { carre = true, size = 'small', title = invite.titre, font = F.POLICES.petit, width = D.boutonClasser,
         place_vertical = 0.5, enabled = F.bind 'libre',
         tooltip = "Classer la photo active (ou la sélection) : Claude propose des mots-clés, un lieu s'il est sûr et une légende, puis attend votre accord avant de rien écrire",
-        action = function() F.envoyer(invite.message, invite.modele) end })
+        -- Le message suit le réglage de l'invite au Gestionnaire (Consignes.message, lu au clic).
+        action = function() F.envoyer(Consignes.message(invite.id), invite.modele) end })
 end
 
 -- Publication… et Consommation…, à droite du bouton Suivi (correctif 1.3.7, décision de Dany du
@@ -397,7 +398,9 @@ end
 -- Les invites en raccourcis (Consignes.invites, Composition comprise), en carrés de 24 points de
 -- bezel (cadre de 26, D5), police 12. Ni « ★ Noter » ni séparateur (décision de Dany), et le menu
 -- Style est passé sous le champ. Classer (`entete`) n'y est plus : son bouton est en haut
--- (Vues.boutonClasser, après la 1.8).
+-- (Vues.boutonClasser, après la 1.8). Chaque bouton envoie l'invite telle que réglée au
+-- Gestionnaire de modules externes (section Invites), relue au clic (Consignes.message) ; son
+-- infobulle, faite à l'ouverture de la fenêtre, la montre telle qu'elle était alors.
 function Vues.invites(f, F, D)
     local rangee = { spacing = 6 }
     for _, invite in ipairs(Consignes.invites) do
@@ -407,9 +410,9 @@ function Vues.invites(f, F, D)
                 bezel = 24,
                 font = F.POLICES.systeme12,
                 title = invite.titre,
-                tooltip = invite.message,
+                tooltip = Consignes.message(invite.id),
                 enabled = F.bind 'libre',
-                action = function() F.envoyer(invite.message, invite.modele) end,
+                action = function() F.envoyer(Consignes.message(invite.id), invite.modele) end,
             })
         end
     end

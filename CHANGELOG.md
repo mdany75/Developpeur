@@ -2,6 +2,22 @@
 
 ## Non publié
 
+### Ajouté
+- **Ce que fait chaque invite, à votre goût** : dans Fichier › Gestionnaire de modules externes ›
+  Développeur IA pour Lightroom, une nouvelle section « Invites » (la dernière). Choisissez une
+  invite dans le menu (Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Composition,
+  Sports, Classer, et Noter et Proposer et appliquer de la Demande rapide) : la liste de tout ce
+  qu'elle fait s'affiche, étape par étape, chacune avec Oui ou Non. Par exemple, pour la Retouche
+  pro : le diagnostic chiffré, les deux passes, les passes correctives, le redressement, le
+  recadrage, le débruitage, les retouches locales, le visage, éclaircir et assombrir, le vignetage.
+  À Non, Claude ne fait pas l'étape, même si sa méthode ou votre guide de style la prévoit.
+  Dessous, un résumé de ce que l'invite fera et ne fera pas, « Remettre comme à l'origine » et
+  « Voir le message à Claude ».
+- Vos choix sont gardés tout de suite et servent dès le clic suivant, dans la fenêtre Claude
+  comme dans la Demande rapide (Retouche pro, Portrait et Classer se règlent une seule fois pour
+  les deux ; Proposer et appliquer règle aussi Obtenir). Avec le dossier commun, ils suivent
+  l'autre Mac. Tant que tout reste à Oui, chaque bouton fait exactement ce qu'il faisait.
+
 ### Changé
 - **Classer monte en haut de la fenêtre Claude**, dans la rangée du titre, juste à gauche de
   « Repartir à neuf », de la même forme que les petits boutons de cette rangée. Il fait exactement

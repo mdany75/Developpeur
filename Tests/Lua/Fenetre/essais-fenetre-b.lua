@@ -1035,6 +1035,40 @@ essai("« Classer » en haut, à gauche de « Repartir à neuf » : plus dans la
     end)
 end)
 
+-- Les invites réglées au Gestionnaire de modules externes (section Invites, après la 1.8, demandé par
+-- Dany le 10 novembre 2026) : chaque bouton envoie son invite telle que réglée, relue au clic ;
+-- l'infobulle la montre telle qu'elle était à l'ouverture.
+essai("Invites réglées : chaque bouton de la fenêtre, Classer compris, envoie l'invite réglée (relue au clic), l'infobulle la montre ; sans réglage, comme à l'origine", function()
+    local Fichiers = require 'Fichiers'
+    local fichier = Chemins.donnee('invites.json')
+    Fichiers.supprimer(fichier)
+    egal(true, Consignes.poserChoix('portrait', { flou = false }))
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    ouvrirFenetre(function(p, contenu)
+        local portrait = parTitre(contenu, 'Portrait')
+        egal(Consignes.message('portrait'), portrait.args.tooltip, "l'infobulle : l'invite réglée")
+        contient(portrait.args.tooltip, "ajouter du flou d'objectif")
+        local envois = {}
+        avec(Fenetre, 'envoyer', function(message) envois[#envois + 1] = message end, function()
+            S.cliquer(portrait)
+            -- Réglé pendant que la fenêtre est ouverte : le clic suivant le suit.
+            egal(true, Consignes.poserChoix('classer', { lieu = false }))
+            egal(true, Consignes.poserChoix('portrait', nil))
+            S.cliquer(parTitre(contenu, 'Classer'))
+            S.cliquer(portrait)
+            S.cliquer(parTitre(contenu, 'Sports'))
+        end)
+        egal(4, #envois)
+        contient(envois[1], Consignes.NE_PAS_FAIRE .. "ajouter du flou d'objectif (lens_blur).", 'Portrait réglé')
+        vrai(not envois[1]:find("flou d'objectif si la photo", 1, true), 'le flou retiré')
+        contient(envois[2], Consignes.NE_PAS_FAIRE .. 'proposer un lieu.', 'Classer réglé')
+        egal(Consignes.invite('portrait').message, envois[3], 'Portrait remis comme à l\'origine')
+        egal(Consignes.invite('sports').message, envois[4], 'sans réglage : le message de toujours')
+    end)
+    Fichiers.supprimer(fichier)
+end)
+
 essai("Mes demandes retiré : ni menu, ni clé, ni fonction ; mes-demandes.json déjà écrit n'est ni lu ni effacé ; le bandeau reprend sa place", function()
     local Fichiers = require 'Fichiers'
     local Stockage = require 'Stockage'

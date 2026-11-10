@@ -1321,7 +1321,7 @@ essai('Gestionnaire de modules externes : les sections se construisent, menus Mo
     local sections = PluginInfoProvider.sectionsForTopOfDialog(f, proprietes)
     -- La troisième section, Dossier commun (3 novembre 2026), a ses essais dans essais-dossier-commun.lua ;
     -- la quatrième, Mises à jour par le SSD (1.7), dans essais-mises-a-jour.lua.
-    egal(4, #sections)
+    egal(5, #sections)
     egal('Liaison avec Claude', sections[1].title)
     egal('Dossier commun', sections[3].title)
     egal('Mises à jour par le SSD', sections[4].title)

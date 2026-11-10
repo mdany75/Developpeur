@@ -238,7 +238,10 @@ essai("Le 4ᵉ bouton, Classer : sa demande part avec Consignes.classerRapide (p
     egal(5, #FenetreRapide.ACTIONS, 'cinq boutons à icône (Proposer et appliquer, 2 novembre 2026)')
     local action = FenetreRapide.ACTIONS[4]
     egal('rapide-classer', action.icone)
-    egal(Consignes.classerRapide, action.message, 'Classer de la Demande rapide, pour chaque photo')
+    -- Le message se fait au clic, d'après le réglage de l'invite classer (section Invites du
+    -- Gestionnaire, après la 1.8) ; sans réglage, celui de Consignes.classerRapide.
+    egal('function', type(action.message), 'fait au clic')
+    egal(Consignes.classerRapide, action.message(), 'Classer de la Demande rapide, pour chaque photo')
     contient(action.tooltip, "rien d'écrit sans votre accord", 'infobulle')
     -- Plusieurs photos sélectionnées ; toute écriture au catalogue (ordinaire ou privée) et tout
     -- champ ou mot-clé posé sur une photo est compté.

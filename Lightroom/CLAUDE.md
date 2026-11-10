@@ -227,6 +227,12 @@ Les pièges :
   ni compétences ni réglages de l'utilisateur, dans le dossier vide `Atelier/`. Un seul processus
   Claude Code à la fois. Modèle et effort se choisissent dans le Gestionnaire de modules externes,
   plus dans la fenêtre.
+- Invites réglables (après la 1.8 ; `docs/SPEC.md`, Invites réglables) : ce qui part d'un bouton
+  se fait au clic par `Consignes.message`, `classerRapideMessage`, `demandeObtenir` ou
+  `proposerAppliquerRapide`, qui relisent `invites.json` ; jamais `invite.message` ni les
+  constantes (`noterRapide`, `classerRapide`, `PROPOSITION_COMPLETE`…), qui sont le message tout à
+  Oui. Une étape à Non est toujours dite à Claude (`Consignes.NE_PAS_FAIRE`), jamais seulement
+  omise ; tout à Oui, le message reste mot pour mot celui d'avant (`essais-invites.lua`).
 - Le presse-papiers ne se lit que sur un clic de l'utilisateur (bouton 📋, `presse-papiers.js`) ;
   les essais passent par un presse-papiers nommé, jamais le vrai.
 - Fenêtre (avant de toucher à `Fenetre.lua`, `Vues.lua`, `Dispositions.lua`, aux images, aux

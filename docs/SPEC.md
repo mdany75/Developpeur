@@ -141,6 +141,7 @@ défait ensuite.
 - Plusieurs photos (conversation de groupe, résumé de 500 photos), « Repartir à neuf », un seul Claude Code pour la fenêtre et la Demande rapide — à la main dans Lightroom ([1.3.6, points 3, 4 et 6](#correctif-136--une-photo-une-conversation)).
 - Avec le vrai Claude : `compare = before_claude` et `rendu_reproductible`, résumé des réglages (JPEG, paramètre prédéfini à l'importation), résumé en haut du fil, `editCount` à 0, modèle ou effort changé (`--resume`) — à la main dans Lightroom ([1.3.6, points 2, 8, 13 et 15](#correctif-136--une-photo-une-conversation) ; [fenêtre, point 10](#à-constater-dans-lightroom-11-111-et-après)).
 - « Classer » dans la rangée du titre, à gauche de « Repartir à neuf » : place, taille, infobulle, grisé pendant que Claude travaille — à la main dans Lightroom ([Classer dans l'en-tête](#classer-dans-len-tête-demandé-par-dany-le-10-novembre-2026) ; Mes demandes, retiré après la 1.8, n'a plus rien à constater).
+- Section Invites du Gestionnaire : le menu, les treize lignes Oui / Non (celles de trop masquées, sans trou gênant), le résumé sur sept lignes, la fenêtre « Voir le message », un choix gardé puis suivi par un bouton de la fenêtre Claude et de la Demande rapide ; avec le vrai Claude, une étape à Non vraiment pas faite (recadrage, grain) — à la main dans Lightroom ([Invites réglables](#invites-réglables-demandé-par-dany-le-10-novembre-2026)).
 - Onglet Focus : autre marque, HEIF, original déplacé, copie recadrée ou tournée, recadrage du boîtier, zone de 5 × 5, aperçu commun sans image après une retouche — à la main dans Lightroom ([1.3, point 22](#à-constater-dans-lightroom-13) ; [Onglet Focus](#onglet-focus-demandé-par-dany-le-22-octobre-2026)).
 - Cadre de mise au point : rouge, photo tournée ou recadrée, zoom (`region`), case « Mise au point » — à la main dans Lightroom ([fenêtre, points 12 et 13](#à-constater-dans-lightroom-11-111-et-après)).
 - Composition : `--horizon` sur une copie au vrai horizon (mer, lac, plaine) — dans la recette, une fois la copie choisie avec Dany et rangée dans Essais ; le cadre dans Agrandir à la main ([1.3, point 16](#à-constater-dans-lightroom-13)).
@@ -2002,6 +2003,84 @@ Demande rapide garde son propre bouton Classer (`Consignes.classerRapide`), inch
 Essais : `Tests/Lua/Fenetre/essais-fenetre-b.lua` (inventaire de l'en-tête et « Classer en haut »)
 et `tests.lua` (la rangée des invites).
 
+### Invites réglables (demandé par Dany le 10 novembre 2026)
+
+Demandé par Dany : « un menu dans la config, qui me dirait tout ce que tu fais dans un preset
+[…] et un bouton oui ou non », pour « pouvoir configurer ces presets, et qu'ils utilisent les
+presets bâtis ». Chaque invite d'un bouton devient une liste d'étapes nommées, chacune à Oui ou à
+Non, réglée dans le Gestionnaire de modules externes et suivie par les boutons à chaque clic.
+
+**Forme des données** (`Consignes.lua`). Les huit invites de `Consignes.invites` (Retouche pro,
+Portrait, Paysage, Noir et blanc, ISO élevé, Composition, Sports, Classer) et les deux de
+`Consignes.autresInvites`, propres à la Demande rapide (Noter ; Proposer et appliquer, dont la
+proposition est aussi celle d'Obtenir), toutes rendues par `Consignes.configurables()`, portent :
+
+- `etapes` : la liste ordonnée de leurs étapes, `{ id, titre, texte, non, defaut = true }`. `id`
+  est stable (la clé du fichier) ; `titre`, court, pour Dany ; `texte`, ce qui part à Claude à Oui,
+  tiré du message de la 1.8 ; `non`, ce que Claude ne doit pas faire à Non, à l'infinitif. Une
+  étape sans `texte` est faite par Claude de lui-même, d'après l'invite du connecteur de même nom
+  (`Prompts.swift` : redressement, recadrage, débruitage, retouches locales, visage, tireur,
+  vignetage de `retouche_pro` ; recadrage et imperfections de `portrait` ; voile et recadrage de
+  `paysage` ; retouches locales de `nuit_iso_eleve`) : elle ne dit rien à Oui et ne parle qu'à
+  Non. Aucun chiffre : les doses restent dans les descriptions des outils ;
+- `forme` (`formes.proposition` et `formes.retouche` pour Proposer et appliquer) : le message,
+  fait de textes fixes et de groupes d'étapes. Un groupe met bout à bout les textes de ses étapes
+  à Oui (`sep`, « , » par défaut, `dernier` avant la dernière), précédés de `avant` (ou de
+  `premier` si aucun groupe n'a rien donné avant lui) et suivis de `apres` ; sans étape à Oui, il
+  ne donne rien. Une étape peut y porter son propre texte (`{ id, texte }` : les retouches locales
+  de la retouche appliquée, `confirm = true` au lieu de `preview = true`) ;
+- `sert` : les boutons qui l'envoient, dit au Gestionnaire.
+
+Le message qui part = la forme, puis, s'il y a des étapes à Non, `Consignes.NE_PAS_FAIRE` (« Ne
+fais pas ceci, même si ta méthode ou mon guide de style le prévoit : ») suivi du `non` de chacune ;
+puis la fin fixe de l'invite (`suite` : l'accord attendu de Classer) et, pour une retouche,
+`Consignes.LIRE_GUIDE`, toujours en dernier. **Une étape à Non est toujours dite, jamais seulement
+omise** : la méthode du connecteur (`ServerInfo.instructions`, les descriptions des outils) et le
+guide de style feraient sinon faire à Claude, de lui-même, une bonne part de ce que Dany a refusé
+(recadrer « si la composition y gagne », débruiter au-dessus de 1,5, le grain d'un style) ; la
+nommer ne coûte que quelques mots, et pour une étape qui n'est pas dans le message, c'est la seule
+façon de la refuser. Tout à Oui, chaque message est mot pour mot celui de la 1.8 : `invite.message`,
+`Consignes.noterRapide`, `Consignes.classerRapide`, `Consignes.PROPOSITION_COMPLETE`,
+`Consignes.RETOUCHE_COMPLETE` et `Consignes.obtenir.demande` sont ces messages tout à Oui, faits au
+chargement sans lire le fichier.
+
+Ce qui part se fait au clic, le fichier relu : `Consignes.message(id)` (les invites de la fenêtre,
+`Vues.invites` et `Vues.boutonClasser` ; Noter), `Consignes.classerRapideMessage()`,
+`Consignes.demandeObtenir()` (Obtenir), `Consignes.proposerAppliquerRapide(mode, gardee)`, et les
+messages de `FenetreRapide.ACTIONS`, tous des fonctions. Retouche pro, Portrait et Classer ont un
+seul réglage pour la fenêtre Claude et la Demande rapide ; Proposer et appliquer, un seul pour ses
+deux formes et Obtenir. L'infobulle d'une invite de la fenêtre montre son message réglé à
+l'ouverture de la fenêtre (la vue ne change pas une fois ouverte).
+
+**Réglage gardé** : `invites.json`, dans la racine des données (`Chemins.donnee` : le dossier
+commun quand il est réglé, il suit l'autre Mac ; dans `Chemins.NOMS_DONNEES` et
+`DossierDonnees.elementsCommuns`), `{ format = 1, invites = { [invite] = { [étape] = booléen } } }`,
+écrit d'un coup par `Fichiers.ecrire` (provisoire puis renommé), comme les conversations.
+Une invite remise tout à Oui en est retirée. Absent, illisible ou inaccessible (dossier commun
+introuvable) : tout à Oui, sans erreur, le fichier n'est pas réécrit à la lecture (un fichier
+illisible est noté au journal) ; une étape, une invite inconnue ou une valeur qui n'est pas un
+booléen est ignorée. Une écriture refusée (dossier commun introuvable) est dite par le
+Gestionnaire, rien n'est écrit ailleurs.
+
+**Section « Invites »** du Gestionnaire de modules externes (`PluginInfoProvider.lua`, la
+cinquième et dernière section : les rangs des quatre autres ne changent pas) : un texte qui dit ce
+que veulent Oui et Non ; le menu « Invite : » (`inviteChoisie`, les dix invites) ; un nombre fixe
+de lignes, `Consignes.maxEtapes()` (13, Proposer et appliquer), chacune deux `radio_button` Oui et
+Non sur la même clé (`etapeOui<i>`) et le titre de l'étape (`etapeTitre<i>`), chaque vue simple
+liée à `etapeVisible<i>` (jamais la rangée : `visible` y serait ignoré) : une ligne de trop est
+masquée et garde sa place, la vue n'est jamais refaite ; « Ce qu'elle fera : » (`resumeInvite`,
+`Consignes.resume` : à quoi elle sert, ce qu'elle fera, ce qu'elle ne fera pas, le guide de style
+lu d'abord) ; « Remettre comme à l'origine » et « Voir le message à Claude » (une fenêtre modale,
+le message tel qu'il part, à copier). Changer d'invite relit son réglage sans rien écrire ; un Oui
+ou un Non est gardé tout de suite (`Consignes.poserChoix`). Le synopsis dit combien d'invites sont
+réglées. Pas de fichier `.lua` nouveau : rien à relancer de plus que pour une autre version.
+
+Essais : `Tests/Lua/Fenetre/essais-invites.lua` (forme des données, message tout à Oui comparé au
+texte de la 1.8, chaque étape à Non et toutes à Non, fichier absent, illisible, aller-retour,
+dossier commun introuvable, même réglage pour la fenêtre et la Demande rapide, la section du
+Gestionnaire ouverte, cliquée et choisie) et `essais-fenetre-b.lua` (« Invites réglées » : les
+boutons de la fenêtre envoient l'invite réglée, relue au clic).
+
 ### Carte Note B (1.3)
 
 En 1.3, la carte Note suit la maquette (`Vues.notation`, lot B5) ; la section précédente reste
@@ -2429,7 +2508,8 @@ plusieurs photos, la conversation n'est pas gardée, un « attends mon accord »
 (relecture du 2 novembre 2026). Claude finit en disant comment écrire : dans la fenêtre Claude
 si la conversation est gardée (une photo, case Autre photo cochée), sinon par l'invite Classer ou
 une nouvelle demande qui nomme ce qu'il faut écrire. Le bouton lui-même n'écrit rien au catalogue
-(`essais-rapide.lua`). Proposer et appliquer (`Consignes.proposerAppliquerRapide`, d'après
+(`essais-rapide.lua`). Depuis les invites réglables (après la 1.8), chaque message de `FenetreRapide.ACTIONS` est une
+fonction qui suit le réglage de son invite, relu au clic (voir Invites réglables). Proposer et appliquer (`Consignes.proposerAppliquerRapide`, d'après
 `Lightroom.mode` et `Moteur.rapideGardee` lus au clic) : en mode Appliquer, la retouche de même
 étendue qu'Obtenir appliquée tout de suite (`Consignes.RETOUCHE_COMPLETE` : un seul `apply_settings`
 et `add_mask` sans `preview`, `confirm = true`, puis `view_photo` pour vérifier ; ni « sans rien
@@ -2555,6 +2635,8 @@ autre sélection, la conversation d'une photo, le groupe, la réservation de Cla
                                             d'une session (voir Pourquoi ? : l'avant/après des
                                             étapes)
     guide-de-style.md                       guide de style (remember_style)
+    invites.json                            réglage des invites des boutons, Oui ou Non par
+                                            étape (après la 1.8 ; voir Invites réglables)
     rendus.json                             rendu de fin de chaque retouche (1.3.5, rendu
                                             reproductible ; gardé par le connecteur, voir
                                             Correctif 1.3.6)

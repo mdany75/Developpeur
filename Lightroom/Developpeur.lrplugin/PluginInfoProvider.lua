@@ -11,7 +11,9 @@
 --   - le dossier commun (3 novembre 2026) : chemin, Choisir…, Revenir au dossier de ce Mac
 --     (DossierCommun.lua, qui seul écrit le pointeur dossier-commun.json) ;
 --   - les mises à jour par le SSD (1.7) : état, Vérifier, Installer depuis le SSD, Déposer sur le
---     SSD (MisesAJour.lua ; le travail est fait par le connecteur, --mises-a-jour).
+--     SSD (MisesAJour.lua ; le travail est fait par le connecteur, --mises-a-jour) ;
+--   - les invites des boutons (après la 1.8, demandé par Dany le 10 novembre 2026), en dernier :
+--     chaque étape à Oui ou à Non (Consignes, invites.json).
 -- Les deux premières sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
 
@@ -336,6 +338,123 @@ local function sectionFenetre(f, prefs, ligne)
     }
 end
 
+-- Section des invites ------------------------------------------------------------------------------
+
+-- Les invites des boutons (demandé par Dany le 10 novembre 2026 : « un menu dans la config, qui me
+-- dirait tout ce que tu fais dans un preset […] et un bouton oui ou non ») : un menu pour choisir
+-- l'invite, puis ses étapes, chacune avec Oui et Non, ce qu'elle fera, « Remettre comme à
+-- l'origine » et le message tel qu'il part à Claude. La liste change avec l'invite sans changer de
+-- structure : un nombre fixe de lignes (Consignes.maxEtapes), chacune liée à la table de la
+-- section (titre, valeur, visible) ; une ligne de trop est masquée. Chaque Oui ou Non est gardé tout
+-- de suite dans invites.json (Consignes.poserChoix), que les boutons relisent à chaque clic.
+local function voirMessage(id, choix)
+    local f = LrView.osFactory()
+    LrDialogs.presentModalDialog {
+        title = "Le message de l'invite à Claude",
+        contents = f:column {
+            f:static_text { title = "Ce que Claude reçoit quand vous cliquez le bouton (la Demande rapide l'adresse à chaque photo sélectionnée)." },
+            f:edit_field { value = Consignes.message(id, choix), height_in_lines = 12, width_in_chars = 80 },
+        },
+        cancelVerb = '< exclude >',
+        actionVerb = "Fermer",
+    }
+end
+
+local function sectionInvites(f, propertyTable, ligne)
+    local bind = LrView.bind
+    local p = propertyTable
+    local n = Consignes.maxEtapes()
+    local items = {}
+    for _, invite in ipairs(Consignes.configurables()) do
+        items[#items + 1] = { title = invite.titre, value = invite.id }
+    end
+    local choix, remplissage = {}, false
+
+    local function etapes()
+        return Consignes.configurable(p.inviteChoisie).etapes
+    end
+    local function synopsis()
+        local reglages, nombre = Consignes.lireReglages(), 0
+        for _, invite in ipairs(Consignes.configurables()) do
+            if Consignes.modifiee(invite.id, Consignes.choix(invite.id, reglages)) then
+                nombre = nombre + 1
+            end
+        end
+        return nombre == 0 and "toutes comme à l'origine"
+            or string.format("%d invite%s réglée%s", nombre, nombre > 1 and "s" or "", nombre > 1 and "s" or "")
+    end
+    local function resumer()
+        p.resumeInvite = Consignes.resume(p.inviteChoisie, choix)
+        p.synopsisInvites = synopsis()
+    end
+    -- Les lignes d'après l'invite choisie et son réglage lu ; rien n'est écrit pendant ce temps.
+    local function charger()
+        choix = Consignes.choix(p.inviteChoisie)
+        local liste = etapes()
+        remplissage = true
+        for i = 1, n do
+            local e = liste[i]
+            p['etapeVisible' .. i] = e ~= nil
+            p['etapeTitre' .. i] = e and e.titre or ""
+            if e then
+                p['etapeOui' .. i] = choix[e.id] ~= false
+            else
+                p['etapeOui' .. i] = true
+            end
+        end
+        remplissage = false
+        resumer()
+    end
+    local function poser(nouveaux)
+        local ok, erreur = Consignes.poserChoix(p.inviteChoisie, nouveaux)
+        if not ok then
+            LrDialogs.message("Invites", "Réglage non gardé : " .. tostring(erreur), 'warning')
+        end
+        charger()
+    end
+
+    p.inviteChoisie = items[1].value
+    charger()
+    p:addObserver('inviteChoisie', function() charger() end)
+    for i = 1, n do
+        p:addObserver('etapeOui' .. i, function(_, _, valeur)
+            local e = etapes()[i]
+            if remplissage or not e then
+                return
+            end
+            choix[e.id] = valeur ~= false
+            poser(choix)
+        end)
+    end
+
+    local section = {
+        title = "Invites",
+        synopsis = bind { key = 'synopsisInvites', bind_to_object = p },
+
+        f:static_text {
+            title = "Ce que fait chaque bouton de la fenêtre Claude et de la Demande rapide, étape par étape : Oui, Claude la fait (comme à l'origine) ; Non, il ne la fait pas, même si sa méthode ou votre guide de style la prévoit. Le réglage sert dès le clic suivant, sur ce Mac et, avec le dossier commun, sur l'autre.",
+            width_in_chars = 66, height_in_lines = 4,
+        },
+        ligne("Invite :", f:popup_menu { value = bind { key = 'inviteChoisie', bind_to_object = p }, items = items }),
+    }
+    for i = 1, n do
+        local visible = bind { key = 'etapeVisible' .. i, bind_to_object = p }
+        local valeur = bind { key = 'etapeOui' .. i, bind_to_object = p }
+        section[#section + 1] = ligne(i == 1 and "Étapes :" or "",
+            f:radio_button { title = "Oui", value = valeur, checked_value = true, visible = visible },
+            f:radio_button { title = "Non", value = valeur, checked_value = false, visible = visible },
+            f:static_text { title = bind { key = 'etapeTitre' .. i, bind_to_object = p }, visible = visible, width_in_chars = 50 })
+    end
+    section[#section + 1] = ligne("Ce qu'elle fera :", f:static_text {
+        title = bind { key = 'resumeInvite', bind_to_object = p },
+        width_in_chars = 56, height_in_lines = 7,
+    })
+    section[#section + 1] = ligne("",
+        f:push_button { title = "Remettre comme à l'origine", action = function() poser(nil) end },
+        f:push_button { title = "Voir le message à Claude", action = function() voirMessage(p.inviteChoisie, choix) end })
+    return section
+end
+
 -- Section du dossier commun ------------------------------------------------------------------------
 
 -- Les fenêtres qui lisent ou écrivent les données, ouvertes : le dossier ne change pas sous elles.
@@ -601,6 +720,8 @@ local function sectionsForTopOfDialog(f, propertyTable)
         sectionFenetre(f, prefs, ligne),
         sectionDossierCommun(f, propertyTable, ligne),
         sectionMisesAJour(f, propertyTable, ligne),
+        -- En dernier, après la 1.8 : les rangs des quatre autres sections ne changent pas.
+        sectionInvites(f, propertyTable, ligne),
     }
 end
 

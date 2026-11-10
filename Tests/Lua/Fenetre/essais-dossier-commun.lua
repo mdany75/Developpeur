@@ -909,7 +909,7 @@ essai('Gestionnaire : DossierCommun.lua qui ne se charge pas (module rechargé s
     package.preload.DossierCommun = nil
     package.loaded.DossierCommun = garde
     vrai(ok, tostring(sections))
-    egal(4, #sections)
+    egal(5, #sections)
     egal('Mises à jour par le SSD', sections[4].title)
     egal('Liaison avec Claude', sections[1].title)
     egal('Fenêtre Claude', sections[2].title)

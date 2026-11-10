@@ -11,7 +11,8 @@
 # Usage : bash uninstall.sh [--tout]
 #         --tout : retire aussi ce que le module et le serveur ont gardé pour l'utilisateur, qui
 #                  reste sans cette option : guide de style, conversations de la fenêtre Claude,
-#                  mes demandes de la fenêtre Claude (mes-demandes.json), profils de
+#                  mes demandes de la fenêtre Claude (mes-demandes.json), réglage des invites
+#                  (invites.json), profils de
 #                  publication, registre de consommation, notes proposées (notation.json),
 #                  carnet de progrès et leçons des photos (carnet.json), suivi des photos
 #                  ouvertes (suivi.json, son journal suivi.journal et suivi-illisible-*.json,

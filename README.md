@@ -200,6 +200,17 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   et assombrir comme un tireur (voir Retouches locales), avec l'avant/après de cette étape ; en
   noir et blanc, le grain vient après. Composition lit la composition de la photo active et propose
   un cadre, sans l'appliquer.
+- **Ce que fait chaque invite, à votre goût** : Fichier › Gestionnaire de modules externes ›
+  Développeur IA pour Lightroom, section Invites (la dernière). Choisissez une invite dans le menu
+  (les huit de la fenêtre, plus Noter et Proposer et appliquer de la Demande rapide, ce dernier
+  servant aussi à Obtenir) : ses étapes s'affichent, chacune avec Oui ou Non, par exemple pour
+  Retouche pro le diagnostic chiffré, les deux passes, le redressement, le recadrage, le
+  débruitage, les retouches locales, le vignetage. À Non, Claude ne fait pas l'étape, même si sa
+  méthode ou votre guide de style la prévoit : la demande la lui nomme (« Ne fais pas ceci… »).
+  Dessous, ce que l'invite fera et ne fera pas, « Remettre comme à l'origine », et « Voir le
+  message à Claude ». Chaque choix est gardé tout de suite et vaut dès le clic suivant, dans la
+  fenêtre Claude comme dans la Demande rapide (Retouche pro, Portrait et Classer y sont réglés une
+  seule fois pour les deux). Tout à Oui, chaque invite fait exactement ce qu'elle faisait.
 - Une carte Note, dans l'onglet Note : la note posée de la photo active, vos étoiles et vos
   drapeaux, et celle que Claude propose, à accepter, laisser ou changer sans repasser par Claude.
   Dans la fenêtre, Claude note d'abord chaque photo qu'il traite : pas de bouton pour le lui
@@ -1444,7 +1455,7 @@ photos (jamais les deux Mac en même temps) :
   copiées, puis mises de côté sur le Mac dans « Avant le dossier commun … » (rien n'est effacé).
   Sur l'autre Mac, choisir le même dossier prend ces données telles quelles. Y vont : guide de
   style, conversations et échanges de Claude Code (une conversation se reprend sur l'autre Mac),
-  Suivi, carnet, notes proposées, profils de publication, consommation, avant/après
+  Suivi, carnet, notes proposées, réglage des invites, profils de publication, consommation, avant/après
   des étapes, index et modèles du sens et des espèces. Restent sur chaque Mac : le connecteur, le
   jeton de la liaison, les journaux, Fibo 2 et Lightroom lui-même. « Revenir au dossier de ce Mac »
   retire le réglage sans rien copier.

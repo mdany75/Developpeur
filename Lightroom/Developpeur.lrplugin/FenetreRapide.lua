@@ -71,18 +71,21 @@ FenetreRapide.FLECHE = 14
 -- entre deux carrés (un carré de 55 a un cadre de 57). Cinq carrés laissent au champ 593 points
 -- (654 avec quatre). `message` : un texte, ou une fonction qui le rend au clic, dans la tâche de
 -- l'envoi, d'après Lightroom.photos() ; elle peut rendre nil et un texte que la fenêtre montre sans
--- rien demander à Claude (FenetreRapide.envoyer).
+-- rien demander à Claude (FenetreRapide.envoyer). Depuis la section Invites du Gestionnaire de
+-- modules externes (demandée par Dany le 10 novembre 2026), chaque message est une fonction : il
+-- suit le réglage de son invite, relu au clic (Noter, Retouche pro, Portrait, Classer, Proposer et
+-- appliquer ; Retouche pro, Portrait et Classer réglés comme dans la fenêtre Claude).
 FenetreRapide.CARRE = FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.ESPACE = 6
 local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
 FenetreRapide.ACTIONS = {
-    { icone = 'rapide-noter', message = Consignes.noterRapide,
+    { icone = 'rapide-noter', message = function() return Consignes.message('noter') end,
         tooltip = "Noter les photos sélectionnées : Claude pose ses notes (0 à 5 ★, ou rejet)" },
-    { icone = 'rapide-retouche', message = Consignes.retoucheProSurLaSelection(retouchePro.message),
+    { icone = 'rapide-retouche', message = function() return Consignes.retoucheProSurLaSelection(Consignes.message('retouche_pro')) end,
         tooltip = retouchePro.titre .. ", par groupes de lumière : la référence de chaque groupe retouchée, ses réglages copiés aux autres photos du groupe, puis harmonisés. " .. retouchePro.message },
-    { icone = 'rapide-portrait', message = Consignes.surLaSelection(portrait.message),
+    { icone = 'rapide-portrait', message = function() return Consignes.surLaSelection(Consignes.message('portrait')) end,
         tooltip = portrait.titre .. ", pour chaque photo sélectionnée : " .. portrait.message },
-    { icone = 'rapide-classer', message = Consignes.classerRapide,
+    { icone = 'rapide-classer', message = function() return Consignes.classerRapideMessage() end,
         tooltip = "Classer les photos sélectionnées : mots-clés, lieu et légende proposés, rien d'écrit sans votre accord" },
     { icone = 'rapide-proposer', message = function(info) return Consignes.proposerAppliquerRapide(Lightroom.mode(), Moteur.rapideGardee(info)) end,
         tooltip = "Proposer et appliquer : Claude prépare la proposition la plus complète possible (réglages et retouches locales) "

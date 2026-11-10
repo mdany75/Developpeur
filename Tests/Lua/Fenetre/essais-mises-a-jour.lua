@@ -398,7 +398,7 @@ essai('Gestionnaire : MisesAJour.lua qui ne se charge pas (module rechargé sans
     package.preload.MisesAJour = nil
     package.loaded.MisesAJour = garde
     vrai(ok, tostring(sections))
-    egal(4, #sections)
+    egal(5, #sections)
     egal('Mises à jour par le SSD', sections[4].title)
     egal('indisponible', sections[4].synopsis)
 end)
