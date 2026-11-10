@@ -327,13 +327,13 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `montrer` | `photos?` ou `selection?`, `module?` (`bibliotheque`, `developpement`), `vue?` (`loupe`, `grille`, `comparer`, `ensemble`, `avant_apres`), `filtre?`, `filtre_preset?`, `remettre_filtre?`, `source_dossier?` ou `source_collection?` (sans photo : la source et le filtre seuls) | `photos`, `module`, `source_changee`, `vue`, `filtre`, `source`, `a_savoir` (voir Bibliothèque, et Ajouts de la 2.4 › Filtre de la Bibliothèque) |
 | `vignettes` | `photos` (50 au plus), `taille` (minimum demandé, de 128 à 2048) | `taille`, `dossier`, `photos` : par photo, sa description détaillée, `vignette` (chemin d'un JPEG temporaire) ou `erreur`, `chemin_original`, `geometrie` (`largeur`, `hauteur`, `orientation`, `cadre` s'il est recadré) ; voir Tri d'une séance |
 | `supprimer` | `photo?`, `reflets` (`actif`, `intensite?` de 1 à 100, `qualite?` : `preview`, `standard`, `best`) ou `poussiere` (`actif` = false : la retirer), `etape`, `raison?`, `confirme` | comme `appliquer`, plus `reflets` (état après le calcul : `reflets`, `intensite`) ; voir Suppression des reflets et Poussière du capteur |
-| `exporter` | `photos`, `dossier` (sauf `reimporter = pile`), `sous_dossier?`, `reglages` (`format`, `qualite`, `espace`, `profondeur`, `hdr`, `compatibilite`, `sans_perte`, `poids_max_ko`, `filigrane`, `reimporter` (`catalogue`, `pile`), `position_pile`, `taille` `{type, valeur}`, `nettete` `{support, niveau}`, `metadonnees`, `sans_lieu`, `resolution`), `jetons?`, `texte_perso?`, `sequence?`, `suite?`, `confirme` | `dossier`, `format`, `fichiers` : par photo, `chemin`, `octets`, `depuis_apercu_dynamique`, `reimportee` (id), ou `erreur` ; voir Livraison |
+| `exporter` | `photos`, `dossier` (sauf `reimporter = pile`), `sous_dossier?`, `reglages` (`format`, `qualite`, `espace`, `profondeur`, `hdr`, `compatibilite`, `sans_perte`, `poids_max_ko`, `filigrane`, `reimporter` (`catalogue`, `pile`), `position_pile`, `taille` `{type, valeur}`, `nettete` `{support, niveau}`, `metadonnees`, `sans_lieu`, `resolution`), `jetons?`, `texte_perso?`, `sequence?`, `suite?`, `confirme` | `dossier`, `format`, `fichiers` : par photo, `chemin`, `octets`, `depuis_apercu_dynamique`, `reimportee` (id), `empilee`, `pas_encore_au_catalogue` ou `pas_encore_empilee`, ou `erreur` ; voir Livraison |
 | `fenetreExport` | `photos?` ou `selection?` | `ouverte`, `photos` : la fenêtre d'exportation de Lightroom, photos sélectionnées |
 | `livraison` | — | `modeles_noms`, `presets_metadonnees` (nom, id), `services_publication` (id, nom, module ; `reglages` d'un service Disque dur, clés `LR_…`) |
 | `choisirDossier` | `titre?`, `depart?`, `attente?` | `dossier`, ou `annule`, ou `en_attente` (la fenêtre attend l'utilisateur ; la commande suivante relit son choix) |
 | `nomsFichiers` | `photos?` ou `selection?`, `modele` (nom), `texte_perso?`, `sequence?` | `modele`, `noms` (20 au plus : photo, `nom` sans l'extension, ou `erreur`) |
 | `apercusDynamiques` | `photos?` ou `selection?`, `retirer?` | `crees`, `existants`, `echecs`, `sans_original`, `retires`, `absents`, `taille_mo` |
-| `retirerReimportees` | `chemins` | `retires` : recette seulement ; fichiers que le module vient de réimporter (même session, 30 min) |
+| `retirerReimportees` | `chemins` | `retires`, `pas_au_catalogue` (inscrits, pas encore ajoutés par Lightroom : rien à retirer, ils restent inscrits) : recette seulement ; fichiers que le module vient de réimporter (inscrits dès l'exportation, même session, 30 min) |
 | `importerGeneree` (29 octobre 2026) | `photo` (id de la photo d'origine ; sans lui, la photo active), `chemin` (le TIFF final, sous `<racine>/Temporaire/Fibo/`), `nom` (nom de base proposé, sans extension), `consigne` (le texte français des modifications, et la raison, pour le journal), `confirme` | `{id, fichier, chemin, empilee, active}` (plus `essai` pour une photo d'essai, `copie_virtuelle` et `photo_fibo` sous « Copies virtuelles seulement ») : la photo de Fibo 2 copiée dans le dossier de l'original et ajoutée au catalogue, empilée au-dessus de lui (une photo d'essai : dans Développeur › Essais, sans pile) ; rejouée une seule fois, et seulement si elle n'a pas été livrée (`.unreachable`), jamais après un délai ni une coupure (voir Retouche générative par Fibo 2) |
 | `masques` | `photo?`, `action` (`lister`, `masquer`, `afficher`, `retirer`, `dupliquer`, `recalculer`, `affiner`, `retirer_vides`), `masque?`, `inverser?`, `nom?`, `contour?`, `decalage?`, `etape`, `raison?`, `confirme` | `lister` : `photo`, `masques` ; sinon `resultats` comme `appliquer`, et `masques` (la liste après l'écriture) ; voir Masques : pistes de la 2.1 |
 | `progression` | `id`, `titre?`, `fait?`, `total?`, `message?`, `fin?` | `annulee` (croix de la barre de Lightroom), `fermee` à la fin |
@@ -9342,7 +9342,9 @@ Réimportation : `LR_reimportExportedPhoto`, `LR_reimport_stackWithOriginal` et
 qu'avec « Même dossier que la photo originale » (`ExportLocationSection` : `canStackWithOriginal`
 quand `export_destinationType = 'sourceFolder'`) : empilée, la livraison va dans le dossier de
 l'original. Lightroom ajoute le fichier au catalogue après le rendu (`AgExportRendition` : `post`) ;
-le module le retrouve par `findPhotoByPath` (10 s au plus). Constaté : un TIFF de la copie d'essai
+le module le retrouve par `findPhotoByPath` (`Livraison.ATTENTE_REIMPORT`, 40 s au plus, sous la
+réponse d'attente de 50 s de `FileOutils` ; le délai de la commande `exporter` est de 15 minutes),
+et attend aussi l'empilement demandé (`isInStackInFolder`). Constaté : un TIFF de la copie d'essai
 RAW est ajouté (photo 53664756) et empilé sous l'original (pile de 3 : original, copie, TIFF) ;
 réimporté dans un dossier neuf, le fichier ajoute aussi ce dossier au catalogue (panneau
 Dossiers), qu'aucune fonction du SDK ne retire : la recette passe donc par l'empilement.
@@ -9350,6 +9352,22 @@ Dossiers), qu'aucune fonction du SDK ne retire : la recette passe donc par l'emp
 chemin exact, réimporté par le module dans la même session, 30 min au plus), par
 `LrSelection.removeFromCatalog` (SDK 14.3), la photo seule sélectionnée : constaté, retirée sans
 fenêtre en 0,5 s ; le fichier va ensuite à la Corbeille.
+
+Constaté dans Lightroom Classic 16.0 le 10 novembre 2026, Lightroom très occupé par un tri assisté
+de 20 000 photos : la recette a exporté DSCF2402.tif à côté de l'original, mais la réponse portait
+`reimportees: []` et `a_savoir` disait pourtant « Fichiers ajoutés au catalogue, empilés avec leur
+original » ; plusieurs minutes après, le TIFF n'était toujours pas au catalogue. Une heure avant,
+une première recette avait échoué par « pas empilée avec l'original » (photo trouvée, pas encore
+empilée). Depuis : le module attend 40 s (au lieu de 10) la photo, et son empilement quand il est
+demandé ; il inscrit chaque fichier livré à réimporter dès l'exportation (`retirerReimportees` en
+retire aussi un arrivé tard ; un fichier pas encore là revient dans `pas_au_catalogue`) ; il marque
+`pas_encore_au_catalogue` ou `pas_encore_empilee`. Le serveur sépare dans `a_savoir` les fichiers
+ajoutés (et empilés) de ceux que Lightroom n'a pas encore ajoutés (« il les ajoutera plus tard,
+empilés avec leur original ; les voir avec find_photos »), avec leurs chemins dans `en_attente` (et
+`pas_encore_empilees`). La recette attend la photo réimportée et empilée (`find_photos` toutes les
+5 s, 2 minutes au plus), puis, réussie ou non, retire le fichier du catalogue et le met à la
+Corbeille ; l'échec dit ce qui manquait. Simulé (`S.delaiReimport`, `S.delaiEmpilement`) :
+`essais-reimportation.lua` ; serveur et recette : `Version25Tests`.
 
 Aperçus dynamiques : `catalog:buildSmartPreviews(photos)` rend `created`, `existed`, `failed`
 (Lightroom montre sa barre de progression) ; `photo:deleteSmartPreview()` rend `deleted`. Le

@@ -906,19 +906,65 @@ public final class Recette {
             try verifier(retire["retires"]?.array?.count == 1, "pas retiré : \(JSONCoding.line(retire))")
             return "créé (\(Self.nombre(cree["taille_mo"]?.double ?? 0)) Mo), puis retiré"
         }
+        try etapeTiffReimporte(id, photo, depart: depart)
+    }
+
+    /// Attente de la photo réimportée et empilée (find_photos répété) : Lightroom, très occupé,
+    /// l'ajoute au catalogue et l'empile bien après la réponse d'export_photos (constaté le
+    /// 10 novembre 2026, Lightroom Classic 16.0, pendant un tri assisté de 20 000 photos).
+    static let attenteReimportation: TimeInterval = 120
+    static let pauseReimportation: TimeInterval = 5
+
+    /// TIFF réimporté et empilé avec l'original, puis retiré du catalogue et mis à la Corbeille.
+    /// Dans tous les cas, même en échec, le fichier livré à côté de l'original de Dany est retiré
+    /// du catalogue (retirerReimportees) et mis à la Corbeille : rien n'y reste.
+    func etapeTiffReimporte(_ id: Int, _ photo: String, depart: Etat) throws {
         try etape(photo, "TIFF réimporté, empilé avec l'original, puis retiré du catalogue et mis à la Corbeille") {
-            let (reponse, _) = try appel("export_photos", ["photo_ids": [photoID], "format": "tiff", "long_edge": 600, "reimport": "stack", "confirm": true])
-            guard let fichier = reponse["fichiers"]?.array?.first?["fichier"]?.string, let nouvelle = reponse["reimportees"]?.array?.first?["id"]?.int else {
-                throw Echec(description: "rien de réimporté : \(JSONCoding.line(reponse))")
+            let (reponse, _) = try appel("export_photos", ["photo_ids": [.number(Double(id))], "format": "tiff", "long_edge": 600, "reimport": "stack", "confirm": true])
+            guard let fichier = reponse["fichiers"]?.array?.first?["fichier"]?.string else {
+                throw Echec(description: "rien d'exporté : \(JSONCoding.line(reponse))")
             }
-            let dossierOriginal = (fichier as NSString).deletingLastPathComponent
-            let (pile, _) = try appel("find_photos", ["folder": .string(dossierOriginal), "text": .string(((fichier as NSString).lastPathComponent as NSString).deletingPathExtension), "limit": 20])
-            let empilee = (pile["photos"]?.array ?? []).first { $0["id"]?.int == nouvelle }?["pile"]
-            _ = try tools.lightroom.send("retirerReimportees", ["chemins": [.string(fichier)]], timeout: 60)
-            try FileManager.default.trashItem(at: URL(fileURLWithPath: fichier), resultingItemURL: nil)
+            let nom = (fichier as NSString).lastPathComponent
+            var nouvelle = reponse["reimportees"]?.array?.first?["id"]?.int
+            var empilee: JSONValue?
+            var erreurAttente: Error?
+            do {
+                let dossierOriginal = (fichier as NSString).deletingLastPathComponent
+                let essais = max(Int((Self.attenteReimportation / Self.pauseReimportation).rounded(.up)), 1)
+                for essai in 0...essais {
+                    if essai > 0 { attendre(Self.pauseReimportation) }
+                    let (pile, _) = try appel("find_photos", ["folder": .string(dossierOriginal), "text": .string((nom as NSString).deletingPathExtension), "limit": 20])
+                    let trouvee = (pile["photos"]?.array ?? []).first { nouvelle != nil ? $0["id"]?.int == nouvelle : $0["fichier"]?.string == nom }
+                    if let trouvee {
+                        nouvelle = trouvee["id"]?.int
+                        if let lue = trouvee["pile"], lue != .null { empilee = lue; break }
+                    }
+                }
+            } catch {
+                erreurAttente = error
+            }
+            // Le ménage, quoi qu'il arrive : retiré du catalogue (s'il y est), puis à la Corbeille.
+            var menage: [String] = []
+            var retrait: JSONValue?
+            do {
+                retrait = try tools.lightroom.send("retirerReimportees", ["chemins": [.string(fichier)]], timeout: 60)
+            } catch {
+                menage.append("pas retiré du catalogue (\(error))")
+            }
+            if FileManager.default.fileExists(atPath: fichier) {
+                do { try FileManager.default.trashItem(at: URL(fileURLWithPath: fichier), resultingItemURL: nil) }
+                catch { menage.append("pas mis à la Corbeille (\(error.localizedDescription))") }
+            }
+            let resteAuCatalogue = retrait?["pas_au_catalogue"]?.array?.isEmpty == false
+            if let erreurAttente { throw Echec(description: "\(erreurAttente)" + (menage.isEmpty ? "" : " ; " + menage.joined(separator: " ; "))) }
+            guard menage.isEmpty else { throw Echec(description: "\(nom) : " + menage.joined(separator: " ; ")) }
             try verifierEgal(try etat(id), depart)
-            try verifier(empilee != nil && empilee != .null, "pas empilée avec l'original")
-            return "\((fichier as NSString).lastPathComponent) empilé (\(empilee?["photos"]?.int ?? 0) photos dans la pile), puis retiré et mis à la Corbeille"
+            let minutes = Self.nombre(Self.attenteReimportation / 60)
+            try verifier(nouvelle != nil && !resteAuCatalogue,
+                         "\(nom) pas encore au catalogue après \(minutes) min (Lightroom occupé) ; fichier mis à la Corbeille"
+                         + (resteAuCatalogue ? ", Lightroom pourra encore l'ajouter : le retirer du catalogue à la main s'il apparaît" : ""))
+            try verifier(empilee != nil, "\(nom) au catalogue, mais pas empilé avec l'original après \(minutes) min ; retiré et mis à la Corbeille")
+            return "\(nom) empilé (\(empilee?["photos"]?.int ?? 0) photos dans la pile), puis retiré et mis à la Corbeille"
         }
     }
 

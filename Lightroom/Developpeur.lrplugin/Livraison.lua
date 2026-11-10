@@ -239,29 +239,62 @@ local genereesSession = {}
 
 local DUREE_RETRAIT = 30 * 60
 
+-- Attente des fichiers réimportés, en secondes : sous la réponse d'attente de 50 s du serveur
+-- (FileOutils ; le délai de la commande exporter, lui, est de 15 minutes). Constaté le 10 novembre
+-- 2026 (Lightroom Classic 16.0, très occupé par un tri assisté de 20 000 photos) : le TIFF réimporté
+-- n'était pas au catalogue au bout des 10 s d'avant, ni plusieurs minutes plus tard ; une heure
+-- plus tôt, la photo trouvée n'était pas encore empilée.
+Livraison.ATTENTE_REIMPORT = 40
+
+-- Vrai si la photo est dans une pile de son dossier (isInStackInFolder, lu comme Photos.decrire).
+local function dansUnePile(photo)
+    local ok, empilee = LrTasks.pcall(photo.getRawMetadata, photo, 'isInStackInFolder')
+    return ok and empilee == true
+end
+
 -- Les fichiers réimportés : Lightroom les ajoute au catalogue après le rendu (AgExportRendition :
--- post), un peu plus tard. Renvoie l'identifiant de chacun, trouvé par son chemin.
-local function photosReimportees(entrees)
+-- post), plus tard, et les empile ensuite avec leur original ; occupé, bien plus tard. Chaque fichier
+-- est inscrit dans reimporteesSession dès l'exportation (retirerReimportees retire aussi celui qui
+-- arrive après la réponse). Renvoie l'identifiant de chacun, trouvé par son chemin, attendu
+-- Livraison.ATTENTE_REIMPORT secondes au plus (empilé aussi, avec empiler) ; sinon il est marqué
+-- pas_encore_au_catalogue, ou pas_encore_empilee.
+local function photosReimportees(entrees, empiler)
     local cat = Photos.catalogue()
-    local fin = LrDate.currentTime() + 10
+    for _, entree in ipairs(entrees) do
+        if entree.chemin then
+            reimporteesSession[entree.chemin] = LrDate.currentTime()
+        end
+    end
+    local fin = LrDate.currentTime() + Livraison.ATTENTE_REIMPORT
+    local manquantes
     repeat
-        local manquantes = 0
+        manquantes = 0
         for _, entree in ipairs(entrees) do
-            if entree.chemin and not entree.reimportee then
+            if entree.chemin and not (entree.reimportee and (entree.empilee or not empiler)) then
                 local ok, photo = LrTasks.pcall(cat.findPhotoByPath, cat, entree.chemin)
                 if ok and photo then
                     entree.reimportee = photo.localIdentifier
-                    reimporteesSession[entree.chemin] = LrDate.currentTime()
-                else
+                    if empiler and dansUnePile(photo) then
+                        entree.empilee = true
+                    end
+                end
+                if not entree.reimportee or (empiler and not entree.empilee) then
                     manquantes = manquantes + 1
                 end
             end
         end
         if manquantes == 0 then
-            return
+            break
         end
         LrTasks.sleep(0.5)
     until LrDate.currentTime() > fin
+    for _, entree in ipairs(entrees) do
+        if entree.chemin and not entree.reimportee then
+            entree.pas_encore_au_catalogue = true
+        elseif entree.chemin and empiler and not entree.empilee then
+            entree.pas_encore_empilee = true
+        end
+    end
 end
 
 -- Retouche générative (Fibo 2) : le dossier de passage des fichiers, <racine>/Temporaire/Fibo, que
@@ -451,7 +484,7 @@ function Livraison.exporter(params)
         fichiers[#fichiers + 1] = entree
     end
     if reglages.LR_reimportExportedPhoto then
-        photosReimportees(livrees)
+        photosReimportees(livrees, reglages.LR_reimport_stackWithOriginal == true)
     end
     if pourFibo then
         -- Exportée pour Fibo 2 : l'accord de cette exportation vaudra pour son importation. Ce n'est
@@ -786,11 +819,13 @@ end
 -- Recette seulement (pas d'outil) : retire du catalogue les fichiers que le module vient d'y
 -- réimporter, par leur chemin exact, dans la même session et dans les 30 minutes
 -- (LrSelection.removeFromCatalog, SDK 14.3, sur la photo seule sélectionnée). Le fichier reste sur
--- le disque : la recette l'efface ensuite.
+-- le disque : la recette l'efface ensuite. Un fichier livré que Lightroom, occupé, n'a pas encore
+-- ajouté au catalogue (constaté le 10 novembre 2026) n'a rien à retirer : il va dans
+-- pas_au_catalogue et reste inscrit (un appel suivant le retire s'il arrive entre-temps).
 function Livraison.retirerReimportees(params)
     local cat = Photos.catalogue()
     local LrSelection = import 'LrSelection'
-    local retires = Json.tableau()
+    local retires, absents = Json.tableau(), Json.tableau()
     -- La vue d'avant, remise à la fin (même après un échec) : sans elle, la photo active restait une
     -- photo du dossier de la photo retirée (constaté le 21 octobre 2026 après la recette).
     local vue = { active = cat:getTargetPhoto(), selection = cat:getTargetPhotos() }
@@ -826,9 +861,11 @@ function Livraison.retirerReimportees(params)
                 if encore then
                     echouer("Lightroom n'a pas retiré « " .. chemin .. " » du catalogue.")
                 end
+                reimporteesSession[chemin] = nil
+                retires[#retires + 1] = chemin
+            else
+                absents[#absents + 1] = chemin
             end
-            reimporteesSession[chemin] = nil
-            retires[#retires + 1] = chemin
         end
     end)
     if selectionChangee then
@@ -837,7 +874,7 @@ function Livraison.retirerReimportees(params)
     if not ok then
         error(erreur, 0)
     end
-    return { retires = retires }
+    return { retires = retires, pas_au_catalogue = absents }
 end
 
 -- Dernier recours : la fenêtre d'exportation de Lightroom, photos sélectionnées ; l'utilisateur

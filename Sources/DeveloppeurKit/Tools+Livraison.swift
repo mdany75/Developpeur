@@ -13,6 +13,30 @@ extension ToolHandler {
     static let maxExportedPhotos = 500
     static let exportTimeout: TimeInterval = 900
 
+    /// Ce que dit export_photos d'une réimportation. Lightroom ajoute les fichiers réimportés au
+    /// catalogue après le rendu, puis les empile ; très occupé, bien plus tard que les 40 s
+    /// d'attente du module (constaté le 10 novembre 2026, Lightroom Classic 16.0 : la réponse
+    /// disait « ajoutés, empilés » pour un TIFF qui n'était pas au catalogue). Chaque groupe dit ce
+    /// qui est vrai de lui seul.
+    static func aSavoirReimportees(ajoutes: Int, nonEmpilees: Int, enAttente: Int, empiler: Bool) -> String {
+        func n(_ nombre: Int, _ mot: String) -> String { "\(nombre) \(mot)\(nombre > 1 ? "s" : "")" }
+        var phrases: [String] = []
+        let empiles = ajoutes - nonEmpilees
+        if empiler {
+            if empiles > 0 { phrases.append("\(n(empiles, "fichier")) ajouté\(empiles > 1 ? "s" : "") au catalogue, empilé\(empiles > 1 ? "s" : "") avec leur original.") }
+            if nonEmpilees > 0 {
+                phrases.append("\(n(nonEmpilees, "fichier")) ajouté\(nonEmpilees > 1 ? "s" : "") au catalogue, mais pas encore empilé\(nonEmpilees > 1 ? "s" : "") (pas_encore_empilees) : Lightroom, occupé, les empilera avec leur original plus tard.")
+            }
+        } else if ajoutes > 0 {
+            phrases.append("\(n(ajoutes, "fichier")) ajouté\(ajoutes > 1 ? "s" : "") au catalogue.")
+        }
+        if enAttente > 0 {
+            phrases.append("\(n(enAttente, "fichier")) livré\(enAttente > 1 ? "s" : "") que Lightroom, occupé, n'a pas encore ajouté\(enAttente > 1 ? "s" : "") au catalogue (en_attente) : il les ajoutera plus tard\(empiler ? ", empilés avec leur original" : "") ; les voir avec find_photos.")
+        }
+        phrases.append("Au catalogue, ils y restent (undo_last ne les retire pas ; Photo › Retirer du catalogue, à la main).")
+        return phrases.joined(separator: " ")
+    }
+
     /// Une livraison type : les réglages d'un service de publication « Disque dur » de
     /// l'utilisateur (lus dans Lightroom), ou, sans ces services, l'un des deux profils par défaut.
     /// Chaque réglage donné à l'appel l'emporte.
@@ -264,6 +288,8 @@ extension ToolHandler {
         commun["confirme"] = .bool(args.bool("confirm") ?? false)
 
         var fichiers: [JSONValue] = [], echecs: [JSONValue] = [], reimportees: [JSONValue] = []
+        // Réimportés que Lightroom, occupé, n'a pas encore ajoutés au catalogue (ou pas encore empilés).
+        var enAttente: [JSONValue] = [], nonEmpilees: [JSONValue] = []
         var octets = 0.0
         var depuisApercus = 0
         var lourds: [String] = []
@@ -301,7 +327,16 @@ extension ToolHandler {
                         depuisApercus += 1
                     }
                     fichiers.append(.object(fichier))
-                    if let id = item["reimportee"]?.int { reimportees.append(["fichier": .string(chemin), "id": .number(Double(id))]) }
+                    if let id = item["reimportee"]?.int {
+                        var reimportee: [String: JSONValue] = ["fichier": .string(chemin), "id": .number(Double(id))]
+                        if item["pas_encore_empilee"]?.bool == true {
+                            reimportee["pas_encore_empilee"] = true
+                            nonEmpilees.append(.string(chemin))
+                        }
+                        reimportees.append(.object(reimportee))
+                    } else if item["pas_encore_au_catalogue"]?.bool == true {
+                        enAttente.append(.string(chemin))
+                    }
                 } else {
                     echecs.append(["photo": item["photo"]?["fichier"] ?? .null, "raison": item["erreur"] ?? .null])
                 }
@@ -326,7 +361,10 @@ extension ToolHandler {
         }
         if reglages["reimporter"] != nil {
             resultat["reimportees"] = .array(reimportees)
-            resultat["a_savoir"] = .string("Fichiers ajoutés au catalogue\(empiler ? ", empilés avec leur original" : "") : ils y restent (undo_last ne les retire pas ; Photo › Retirer du catalogue, à la main).")
+            resultat["a_savoir"] = .string(Self.aSavoirReimportees(ajoutes: reimportees.count, nonEmpilees: nonEmpilees.count,
+                                                                   enAttente: enAttente.count, empiler: empiler))
+            if !enAttente.isEmpty { resultat["en_attente"] = .array(enAttente) }
+            if !nonEmpilees.isEmpty { resultat["pas_encore_empilees"] = .array(nonEmpilees) }
         }
         if let limite = reglages["poids_max_ko"]?.double, !lourds.isEmpty {
             resultat["au_dessus_du_poids"] = .string("\(lourds.count) fichier\(lourds.count > 1 ? "s" : "") au-dessus de \(Int(limite)) Ko (\(lourds.prefix(5).joined(separator: ", "))) : Lightroom livre alors le plus petit fichier possible à cette taille ; réduire long_edge pour tenir la limite.")
