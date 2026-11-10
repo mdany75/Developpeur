@@ -70,7 +70,7 @@ local AVANT = {
 
 -- Les traces d'une liste mal recollée.
 local function propre(message, quoi)
-    for _, motif in ipairs({ ' ,', ', ,', ': ,', ': ;', ': %.', ' ;;', '%(%)', '%( ', ' %)', '  ', ',%.', ';%.', ' %.' }) do
+    for _, motif in ipairs({ ' ,', ', ,', ': ,', ': ;', ': %.', ' ;;', '%(%)', '%( ', ' %)', '  ', ',%.', ';%.', ' %.', 'et puis', ': puis' }) do
         vrai(not message:find(motif), string.format('%s : « %s » dans %q', quoi, motif, message))
     end
 end
@@ -166,9 +166,23 @@ essai('Une étape à Non : son texte retiré, et dite à Claude (« Ne fais pas 
     -- le message à Oui : à Non, elle est dite.
     egal("Retouche la photo active comme un professionnel : diagnostic chiffré, deux passes vérifiées, puis au plus deux passes correctives si un défaut reste. "
         .. Consignes.NE_PAS_FAIRE .. "recadrer. " .. Consignes.LIRE_GUIDE, Consignes.message('retouche_pro', { recadrer = false }))
-    -- Le grain du noir et blanc : la liste se finit sans lui.
-    egal("Passe la photo active en noir et blanc : profil, mélangeur, contraste local, et puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape. "
+    -- Le grain du noir et blanc : la liste se finit sans lui, sans « et puis » (le tireur porte déjà
+    -- son « puis »).
+    egal("Passe la photo active en noir et blanc : profil, mélangeur, contraste local, puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape. "
         .. Consignes.NE_PAS_FAIRE .. "ajouter du grain. " .. Consignes.LIRE_GUIDE, Consignes.message('noir_et_blanc', { grain = false }))
+    -- Le tireur seul (toutes les autres étapes à Non) : il ouvre la liste, sans « puis ».
+    contient(Consignes.message('portrait', { peau = false, yeux = false, dents = false, arriere_plan = false, flou = false }),
+        "Retouche ce portrait : éclaircis et assombris comme un tireur pour mener l'œil au visage")
+    contient(Consignes.message('paysage', { horizon = false, ciel = false, profondeur = false, masques = false }),
+        "Retouche ce paysage : éclaircis et assombris")
+    contient(Consignes.message('noir_et_blanc', { profil = false, melangeur = false, contraste_local = false, grain = false }),
+        "Passe la photo active en noir et blanc : éclaircis et assombris")
+    contient(Consignes.message('retouche_pro', { diagnostic = false, deux_passes = false }),
+        "comme un professionnel : au plus deux passes correctives")
+    -- Le style choisi (menu Style) est nommé : sa recette ne l'emporte pas sur une étape à Non
+    -- (« Or et peau douce » adoucit la peau, Portrait › peau à Non).
+    contient(Consignes.NE_PAS_FAIRE, "le style choisi", 'le style choisi ne passe pas outre')
+    contient(Consignes.message('portrait', { peau = false }), "mon guide de style ou le style choisi le prévoit : toucher à la peau")
     -- Deux étapes à Non : dites dans l'ordre des étapes.
     contient(Consignes.message('iso_eleve', { nettete = false, bruit = false }),
         "Retouche cette photo prise à ISO élevé : les ombres et les couleurs, sans lisser les détails. " .. Consignes.NE_PAS_FAIRE .. "débruiter (enhance_photo) ; toucher à la netteté.")
@@ -215,6 +229,21 @@ essai("Le résumé dit à quoi sert l'invite, ce qu'elle fera et ce qu'elle ne f
     contient(r, 'guide de style')
     vrai(not Consignes.resume('portrait', {}):find('Ne fera pas', 1, true), 'tout à Oui : rien à ne pas faire')
     vrai(not Consignes.resume('composition', {}):find('guide de style', 1, true), 'Composition ne lit pas le guide')
+    -- Proposer et appliquer fait lire le guide (Obtenir et les deux messages de la Demande rapide) :
+    -- son résumé le dit.
+    for _, m in ipairs({ Consignes.demandeObtenir({}), Consignes.proposerAppliquerRapide('appliquer', false, {}),
+        Consignes.proposerAppliquerRapide('proposer', true, {}) }) do
+        contient(m, Consignes.LIRE_GUIDE, 'Proposer et appliquer lit le guide')
+    end
+    contient(Consignes.resume('proposer_appliquer', {}), "Lit d'abord votre guide de style.", 'le résumé de Proposer et appliquer')
+    -- Et chaque invite dont un message lit le guide le dit, les autres non.
+    for _, invite in ipairs(Consignes.configurables()) do
+        local lit = false
+        for _, v in ipairs(Consignes.variantes(invite.id, {})) do
+            lit = lit or v.message:find(Consignes.LIRE_GUIDE, 1, true) ~= nil
+        end
+        egal(lit, Consignes.resume(invite.id, {}):find('guide de style', 1, true) ~= nil, invite.id .. ' : le guide dit au résumé')
+    end
 end)
 
 -- Fichier invites.json --------------------------------------------------------------------------------
@@ -230,7 +259,9 @@ essai('Fichier : absent ou illisible, tout à Oui sans erreur ; une valeur qui n
         end
     end
     toutOui('absent')
-    for _, texte in ipairs({ '{"format":1,"invites":{"portrait":', 'pas du JSON', '[]', '{"format":1}', '{"format":1,"invites":"non"}', '' }) do
+    -- Un format inconnu (un module plus récent) n'est pas lu comme le format 1.
+    for _, texte in ipairs({ '{"format":1,"invites":{"portrait":', 'pas du JSON', '[]', '{"format":1}', '{"format":1,"invites":"non"}', '',
+        '{"format":2,"invites":{"portrait":{"flou":false}}}', '{"invites":{"portrait":{"flou":false}}}' }) do
         Fichiers.ecrire(fichier, texte)
         toutOui('illisible ' .. texte)
         egal(texte, Fichiers.lire(fichier), 'le fichier n\'est pas réécrit à la lecture')
@@ -283,6 +314,132 @@ essai('Dossier commun introuvable : tout à Oui à la lecture, sans erreur ; le 
     Fichiers.supprimer(Chemins.pointeur())
 end)
 
+-- Les entrées du journal pendant `fn` (Journal.noter, que Consignes appelle à chaque fois).
+local function journal(fn)
+    local Journal = require 'Journal'
+    local avant, lignes = Journal.noter, {}
+    Journal.noter = function(...)
+        local morceaux = {}
+        for i = 1, select('#', ...) do
+            morceaux[#morceaux + 1] = tostring((select(i, ...)))
+        end
+        lignes[#lignes + 1] = table.concat(morceaux, ' ')
+    end
+    local ok, erreur = pcall(fn)
+    Journal.noter = avant
+    assert(ok, erreur)
+    return lignes
+end
+
+-- Les copies mises de côté (invites-illisible-*.json), avec leur contenu.
+local function misesDeCote()
+    local liste = {}
+    for _, nom in ipairs(Fichiers.entrees(Chemins.donnees())) do
+        local chemin = Chemins.donnee(nom)
+        if nom:find('^invites%-illisible%-') then
+            liste[#liste + 1] = { nom = nom, contenu = Fichiers.lire(chemin), chemin = chemin }
+        end
+    end
+    return liste
+end
+
+local function retirerMisesDeCote()
+    for _, m in ipairs(misesDeCote()) do
+        Fichiers.supprimer(m.chemin)
+    end
+end
+
+essai("Fichier illisible ou d'un format inconnu : mis de côté (invites-illisible-<date>.json, dans les données) avant la première écriture, jamais écrasé ; rien d'effacé", function()
+    remettre()
+    retirerMisesDeCote()
+    vrai(Chemins.estDonnee('invites-illisible-1700000000.json'), 'la copie suit le dossier commun, comme celles du carnet et du Suivi')
+    -- Coupé (copie du SSD interrompue) : le premier Oui ou Non le met de côté, puis écrit le choix.
+    local coupe = '{"format":1,"invites":{"portrait":{"flou":false},"classer":{"lie'
+    Fichiers.ecrire(fichier, coupe)
+    egal(true, Consignes.poserChoix('paysage', { ciel = false }))
+    local copies = misesDeCote()
+    egal(1, #copies, 'une copie mise de côté')
+    egal(coupe, copies[1].contenu, 'son contenu gardé tel quel')
+    egal(false, Consignes.choix('paysage').ciel, 'le nouveau choix écrit')
+    egal(1, Json.decode(Fichiers.lire(fichier)).format)
+    -- Un format inconnu (un module plus récent) : ni lu comme le format 1, ni écrasé.
+    local futur = '{"format":2,"invites":{"portrait":{"flou":false}},"autre":true}'
+    Fichiers.ecrire(fichier, futur)
+    egal(true, Consignes.choix('portrait').flou, 'format inconnu : tout à Oui')
+    egal(true, Consignes.choix('paysage').ciel, 'format inconnu : rien n\'en est lu')
+    egal(true, Consignes.poserChoix('classer', { lieu = false }))
+    copies = misesDeCote()
+    egal(2, #copies, 'une deuxième copie, sous un autre nom')
+    vrai(copies[1].nom ~= copies[2].nom, 'jamais le nom d\'une copie qui existe')
+    vrai(copies[1].contenu == futur or copies[2].contenu == futur, 'le format inconnu gardé tel quel')
+    egal(false, Consignes.choix('classer').lieu)
+    -- Lisible : rien de plus n'est mis de côté.
+    egal(true, Consignes.poserChoix('classer', { lieu = true }))
+    egal(2, #misesDeCote(), 'un fichier lisible n\'est pas mis de côté')
+    -- Vide : rien à garder, il est remplacé.
+    Fichiers.ecrire(fichier, '')
+    egal(true, Consignes.poserChoix('portrait', { dents = false }))
+    egal(2, #misesDeCote(), 'un fichier vide n\'a rien à garder')
+    egal(false, Consignes.choix('portrait').dents)
+    -- Qui ne se laisse pas mettre de côté : rien n'est écrit, il reste tel quel, et la raison est dite.
+    Fichiers.ecrire(fichier, coupe)
+    local renommer, deplacer = os.rename, S.modules.LrFileUtils.move
+    os.rename = function() return nil end
+    S.modules.LrFileUtils.move = function() return false end
+    local ok, pose, pourquoi = pcall(Consignes.poserChoix, 'portrait', { flou = false })
+    os.rename, S.modules.LrFileUtils.move = renommer, deplacer
+    vrai(ok, 'sans erreur : ' .. tostring(pose))
+    egal(false, pose, 'non gardé')
+    contient(pourquoi, 'illisible', 'la raison')
+    egal(coupe, Fichiers.lire(fichier), 'laissé tel quel')
+    egal(2, #misesDeCote(), 'rien de mis de côté')
+    remettre()
+    retirerMisesDeCote()
+end)
+
+essai("Journal : chaque cause dite une fois (la fenêtre lit le réglage à chaque infobulle et à chaque clic) ; le dossier commun introuvable est dit comme tel", function()
+    remettre()
+    Consignes.lireReglages() -- absent : les causes déjà dites sont oubliées
+    Fichiers.ecrire(fichier, 'pas du JSON')
+    local lignes = journal(function()
+        for _ = 1, 7 do
+            Consignes.lireReglages()
+            Consignes.message('portrait')
+        end
+    end)
+    egal(1, #lignes, 'une seule entrée pour sept lectures : ' .. table.concat(lignes, ' | '))
+    contient(lignes[1], 'illisible')
+    -- Une autre cause : dite à son tour, une fois.
+    Fichiers.ecrire(fichier, '{"format":9,"invites":{}}')
+    lignes = journal(function()
+        for _ = 1, 3 do
+            Consignes.lireReglages()
+        end
+    end)
+    egal(1, #lignes)
+    contient(lignes[1], 'format inconnu')
+    -- Lu de nouveau : la même panne, plus tard, est dite de nouveau.
+    remettre()
+    Consignes.lireReglages()
+    Fichiers.ecrire(fichier, 'pas du JSON')
+    egal(1, #journal(function() Consignes.lireReglages() end), 'dite de nouveau après une lecture réussie')
+    remettre()
+    -- Le dossier commun introuvable : ni « illisible », ni plusieurs fois.
+    local absent = S.home .. '/Volumes/Photos débranché/Développeur IA'
+    Fichiers.ecrire(Chemins.pointeur(), Json.encode({ format = 1, dossier = absent }))
+    lignes = journal(function()
+        for _ = 1, 5 do
+            Consignes.lireReglages()
+            Consignes.message('classer')
+        end
+    end)
+    Fichiers.supprimer(Chemins.pointeur())
+    egal(1, #lignes, 'une fois : ' .. table.concat(lignes, ' | '))
+    contient(lignes[1], 'dossier commun introuvable')
+    vrai(not lignes[1]:find('illisible', 1, true), 'pas « illisible »')
+    remettre()
+end)
+
 -- Une seule configuration pour la fenêtre Claude et la Demande rapide ------------------------------
 
 essai("La même configuration pour la fenêtre Claude et la Demande rapide : Retouche pro, Portrait, Classer, Noter, Proposer et appliquer, relus au clic", function()
@@ -315,8 +472,23 @@ essai("La même configuration pour la fenêtre Claude et la Demande rapide : Ret
     vrai(not Consignes.demandeObtenir():find(', TSL,', 1, true), 'Obtenir suit Proposer et appliquer')
     vrai(not Consignes.proposerAppliquerRapide('appliquer', false):find(', TSL,', 1, true), 'Proposer et appliquer, mode Appliquer')
     vrai(not Consignes.proposerAppliquerRapide('proposer', true):find(', TSL,', 1, true), "Proposer et appliquer, « Proposer d'abord »")
+    -- Les infobulles des cinq boutons, faites à l'ouverture de la fenêtre (FenetreRapide.infobulle),
+    -- montrent le réglage : le message de Retouche pro et de Portrait, ce que les autres ne feront pas.
+    contient(FenetreRapide.infobulle(A[2]), Consignes.message('retouche_pro'), 'infobulle de Retouche pro')
+    contient(FenetreRapide.infobulle(A[2]), Consignes.NE_PAS_FAIRE .. 'recadrer.')
+    contient(FenetreRapide.infobulle(A[3]), Consignes.message('portrait'), 'infobulle de Portrait')
+    contient(FenetreRapide.infobulle(A[3]), 'blanchir les dents')
+    contient(FenetreRapide.infobulle(A[1]), 'ne fera pas : Noter aussi les photos déjà évaluées.', 'infobulle de Noter')
+    contient(FenetreRapide.infobulle(A[4]), "ne fera pas : Lieu, seulement s'il est sûr (jamais deviné).", 'infobulle de Classer')
+    contient(FenetreRapide.infobulle(A[5]), 'ne fera pas : Mélangeur TSL.', 'infobulle de Proposer et appliquer')
     remettre()
     egal(AVANT.classerRapide, A[4].message(), 'fichier retiré : de nouveau comme à l\'origine')
+    -- Sans réglage : les infobulles d'origine, sans rien de plus.
+    contient(FenetreRapide.infobulle(A[2]), AVANT.retouche_pro)
+    contient(FenetreRapide.infobulle(A[3]), AVANT.portrait)
+    for i = 1, 5 do
+        vrai(not FenetreRapide.infobulle(A[i]):find('ne fera pas', 1, true), 'bouton ' .. i .. ' : rien à ne pas faire')
+    end
 end)
 
 -- Section Invites du Gestionnaire de modules externes ------------------------------------------------
@@ -410,6 +582,130 @@ essai("Gestionnaire, section Invites (la dernière) : menu des invites, un nombr
     egal(nil, Fichiers.existe(fichier) or nil, 'rien d\'écrit à l\'ouverture')
 end)
 
+-- Chaque combinaison de Oui et de Non d'une invite (2^n), donnée à `fn(choix)`.
+local function combinaisons(invite, fn)
+    local n = #invite.etapes
+    for m = 0, 2 ^ n - 1 do
+        local choix = {}
+        for i, e in ipairs(invite.etapes) do
+            if math.floor(m / 2 ^ (i - 1)) % 2 == 1 then
+                choix[e.id] = false
+            end
+        end
+        fn(choix)
+    end
+end
+
+essai("Gestionnaire, section Invites : chaque texte tient dans sa place (largeur en caractères × lignes) : l'introduction, chaque titre d'étape sur sa ligne, le résumé de chaque invite, tout à Oui comme avec la pire combinaison de Non", function()
+    remettre()
+    local Texte = require 'Texte'
+    local section, p = sectionInvites()
+    local titres, resume, fixes = {}, nil, {}
+    for _, v in ipairs(section) do
+        for _, x in ipairs(parGenre(v, 'static_text')) do
+            local t = x.args.title
+            if type(t) == 'table' and t.liaison and t.key:find('^etapeTitre') then
+                titres[#titres + 1] = x
+            elseif type(t) == 'table' and t.liaison and t.key == 'resumeInvite' then
+                resume = x
+            elseif type(t) == 'string' and x.args.height_in_lines then
+                fixes[#fixes + 1] = x
+            end
+        end
+    end
+    egal(Consignes.maxEtapes(), #titres, 'un titre par ligne')
+    vrai(resume, 'le résumé')
+    vrai(#fixes >= 1, "l'introduction")
+    -- Les textes fixes (l'introduction) : leurs lignes suffisent.
+    for _, x in ipairs(fixes) do
+        local largeur, lignes = x.args.width_in_chars, x.args.height_in_lines
+        vrai(largeur, 'largeur de ' .. x.args.title)
+        vrai(Texte.nombreDeLignes(x.args.title, largeur) <= lignes,
+            string.format('%d lignes à %d caractères pour %q, %d prévues', Texte.nombreDeLignes(x.args.title, largeur), largeur, x.args.title, lignes))
+    end
+    -- Chaque titre de chaque invite, sur la ligne d'un titre.
+    local largeur, lignes = titres[1].args.width_in_chars, titres[1].args.height_in_lines or 1
+    for _, x in ipairs(titres) do
+        egal(largeur, x.args.width_in_chars, 'la même largeur pour chaque ligne')
+    end
+    for _, invite in ipairs(Consignes.configurables()) do
+        for _, e in ipairs(invite.etapes) do
+            vrai(Texte.nombreDeLignes(e.titre, largeur) <= lignes and Texte.longueur(e.titre) <= largeur,
+                string.format('%s.%s : %q fait %d caractères, %d de place', invite.id, e.id, e.titre, Texte.longueur(e.titre), largeur))
+        end
+    end
+    -- Le résumé : chaque invite, chaque combinaison ; la hauteur est celle du plus long, ni moins
+    -- (coupé), ni plus (des lignes vides pour rien).
+    largeur, lignes = resume.args.width_in_chars, resume.args.height_in_lines
+    vrai(largeur and lignes, 'le résumé a sa largeur et ses lignes')
+    local plus, pire = 0, nil
+    for _, invite in ipairs(Consignes.configurables()) do
+        combinaisons(invite, function(choix)
+            local texte = Consignes.resume(invite.id, choix)
+            local n = Texte.nombreDeLignes(texte, largeur)
+            if n > plus then
+                plus, pire = n, texte
+            end
+        end)
+        egal(true, Texte.nombreDeLignes(Consignes.resume(invite.id, {}), largeur) <= lignes, invite.id .. ' : tout à Oui')
+    end
+    vrai(plus <= lignes, string.format('le plus long résumé fait %d lignes à %d caractères, %d prévues :\n%s', plus, largeur, lignes, tostring(pire)))
+    egal(plus, lignes, 'la hauteur du résumé : celle du plus long (Consignes.LIGNES_RESUME)')
+    -- La ligne « Ne fera pas », la plus utile, est dans le plus long.
+    contient(pire, 'Ne fera pas', 'le plus long a des étapes à Non')
+end)
+
+essai("Gestionnaire, « Voir le message à Claude » : chaque message que l'invite envoie, un par bouton, tel qu'il part (Retouche pro par groupes de lumière, Classer qui propose seulement, les trois de Proposer et appliquer)", function()
+    remettre()
+    local FenetreRapide = require 'FenetreRapide'
+    local A = FenetreRapide.ACTIONS
+    egal(true, Consignes.poserChoix('proposer_appliquer', { tsl = false }))
+    egal(true, Consignes.poserChoix('retouche_pro', { recadrer = false }))
+    local attendus = {
+        retouche_pro = { Consignes.message('retouche_pro'), A[2].message() },
+        portrait = { Consignes.message('portrait'), A[3].message() },
+        classer = { Consignes.message('classer'), A[4].message() },
+        noter = { A[1].message() },
+        proposer_appliquer = { Consignes.demandeObtenir(), Consignes.proposerAppliquerRapide('appliquer', false),
+            (Consignes.proposerAppliquerRapide('proposer', true)) },
+    }
+    ouvrir(function(p, contenu)
+        local menu = parGenre(contenu, 'popup_menu')[1]
+        for _, invite in ipairs(Consignes.configurables()) do
+            S.choisir(menu, invite.id)
+            local dialogues = #S.dialogues
+            S.cliquer(S.trouverBouton(contenu, 'Voir le message à Claude'))
+            egal(dialogues + 1, #S.dialogues, invite.id .. ' : une fenêtre')
+            local d = S.dialogues[#S.dialogues].contents
+            local champs = parGenre(d, 'edit_field')
+            local attendu = attendus[invite.id] or { Consignes.message(invite.id) }
+            egal(#attendu, #champs, invite.id .. ' : un message par bouton')
+            for i, m in ipairs(attendu) do
+                egal(m, champs[i].args.value, invite.id .. ' : message ' .. i)
+            end
+            local variantes = Consignes.variantes(invite.id)
+            egal(#attendu, #variantes)
+            for _, x in ipairs(parGenre(d, 'static_text')) do
+                vrai(not x.args.title:find("l'adresse à chaque photo", 1, true), invite.id .. ' : plus de phrase fausse')
+            end
+            -- Chaque message est nommé par son bouton.
+            local textes = {}
+            for _, x in ipairs(parGenre(d, 'static_text')) do
+                textes[#textes + 1] = x.args.title
+            end
+            for _, v in ipairs(variantes) do
+                contient(table.concat(textes, '\n'), v.titre, invite.id)
+            end
+        end
+    end)
+    contient(attendus.retouche_pro[2], 'par groupes de lumière', 'Retouche pro de la Demande rapide')
+    contient(attendus.classer[2], "n'appelle pas set_metadata", 'Classer de la Demande rapide propose seulement')
+    for _, m in ipairs(attendus.proposer_appliquer) do
+        contient(m, Consignes.NE_PAS_FAIRE .. 'toucher au mélangeur TSL.', 'le réglage dans chaque message')
+    end
+    remettre()
+end)
+
 essai("Gestionnaire, section Invites : choisir Portrait, mettre une étape à Non (gardé tout de suite), changer d'invite et revenir, Remettre comme à l'origine, voir le message", function()
     remettre()
     ouvrir(function(p, contenu)
@@ -481,6 +777,77 @@ essai("Gestionnaire, section Invites : le dossier commun introuvable, le choix n
         Fichiers.supprimer(Chemins.pointeur())
     end)
     vrai(not Fichiers.existe(fichier))
+end)
+
+-- Essais repris de essais-mes-demandes.lua, retiré avec le menu (relevé de la revue du 10 novembre
+-- 2026 : ils ne vérifiaient pas que Mes demandes) ---------------------------------------------------
+
+local function refuse(fn, attendu, quoi)
+    local ok, erreur = pcall(fn)
+    vrai(not ok, (quoi or 'refus attendu') .. ' : accepté')
+    vrai(tostring(erreur):find(attendu, 1, true), (quoi or 'refus') .. ' : ' .. tostring(erreur))
+end
+
+local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(.*/)') or '.') .. ' && pwd -P'):gsub('%s+$', '')
+
+essai('Consignes : plus de section « Demande à garder », ni de ligne à écrire, ni dans la Demande rapide (« Pas de titre. » gardé) ; plus de section Leçon ; le texte sous 7 500', function()
+    local Texte = require 'Texte'
+    local texte = Consignes.texte
+    egal(nil, texte:find('Demande à garder', 1, true), 'plus de section Demande à garder')
+    egal(nil, texte:find('<ta demande>', 1, true), 'plus de gabarit')
+    for _, quoi in ipairs({ 'rapide', 'rapidePhoto' }) do
+        egal(nil, Consignes[quoi]:find('Demande à garder', 1, true), quoi)
+        contient(Consignes[quoi], 'Pas de titre.', quoi)
+    end
+    egal(nil, texte:find('\n## Leçon de la photo\n', 1, true), 'plus de section Leçon')
+    vrai(Texte.longueur(texte) <= 7500, string.format('plafond des consignes : %d', Texte.longueur(texte)))
+    vrai(not texte:find('\\\n', 1, true), 'lignes recollées')
+end)
+
+essai('Simulation : un élément de menu sans titre refusé à la création ; S.choisir refuse un élément grisé, un séparateur, une valeur absente ; une liste liée refaite sans titre refusée', function()
+    local f = S.modules.LrView.osFactory()
+    local bind = S.modules.LrView.bind
+    refuse(function() f:popup_menu { items = { { value = 1 } } } end, 'sans title ni separator')
+    refuse(function() f:popup_menu { items = { { title = 'a', value = 1, enabled = 'non' } } } end, 'enabled doit être un booléen')
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.choix = 'a'
+    p.elements = { { title = 'A', value = 'a' }, { separator = true }, { title = 'Grisé', value = 'g', enabled = false }, 'texte' }
+    local menu = f:popup_menu { value = bind { key = 'choix', bind_to_object = p }, items = bind { key = 'elements', bind_to_object = p } }
+    local vu = false
+    S.pendantFenetre = function()
+        vu = true
+        refuse(function() S.choisir(menu, 'g') end, 'grisé', 'un élément grisé ne se choisit pas')
+        refuse(function() S.choisir(menu, nil) end, 'aucun élément', 'un séparateur ne se choisit pas')
+        refuse(function() S.choisir(menu, 'absente') end, 'aucun élément', 'une valeur absente')
+        egal('a', p.choix, 'rien de choisi')
+        S.choisir(menu, 'texte')
+        egal('texte', p.choix, 'un texte est sa propre valeur')
+        -- Une liste refaite sans titre à un élément : refusée à la nouvelle valeur.
+        refuse(function() p.elements = { { value = 'x' } } end, 'sans title ni separator')
+        S.refusDeLaFenetre()
+    end
+    S.modules.LrDialogs.presentFloatingDialog(_PLUGIN, { title = 'Menu', contents = f:column { menu } })
+    S.pendantFenetre = nil
+    vrai(vu, 'la fenêtre ouverte')
+end)
+
+essai('uninstall.sh et README : invites.json et ses copies illisibles retirés par --tout (tout le dossier) ; sans --tout, ils restent et le script le dit ; le README les cite', function()
+    local script = assert(Fichiers.lire(dossierTests .. '/../../../uninstall.sh'), 'uninstall.sh')
+    local entete = script:match('^(.-)\nset %-euo pipefail')
+    contient(entete, '(invites.json', 'en-tête')
+    contient(entete, 'invites-illisible-', 'en-tête : les copies illisibles')
+    local travail = script:match('TRAVAIL=%((.-)\n%)')
+    vrai(not travail:find('invites', 1, true), "invites.json n'est pas un fichier de travail")
+    contient(script, 'retirer "${DEST_DIR}"', '--tout retire tout le dossier')
+    local gardes = script:match('GARDES%+=%("%${DEST_DIR} %((.-)%)"%)')
+    vrai(gardes, 'la ligne « Gardé pour vous » du dossier')
+    contient(gardes, 'réglage des invites', 'gardé et dit')
+    local readme = assert(Fichiers.lire(dossierTests .. '/../../../README.md'), 'README.md')
+    local reste = readme:match('\nCe qui reste sur le Mac :\n(.-)\n\n[^\n%-]')
+    vrai(reste, 'la liste « Ce qui reste sur le Mac » du README')
+    contient(reste, '`invites.json`', 'le README cite invites.json')
+    local desinstaller = readme:match('Pour désinstaller : (.-)\n\n')
+    contient(desinstaller, '`invites.json`', 'la désinstallation le garde')
 end)
 
 print(string.format('\n%d essais réussis, %d en échec', reussis, echecs))

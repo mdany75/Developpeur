@@ -222,7 +222,8 @@ final class DossierDonneesTests: XCTestCase {
     /// Le contrat avec le module : les éléments communs, et ceux qui restent locaux.
     func testElementsCommunsDuContrat() {
         for nom in ["guide-de-style.md", "Conversations", "suivi.json", "suivi.journal", "suivi-illisible-12.json", "carnet.json",
-                    "carnet-illisible-3.json", "notation.json", "mes-demandes.json", "mes-demandes-illisible-4.json", "invites.json", "publication.json",
+                    "carnet-illisible-3.json", "notation.json", "mes-demandes.json", "mes-demandes-illisible-4.json", "invites.json",
+                    "invites-illisible-5.json", "publication.json",
                     "consommation.json", "rendus.json", "Etapes", "Index", "Modeles", "Claude Code"] {
             XCTAssertTrue(DossierDonnees.estCommun(nom), nom)
         }

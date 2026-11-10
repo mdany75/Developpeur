@@ -78,20 +78,41 @@ FenetreRapide.FLECHE = 14
 FenetreRapide.CARRE = FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.ESPACE = 6
 local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
+-- `tooltip` : une fonction, appelée à l'ouverture de la fenêtre (FenetreRapide.infobulle), pour
+-- montrer l'invite telle que réglée à ce moment, comme les infobulles de la fenêtre Claude
+-- (Vues.invites) : le message de Retouche pro et de Portrait, et ce que les autres ne feront pas.
 FenetreRapide.ACTIONS = {
     { icone = 'rapide-noter', message = function() return Consignes.message('noter') end,
-        tooltip = "Noter les photos sélectionnées : Claude pose ses notes (0 à 5 ★, ou rejet)" },
+        tooltip = function()
+            return "Noter les photos sélectionnées : Claude pose ses notes (0 à 5 ★, ou rejet)." .. Consignes.noteReglage('noter')
+        end },
     { icone = 'rapide-retouche', message = function() return Consignes.retoucheProSurLaSelection(Consignes.message('retouche_pro')) end,
-        tooltip = retouchePro.titre .. ", par groupes de lumière : la référence de chaque groupe retouchée, ses réglages copiés aux autres photos du groupe, puis harmonisés. " .. retouchePro.message },
+        tooltip = function()
+            return retouchePro.titre .. ", par groupes de lumière : la référence de chaque groupe retouchée, ses réglages copiés aux autres photos du groupe, puis harmonisés. "
+                .. Consignes.message('retouche_pro')
+        end },
     { icone = 'rapide-portrait', message = function() return Consignes.surLaSelection(Consignes.message('portrait')) end,
-        tooltip = portrait.titre .. ", pour chaque photo sélectionnée : " .. portrait.message },
+        tooltip = function() return portrait.titre .. ", pour chaque photo sélectionnée : " .. Consignes.message('portrait') end },
     { icone = 'rapide-classer', message = function() return Consignes.classerRapideMessage() end,
-        tooltip = "Classer les photos sélectionnées : mots-clés, lieu et légende proposés, rien d'écrit sans votre accord" },
+        tooltip = function()
+            return "Classer les photos sélectionnées : mots-clés, lieu et légende proposés, rien d'écrit sans votre accord." .. Consignes.noteReglage('classer')
+        end },
     { icone = 'rapide-proposer', message = function(info) return Consignes.proposerAppliquerRapide(Lightroom.mode(), Moteur.rapideGardee(info)) end,
-        tooltip = "Proposer et appliquer : Claude prépare la proposition la plus complète possible (réglages et retouches locales) "
-            .. "pour chaque photo sélectionnée, l'applique, puis dit ce qui a changé et pourquoi. En mode « Proposer d'abord », "
-            .. "il propose seulement, pour une photo seule gardée dans sa conversation : à accepter dans la fenêtre Claude." },
+        tooltip = function()
+            return "Proposer et appliquer : Claude prépare la proposition la plus complète possible (réglages et retouches locales) "
+                .. "pour chaque photo sélectionnée, l'applique, puis dit ce qui a changé et pourquoi. En mode « Proposer d'abord », "
+                .. "il propose seulement, pour une photo seule gardée dans sa conversation : à accepter dans la fenêtre Claude."
+                .. Consignes.noteReglage('proposer_appliquer')
+        end },
 }
+
+-- L'infobulle d'un bouton, telle que l'invite est réglée maintenant (un texte : tel quel).
+function FenetreRapide.infobulle(action)
+    if type(action.tooltip) == 'function' then
+        return action.tooltip()
+    end
+    return action.tooltip
+end
 -- La zone du résultat : toute la hauteur au-dessus de la demande (relevé le 22 octobre 2026 : 988 ×
 -- 248 pour 984 × 214, d'où 996 × 216 pour 1 000 × 250 ; 267 de haut pour 1 000 × 300 depuis le
 -- 2 novembre 2026, 397 pour 1 000 × 430 le même soir), sans barre de défilement : ▲ et ▼ y
@@ -450,7 +471,7 @@ function FenetreRapide.afficher()
                     width = FenetreRapide.CARRE,
                     height = FenetreRapide.HAUTEUR_DEMANDE,
                     enabled = bind 'libre',
-                    tooltip = a.tooltip,
+                    tooltip = FenetreRapide.infobulle(a),
                     action = function() FenetreRapide.demander(a.message) end,
                 },
             }

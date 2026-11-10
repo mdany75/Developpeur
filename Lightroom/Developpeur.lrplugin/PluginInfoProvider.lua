@@ -347,20 +347,36 @@ end
 -- structure : un nombre fixe de lignes (Consignes.maxEtapes), chacune liée à la table de la
 -- section (titre, valeur, visible) ; une ligne de trop est masquée. Chaque Oui ou Non est gardé tout
 -- de suite dans invites.json (Consignes.poserChoix), que les boutons relisent à chaque clic.
+-- « Voir le message à Claude » : chaque message que l'invite envoie, un par bouton (Consignes.variantes),
+-- chacun dans un champ où il se copie.
+local LARGEUR_MESSAGE = 80
 local function voirMessage(id, choix)
     local f = LrView.osFactory()
+    local Texte = require 'Texte'
+    local entete = "Ce que Claude reçoit, tel quel, à chaque bouton qui envoie cette invite (le contexte de la photo s'y ajoute) :"
+    local contenu = { spacing = 6,
+        f:static_text { title = entete, width_in_chars = LARGEUR_MESSAGE, height_in_lines = Texte.nombreDeLignes(entete, LARGEUR_MESSAGE) } }
+    for _, v in ipairs(Consignes.variantes(id, choix)) do
+        contenu[#contenu + 1] = f:static_text { title = v.titre .. " :", width_in_chars = LARGEUR_MESSAGE,
+            height_in_lines = Texte.nombreDeLignes(v.titre .. " :", LARGEUR_MESSAGE) }
+        contenu[#contenu + 1] = f:edit_field { value = v.message, width_in_chars = LARGEUR_MESSAGE,
+            height_in_lines = math.min(10, Texte.nombreDeLignes(v.message, LARGEUR_MESSAGE)) }
+    end
     LrDialogs.presentModalDialog {
         title = "Le message de l'invite à Claude",
-        contents = f:column {
-            f:static_text { title = "Ce que Claude reçoit quand vous cliquez le bouton (la Demande rapide l'adresse à chaque photo sélectionnée)." },
-            f:edit_field { value = Consignes.message(id, choix), height_in_lines = 12, width_in_chars = 80 },
-        },
+        contents = f:column(contenu),
         cancelVerb = '< exclude >',
         actionVerb = "Fermer",
     }
 end
 
+-- Le texte d'en tête de la section, et les largeurs : chaque texte a les lignes qu'il lui faut
+-- (Texte.nombreDeLignes ; essais-invites.lua vérifie que chacun tient).
+local INTRO_INVITES = "Ce que fait chaque bouton de la fenêtre Claude et de la Demande rapide, étape par étape : Oui, Claude la fait (comme à l'origine) ; Non, il ne la fait pas, même si sa méthode, votre guide de style ou le style choisi la prévoit. Le réglage sert dès le clic suivant, sur ce Mac et, avec le dossier commun, sur l'autre."
+local LARGEUR_INTRO = 66
+
 local function sectionInvites(f, propertyTable, ligne)
+    local Texte = require 'Texte'
     local bind = LrView.bind
     local p = propertyTable
     local n = Consignes.maxEtapes()
@@ -432,8 +448,8 @@ local function sectionInvites(f, propertyTable, ligne)
         synopsis = bind { key = 'synopsisInvites', bind_to_object = p },
 
         f:static_text {
-            title = "Ce que fait chaque bouton de la fenêtre Claude et de la Demande rapide, étape par étape : Oui, Claude la fait (comme à l'origine) ; Non, il ne la fait pas, même si sa méthode ou votre guide de style la prévoit. Le réglage sert dès le clic suivant, sur ce Mac et, avec le dossier commun, sur l'autre.",
-            width_in_chars = 66, height_in_lines = 4,
+            title = INTRO_INVITES,
+            width_in_chars = LARGEUR_INTRO, height_in_lines = Texte.nombreDeLignes(INTRO_INVITES, LARGEUR_INTRO),
         },
         ligne("Invite :", f:popup_menu { value = bind { key = 'inviteChoisie', bind_to_object = p }, items = items }),
     }
@@ -443,11 +459,12 @@ local function sectionInvites(f, propertyTable, ligne)
         section[#section + 1] = ligne(i == 1 and "Étapes :" or "",
             f:radio_button { title = "Oui", value = valeur, checked_value = true, visible = visible },
             f:radio_button { title = "Non", value = valeur, checked_value = false, visible = visible },
-            f:static_text { title = bind { key = 'etapeTitre' .. i, bind_to_object = p }, visible = visible, width_in_chars = 50 })
+            f:static_text { title = bind { key = 'etapeTitre' .. i, bind_to_object = p }, visible = visible,
+                width_in_chars = Consignes.LARGEUR_TITRE, height_in_lines = 1 })
     end
     section[#section + 1] = ligne("Ce qu'elle fera :", f:static_text {
         title = bind { key = 'resumeInvite', bind_to_object = p },
-        width_in_chars = 56, height_in_lines = 7,
+        width_in_chars = Consignes.LARGEUR_RESUME, height_in_lines = Consignes.LIGNES_RESUME,
     })
     section[#section + 1] = ligne("",
         f:push_button { title = "Remettre comme à l'origine", action = function() poser(nil) end },

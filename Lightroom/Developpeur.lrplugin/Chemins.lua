@@ -40,7 +40,9 @@
 --       mes-demandes.json                      les demandes de l'ancien menu Mes demandes (retiré
 --                                              après la 1.8) : gardé tel quel, jamais lu ni effacé
 --       invites.json                           le réglage des invites des boutons (Oui ou Non par
---                                              étape, Consignes.lua ; après la 1.8)
+--                                              étape, Consignes.lua ; après la 1.8 ;
+--                                              invites-illisible-<date>.json : un réglage
+--                                              illisible mis de côté)
 --       Etapes/                                avant/après de chaque étape de Claude (1.3)
 --   ~/Library/Logs/Developpeur/conversation.log   (à côté de module.log, le journal de la liaison)
 
@@ -81,7 +83,7 @@ Chemins.NOMS_DONNEES = {
     'Claude Code',
 }
 -- Les copies illisibles mises de côté, rangées avec leur fichier.
-Chemins.MOTIFS_DONNEES = { '^suivi%-illisible%-.+%.json$', '^carnet%-illisible%-', '^mes%-demandes%-illisible%-' }
+Chemins.MOTIFS_DONNEES = { '^suivi%-illisible%-.+%.json$', '^carnet%-illisible%-', '^mes%-demandes%-illisible%-', '^invites%-illisible%-' }
 
 local nomsDonnees = {}
 for _, nom in ipairs(Chemins.NOMS_DONNEES) do

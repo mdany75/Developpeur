@@ -1016,6 +1016,7 @@ essai("« Classer » en haut, à gauche de « Repartir à neuf » : plus dans la
         local infobulle = valeur(classer, 'tooltip', p)
         contient(infobulle, 'Classer la photo active', 'infobulle')
         contient(infobulle, 'votre accord', 'infobulle : rien d\'écrit sans accord')
+        vrai(not infobulle:find('ne fera pas', 1, true), 'sans réglage : rien de plus')
         -- Grisé comme les invites : la même clé `libre`.
         local sports = parTitre(contenu, 'Sports')
         egal(sports.args.enabled.key, classer.args.enabled.key, 'grisé dans les mêmes cas que les invites')
@@ -1043,12 +1044,16 @@ essai("Invites réglées : chaque bouton de la fenêtre, Classer compris, envoie
     local fichier = Chemins.donnee('invites.json')
     Fichiers.supprimer(fichier)
     egal(true, Consignes.poserChoix('portrait', { flou = false }))
+    egal(true, Consignes.poserChoix('classer', { legende = false }))
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
         local portrait = parTitre(contenu, 'Portrait')
         egal(Consignes.message('portrait'), portrait.args.tooltip, "l'infobulle : l'invite réglée")
         contient(portrait.args.tooltip, "ajouter du flou d'objectif")
+        -- Classer en haut : son infobulle dit aussi ce que l'invite réglée ne fera pas.
+        contient(valeur(parTitre(contenu, 'Classer'), 'tooltip', p), "ne fera pas : Légende courte, sans remplacer la vôtre.",
+            "l'infobulle de Classer : le réglage")
         local envois = {}
         avec(Fenetre, 'envoyer', function(message) envois[#envois + 1] = message end, function()
             S.cliquer(portrait)

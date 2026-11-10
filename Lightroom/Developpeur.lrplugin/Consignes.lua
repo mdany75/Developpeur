@@ -145,9 +145,13 @@ end
 -- Une étape à Non est toujours dite (jamais seulement omise) : la méthode du connecteur, ses
 -- consignes et le guide de style feraient sinon faire à Claude, de lui-même, une bonne part de ce
 -- que Dany a refusé (recadrage, débruitage, grain…). Tout à Oui, le message est celui d'avant
--- (essais-moteur.lua le compare au texte de la 1.8). Les doses restent dans les descriptions des
+-- (essais-invites.lua le compare au texte de la 1.8). Les doses restent dans les descriptions des
 -- outils : aucun chiffre ici.
-Consignes.NE_PAS_FAIRE = "Ne fais pas ceci, même si ta méthode ou mon guide de style le prévoit : "
+-- Le style choisi (menu Style, Consignes.ligneStyle) y est nommé aussi : sa recette peut contredire
+-- une étape à Non (« Or et peau douce » adoucit la peau, Portrait › peau à Non). La phrase dit que
+-- le refus l'emporte, plutôt que de retirer de la recette ce qui le contredit : une seule règle,
+-- sûre pour tout style, même un style ajouté plus tard, et la recette reste la même partout.
+Consignes.NE_PAS_FAIRE = "Ne fais pas ceci, même si ta méthode, mon guide de style ou le style choisi le prévoit : "
 
 local function etape(id, titre, texte, non)
     return { id = id, titre = titre, texte = texte, non = non, defaut = true }
@@ -191,9 +195,19 @@ local function assembler(invite, forme, choix)
             end
             if #textes > 0 then
                 local sep = p.sep or ", "
+                -- Un texte qui commence par « puis » porte déjà son lien : jamais « et puis » (le
+                -- `dernier` d'avant lui devient `sep`), et sans « puis » quand il ouvre la liste
+                -- (« Retouche ce portrait : éclaircis… », toutes les autres étapes à Non).
+                if rien and textes[1]:find('^puis ') then
+                    textes[1] = textes[1]:sub(6)
+                end
                 local liste = textes[#textes]
                 if #textes > 1 then
-                    liste = table.concat(textes, sep, 1, #textes - 1) .. (p.dernier or sep) .. liste
+                    local lien = p.dernier or sep
+                    if liste:find('^puis ') then
+                        lien = sep
+                    end
+                    liste = table.concat(textes, sep, 1, #textes - 1) .. lien .. liste
                 end
                 morceaux[#morceaux + 1] = ((rien and p.premier) or p.avant or "") .. liste .. (p.apres or "")
                 rien = false
@@ -226,17 +240,17 @@ Consignes.invites = {
         retouche = true,
         sert = "le bouton Retouche pro de la fenêtre Claude et celui de la Demande rapide",
         etapes = {
-            etape('diagnostic', "Diagnostic chiffré : exposition, couleurs, sujet, intention", "diagnostic chiffré", "chiffrer le diagnostic"),
-            etape('deux_passes', "Deux passes vérifiées : lumière et couleur, puis finitions", "deux passes vérifiées",
+            etape('diagnostic', "Diagnostic chiffré : lumière, couleurs, sujet", "diagnostic chiffré", "chiffrer le diagnostic"),
+            etape('deux_passes', "Deux passes : la base, puis les finitions", "deux passes vérifiées",
                 "faire la deuxième passe, celle des finitions"),
-            etape('correctives', "Passes correctives si un défaut reste (deux au plus)",
+            etape('correctives', "Jusqu'à deux passes correctives, si besoin",
                 "puis au plus deux passes correctives si un défaut reste", "faire une passe corrective"),
-            implicite('redresser', "Redresser l'horizon ou les verticales (mesurés)", "redresser la photo (ni crop.angle ni Upright)"),
+            implicite('redresser', "Redresser l'horizon ou les verticales", "redresser la photo (ni crop.angle ni Upright)"),
             implicite('recadrer', "Recadrer si la composition y gagne nettement", "recadrer"),
             implicite('debruitage', "Débruitage IA si le bruit est fort", "débruiter (enhance_photo)"),
-            implicite('locales', "Retouches locales légères : ciel, sujet, arrière-plan", "faire des retouches locales (add_mask)"),
-            implicite('visage', "Visage : peau, iris, dents, à intensité réduite", "toucher à la peau, à l'iris et aux dents"),
-            implicite('tireur', "Éclaircir et assombrir comme un tireur, avec l'avant/après", "éclaircir et assombrir comme un tireur"),
+            implicite('locales', "Retouches locales : ciel, sujet, arrière-plan", "faire des retouches locales (add_mask)"),
+            implicite('visage', "Visage : peau, iris, dents, en douceur", "toucher à la peau, à l'iris et aux dents"),
+            implicite('tireur', "Éclaircir et assombrir comme un tireur", "éclaircir et assombrir comme un tireur"),
             implicite('vignetage', "Vignetage ou bords assombris", "assombrir les bords (ni vignetage ni radial inversé)"),
         },
         forme = { "Retouche la photo active comme un professionnel",
@@ -245,14 +259,14 @@ Consignes.invites = {
         retouche = true,
         sert = "le bouton Portrait de la fenêtre Claude et celui de la Demande rapide",
         etapes = {
-            etape('peau', "Peau, lissée selon la personne (rien pour un enfant)", "peau", "toucher à la peau (ni masque ni effet de peau)"),
+            etape('peau', "Peau lissée selon la personne (pas un enfant)", "peau", "toucher à la peau (ni masque ni effet de peau)"),
             etape('yeux', "Yeux : iris renforcé", "yeux", "renforcer les yeux"),
             etape('dents', "Dents blanchies, si elles se voient", "dents", "blanchir les dents"),
             etape('arriere_plan', "Arrière-plan moins présent s'il distrait", "arrière-plan", "toucher à l'arrière-plan"),
             etape('flou', "Flou d'objectif, si la photo s'y prête", "flou d'objectif si la photo s'y prête", "ajouter du flou d'objectif (lens_blur)"),
-            etape('tireur', "Éclaircir et assombrir vers le visage, avec l'avant/après", TIREUR:format('visage'),
+            etape('tireur', "Éclaircir et assombrir vers le visage", TIREUR:format('visage'),
                 "éclaircir et assombrir comme un tireur"),
-            implicite('recadrer', "Recadrer si le portrait y gagne nettement (yeux au tiers haut)", "recadrer"),
+            implicite('recadrer', "Recadrer s'il y gagne (yeux au tiers haut)", "recadrer"),
             implicite('imperfections', "Petites imperfections passagères (boutons)", "retirer des imperfections (retouch_spots)"),
         },
         forme = { "Retouche ce portrait", { avant = " : ", 'peau', 'yeux', 'dents', 'arriere_plan', 'flou' },
@@ -264,8 +278,8 @@ Consignes.invites = {
             etape('horizon', "Horizon mesuré et redressé", "horizon", "redresser l'horizon"),
             etape('ciel', "Ciel un peu plus dense", "ciel", "toucher au ciel"),
             etape('profondeur', "Profondeur : premier plan et lointain", "profondeur", "travailler la profondeur"),
-            etape('masques', "Masques de paysage : montagnes, eau, végétation", "masques de paysage", "poser des masques de paysage"),
-            etape('tireur', "Éclaircir et assombrir vers le sujet, avec l'avant/après", TIREUR:format('sujet'),
+            etape('masques', "Masques : montagnes, eau, végétation", "masques de paysage", "poser des masques de paysage"),
+            etape('tireur', "Éclaircir et assombrir vers le sujet", TIREUR:format('sujet'),
                 "éclaircir et assombrir comme un tireur"),
             implicite('voile', "Correction du voile, si la scène est voilée", "corriger le voile (Dehaze)"),
             implicite('recadrer', "Recadrer si le cadre y gagne nettement", "recadrer"),
@@ -277,9 +291,9 @@ Consignes.invites = {
         sert = "le bouton Noir et blanc de la fenêtre Claude",
         etapes = {
             etape('profil', "Profil noir et blanc", "profil", "changer le profil"),
-            etape('melangeur', "Mélangeur noir et blanc : ciel, peau, feuillage", "mélangeur", "régler le mélangeur noir et blanc"),
+            etape('melangeur', "Mélangeur : ciel, peau, feuillage", "mélangeur", "régler le mélangeur noir et blanc"),
             etape('contraste_local', "Contraste local : courbe, clarté, texture", "contraste local", "ajouter du contraste local"),
-            etape('tireur', "Éclaircir et assombrir vers le sujet, avec l'avant/après",
+            etape('tireur', "Éclaircir et assombrir vers le sujet",
                 "puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape",
                 "éclaircir et assombrir comme un tireur"),
             etape('grain', "Grain fin et discret", "grain", "ajouter du grain"),
@@ -294,7 +308,7 @@ Consignes.invites = {
             etape('ombres', "Ombres relevées avec retenue", "les ombres", "relever les ombres"),
             etape('couleurs', "Couleurs des éclairages", "les couleurs", "corriger les couleurs"),
             etape('nettete', "Netteté faible, avec masquage", "la netteté", "toucher à la netteté"),
-            implicite('locales', "Retouches locales légères : ciel, lampes trop fortes", "faire des retouches locales (add_mask)"),
+            implicite('locales', "Retouches locales : ciel, lampes trop fortes", "faire des retouches locales (add_mask)"),
         },
         forme = { "Retouche cette photo prise à ISO élevé", { avant = " : ", 'bruit' },
             { avant = ", puis ", premier = " : ", dernier = " et ", 'ombres', 'couleurs', 'nettete' }, ", sans lisser les détails." } },
@@ -315,13 +329,13 @@ Consignes.invites = {
         retouche = true,
         sert = "le bouton Sports de la fenêtre Claude",
         etapes = {
-            etape('sujet', "Le sujet en action d'abord : exposition, contraste, netteté",
+            etape('sujet', "Le sujet d'abord : lumière, contraste, netteté",
                 "le sujet en action d'abord (exposition, contraste et netteté sur lui)", "retoucher le sujet à part"),
             etape('couleurs', "Couleurs fidèles des maillots et du terrain", "couleurs fidèles des maillots et du terrain",
                 "corriger les couleurs des maillots et du terrain"),
             etape('arriere_plan', "Arrière-plan calmé", "arrière-plan calmé", "calmer l'arrière-plan"),
             etape('bruit', "Bruit, si l'ISO est élevé", "bruit si l'ISO est élevé", "débruiter (enhance_photo)"),
-            etape('recadrage', "Recadrage serré sur l'action, s'il y gagne nettement",
+            etape('recadrage', "Recadrage serré sur l'action, s'il y gagne",
                 "recadrage serré sur l'action seulement s'il y gagne nettement, et dis-le", "recadrer"),
         },
         forme = { "Retouche cette photo de sport", { avant = " : ", 'sujet', 'couleurs', 'arriere_plan' },
@@ -366,7 +380,7 @@ Consignes.autresInvites = {
         sert = "le bouton Noter de la Demande rapide",
         etapes = {
             etape('deja', "Noter aussi les photos déjà évaluées", "même déjà évaluée", "changer la note d'une photo déjà évaluée"),
-            etape('regarder', "Regarder chaque photo et son point de mise au point",
+            etape('regarder', "Regarder chaque photo et sa mise au point",
                 "view_photo avec af_point = true sur chacune (plus de 30 photos : planche par planche, puce Notes de tes consignes)",
                 "regarder chaque photo une à une (view_photo)"),
             etape('raison', "Dire chaque note posée et sa raison", "Dis chaque note posée et sa raison en une phrase.", "expliquer chaque note"),
@@ -374,13 +388,16 @@ Consignes.autresInvites = {
         forme = { "Note chaque photo sélectionnée selon le standard de notation", { avant = ", ", 'deja' }, " : cull_photos avec selection = true",
             { avant = ", ", 'regarder' }, ", puis propose_ratings avec apply = true pour poser les notes.", { avant = " ", 'raison' } } },
     { id = 'proposer_appliquer', titre = "Proposer et appliquer (et Obtenir)",
+        -- Ses messages font lire le guide de style (avecGuide), sans `retouche` : ils se font par
+        -- `composer`, Obtenir et proposerAppliquerRapide ; `litGuide` le dit au résumé.
+        litGuide = true,
         sert = "le bouton Proposer et appliquer de la Demande rapide, et Obtenir dans l'onglet Proposition de la fenêtre Claude",
         etapes = {
             etape('profil', "Profil", "profil", "changer le profil"),
             etape('objectif', "Corrections d'objectif et Upright, si utile", "corrections d'objectif et Upright si utile",
                 "corriger l'objectif ou la perspective (Upright)"),
             etape('balance', "Balance des blancs", "balance des blancs", "changer la balance des blancs"),
-            etape('tonalite', "Tonalité : exposition, contraste, hautes lumières, ombres", "tonalité", "changer la tonalité"),
+            etape('tonalite', "Tonalité : exposition, contraste, ombres", "tonalité", "changer la tonalité"),
             etape('presence', "Présence : texture, clarté, vibrance", "présence", "changer la présence"),
             etape('tsl', "Mélangeur TSL", "TSL", "toucher au mélangeur TSL"),
             etape('etalonnage', "Étalonnage des couleurs", "étalonnage", "toucher à l'étalonnage"),
@@ -391,7 +408,7 @@ Consignes.autresInvites = {
             etape('locales', "Retouches locales utiles : ciel, sujet, peau",
                 "les retouches locales utiles (ciel, sujet, peau…) par add_mask avec preview = true", "faire des retouches locales (add_mask)"),
             etape('recadrage', "Recadrage, seulement s'il y gagne nettement", "un recadrage seulement s'il y gagne nettement", "recadrer"),
-            etape('correctif', "Une passe corrective si un défaut reste (appliquée)",
+            etape('correctif', "Une passe corrective si un défaut reste",
                 "une passe corrective seulement si un défaut est constaté", "faire une passe corrective"),
         },
         -- La proposition (Obtenir ; Proposer et appliquer en « Proposer d'abord ») et la retouche
@@ -466,9 +483,14 @@ end
 -- { format = 1, invites = { [id d'invite] = { [id d'étape] = true ou false } } }, écrit d'un coup
 -- (Fichiers.ecrire, comme les conversations). Lu à chaque lancement d'une invite. Absent, illisible
 -- ou inaccessible (dossier commun introuvable) : tout à Oui, sans erreur ; une étape ou une invite
--- inconnue, ou une valeur qui n'est pas un booléen, est ignorée (son défaut, Oui).
+-- inconnue, ou une valeur qui n'est pas un booléen, est ignorée (son défaut, Oui). Un fichier
+-- présent mais illisible, ou d'un autre format, n'est jamais écrasé : il est mis de côté
+-- (invites-illisible-<date>.json, à côté de lui, comme carnet.json et suivi.json) avant la
+-- première écriture ; rien n'est effacé. Le journal dit chaque cause une fois (la fenêtre lit le
+-- réglage à chaque infobulle et à chaque clic), jusqu'à une lecture réussie.
 Consignes.FICHIER_REGLAGES = 'invites.json'
 Consignes.FORMAT_REGLAGES = 1
+Consignes.PREFIXE_ILLISIBLE = 'invites-illisible-'
 
 local function cheminReglages()
     return require('Chemins').donnee(Consignes.FICHIER_REGLAGES)
@@ -478,38 +500,104 @@ local function noter(...)
     pcall(function(...) require('Journal').noter(...) end, ...)
 end
 
+-- Les causes déjà dites au journal, une fois chacune.
+local causesDites = {}
+local function direUneFois(cause, ...)
+    if not causesDites[cause] then
+        causesDites[cause] = true
+        noter(...)
+    end
+end
+
+-- Les réglages lus, { [id d'invite] = { [id d'étape] = booléen } } (des tables neuves), et l'état
+-- du fichier : 'absent', 'lu', 'illisible' (présent, mais illisible ou d'un autre format ; `cause`)
+-- ou 'introuvable' (le dossier commun réglé est introuvable ; `cause` : le refus à dire).
+local function lire()
+    local Chemins = require 'Chemins'
+    local refus = Chemins.refusDonnees()
+    if refus then
+        direUneFois('introuvable', "Réglage des invites : dossier commun introuvable (tout à Oui) :", refus)
+        return {}, 'introuvable', refus
+    end
+    local Fichiers = require 'Fichiers'
+    local chemin = cheminReglages()
+    local texte = Fichiers.lire(chemin)
+    if texte == nil and not Fichiers.existe(chemin) then
+        causesDites = {}
+        return {}, 'absent'
+    end
+    local cause, lu
+    if texte == nil then
+        cause = "fichier impossible à ouvrir"
+    else
+        local ok, valeur = pcall(require('Json').decode, texte)
+        lu = valeur
+        if not ok then
+            cause = "JSON illisible"
+        elseif type(lu) ~= 'table' or type(lu.invites) ~= 'table' then
+            cause = "sans liste d'invites"
+        elseif lu.format ~= Consignes.FORMAT_REGLAGES then
+            cause = "format inconnu (" .. tostring(lu.format) .. ")"
+        end
+    end
+    if cause then
+        direUneFois('illisible : ' .. cause, "Réglage des invites illisible (" .. cause .. ") : tout à Oui ; " .. chemin
+            .. " sera mis de côté avant la prochaine écriture")
+        return {}, 'illisible', cause
+    end
+    local reglages = {}
+    for _, invite in ipairs(Consignes.configurables()) do
+        local siens = lu.invites[invite.id]
+        if type(siens) == 'table' then
+            local choix = {}
+            for _, e in ipairs(invite.etapes) do
+                if type(siens[e.id]) == 'boolean' then
+                    choix[e.id] = siens[e.id]
+                end
+            end
+            reglages[invite.id] = choix
+        end
+    end
+    causesDites = {}
+    return reglages, 'lu'
+end
+
 -- Tous les choix lus : { [id d'invite] = { [id d'étape] = booléen } }, des tables neuves.
 function Consignes.lireReglages()
-    local ok, lus = pcall(function()
-        local texte = require('Fichiers').lire(cheminReglages())
-        if not texte then
-            return {}
-        end
-        local Json = require 'Json'
-        local lu = Json.decode(texte)
-        if type(lu) ~= 'table' or type(lu.invites) ~= 'table' then
-            error("invites.json sans liste d'invites", 0)
-        end
-        local reglages = {}
-        for _, invite in ipairs(Consignes.configurables()) do
-            local siens = lu.invites[invite.id]
-            if type(siens) == 'table' then
-                local choix = {}
-                for _, e in ipairs(invite.etapes) do
-                    if type(siens[e.id]) == 'boolean' then
-                        choix[e.id] = siens[e.id]
-                    end
-                end
-                reglages[invite.id] = choix
-            end
-        end
-        return reglages
-    end)
+    local ok, reglages = pcall(lire)
     if not ok then
-        noter("Réglage des invites illisible (tout à Oui) :", tostring(lus))
+        direUneFois('erreur : ' .. tostring(reglages), "Réglage des invites illisible (tout à Oui) :", tostring(reglages))
         return {}
     end
-    return lus
+    return reglages
+end
+
+-- Met de côté un invites.json illisible (invites-illisible-<date>.json, jamais le nom d'un fichier
+-- qui existe), avant d'écrire à sa place ; un fichier vide n'a rien à garder. Une erreur si le
+-- fichier n'a pas pu être mis de côté : rien n'est écrit, il reste tel quel.
+local function mettreDeCote()
+    local Fichiers = require 'Fichiers'
+    local fichier = cheminReglages()
+    local texte = Fichiers.lire(fichier)
+    if not Fichiers.existe(fichier) or texte == '' then
+        return
+    end
+    local Chemins = require 'Chemins'
+    local base = Consignes.PREFIXE_ILLISIBLE .. tostring(os.time())
+    local nom, n = base .. '.json', 1
+    while Fichiers.existe(Chemins.donnee(nom)) do
+        n = n + 1
+        nom = base .. '-' .. n .. '.json'
+    end
+    local aCote = Chemins.donnee(nom)
+    if not (type(os.rename) == 'function' and os.rename(fichier, aCote)) then
+        pcall(function() import('LrFileUtils').move(fichier, aCote) end)
+    end
+    if Fichiers.existe(fichier) or not Fichiers.existe(aCote) then
+        noter("Réglage des invites illisible non mis de côté : rien n'est écrit dans", fichier)
+        error("invites.json illisible, laissé tel quel : réglage non gardé", 0)
+    end
+    noter("Réglage des invites illisible mis de côté :", aCote)
 end
 
 -- Les choix d'une invite, chaque étape avec sa valeur (lue, sinon son défaut) ; `reglages` : ceux
@@ -555,11 +643,18 @@ local function ecrireReglages(reglages)
 end
 
 -- Garde les choix d'une invite (nil : comme à l'origine, l'invite retirée du fichier). Rend vrai, ou
--- false et la raison (dossier commun introuvable, écriture impossible).
+-- false et la raison (dossier commun introuvable, fichier illisible qui n'a pas pu être mis de
+-- côté, écriture impossible). Un fichier illisible est mis de côté d'abord : les réglages qu'il
+-- portait ne se lisent plus, mais rien n'est perdu.
 function Consignes.poserChoix(id, choix)
     local invite = Consignes.configurable(id)
     local ok, erreur = pcall(function()
-        local reglages = Consignes.lireReglages()
+        local reglages, etat, cause = lire()
+        if etat == 'introuvable' then
+            error(cause, 0)
+        elseif etat == 'illisible' then
+            mettreDeCote()
+        end
         if choix == nil or not Consignes.modifiee(invite.id, choix) then
             reglages[invite.id] = nil
         else
@@ -580,6 +675,19 @@ function Consignes.message(id, choix)
     return messageDe(invite, choix or Consignes.choix(invite.id))
 end
 
+-- Le texte du résumé, d'après les titres des étapes faites (`fera`) et refusées (`nePas`).
+local function texteResume(invite, fera, nePas)
+    local lignes = { "Sert à : " .. invite.sert .. "." }
+    lignes[#lignes + 1] = "Fera : " .. (#fera > 0 and table.concat(fera, " ; ") or "rien de ce qui est listé") .. "."
+    if #nePas > 0 then
+        lignes[#lignes + 1] = "Ne fera pas : " .. table.concat(nePas, " ; ") .. "."
+    end
+    if invite.retouche or invite.litGuide then
+        lignes[#lignes + 1] = "Lit d'abord votre guide de style."
+    end
+    return table.concat(lignes, "\n")
+end
+
 -- Ce que fera l'invite, en mots pour Dany (section Invites du Gestionnaire).
 function Consignes.resume(id, choix)
     local invite = Consignes.configurable(id)
@@ -591,16 +699,20 @@ function Consignes.resume(id, choix)
             nePas[#nePas + 1] = e.titre
         end
     end
-    local lignes = { "Sert à : " .. invite.sert .. "." }
-    lignes[#lignes + 1] = "Fera : " .. (#fera > 0 and table.concat(fera, " ; ") or "rien de ce qui est listé") .. "."
-    if #nePas > 0 then
-        lignes[#lignes + 1] = "Ne fera pas : " .. table.concat(nePas, " ; ") .. "."
-    end
-    if invite.retouche then
-        lignes[#lignes + 1] = "Lit d'abord votre guide de style."
-    end
-    return table.concat(lignes, "\n")
+    return texteResume(invite, fera, nePas)
 end
+
+-- Les places de la section Invites du Gestionnaire, en caractères (width_in_chars) et en lignes
+-- (height_in_lines ; relevé de la revue du 10 novembre 2026 : 7 lignes fixes coupaient la fin du
+-- résumé, la ligne « Ne fera pas », et 16 titres dépassaient leur ligne). Le titre d'une étape tient
+-- sur une ligne de LARGEUR_TITRE ; le résumé, à LARGEUR_RESUME, sur LIGNES_RESUME lignes : le plus
+-- long de tous, chaque invite et chaque combinaison de Oui et de Non essayées par
+-- essais-invites.lua (Texte.nombreDeLignes), qui échoue si un titre ou un texte change sans que ces
+-- nombres suivent. Une constante : les 8 192 combinaisons de Proposer et appliquer prendraient
+-- plusieurs secondes à l'ouverture du Gestionnaire.
+Consignes.LARGEUR_TITRE = 50
+Consignes.LARGEUR_RESUME = 66
+Consignes.LIGNES_RESUME = 12
 
 -- Les styles du menu Style (sous les invites) : leur définition part avec chaque demande.
 -- « Standard » n'ajoute rien à la demande (un style « Aucun » à côté ferait la même chose).
@@ -991,6 +1103,61 @@ end
 
 proposerAppliquer.composer = function(choix)
     return Consignes.proposerAppliquerRapide('appliquer', false, choix)
+end
+
+-- Les messages d'une invite tels qu'ils partent, un par bouton qui l'envoie, pour « Voir le message
+-- à Claude » du Gestionnaire : { { titre, message } } (relevé de la revue du 10 novembre 2026 : un
+-- seul message montré, et une phrase fausse pour Retouche pro, traitée par groupes de lumière dans
+-- la Demande rapide, et pour Classer, qui y propose seulement). Les mêmes fonctions que les boutons
+-- (FenetreRapide.ACTIONS, Vues.invites, Vues.boutonClasser, Fenetre.obtenir) : essais-invites.lua
+-- les compare. `choix` : nil, lus dans le fichier.
+function Consignes.variantes(id, choix)
+    local invite = Consignes.configurable(id)
+    choix = choix or Consignes.choix(invite.id)
+    local liste = {}
+    local function ajouter(titre, message)
+        liste[#liste + 1] = { titre = titre, message = message }
+    end
+    if invite.id == 'noter' then
+        ajouter("Bouton Noter de la Demande rapide, pour toutes les photos sélectionnées", Consignes.message('noter', choix))
+    elseif invite.id == 'proposer_appliquer' then
+        ajouter("Obtenir, dans l'onglet Proposition de la fenêtre Claude, pour la photo active", Consignes.demandeObtenir(choix))
+        ajouter("Proposer et appliquer de la Demande rapide, en mode Appliquer, pour chaque photo sélectionnée",
+            Consignes.proposerAppliquerRapide('appliquer', false, choix))
+        ajouter("Proposer et appliquer de la Demande rapide, en mode « Proposer d'abord », pour une photo seule gardée dans sa conversation",
+            (Consignes.proposerAppliquerRapide('proposer', true, choix)))
+    else
+        local message = Consignes.message(invite.id, choix)
+        ajouter("Bouton " .. invite.titre .. " de la fenêtre Claude, pour la photo active", message)
+        if invite.id == 'retouche_pro' then
+            ajouter("Bouton Retouche pro de la Demande rapide, par groupes de lumière sur les photos sélectionnées",
+                Consignes.retoucheProSurLaSelection(message))
+        elseif invite.id == 'portrait' then
+            ajouter("Bouton Portrait de la Demande rapide, pour chaque photo sélectionnée", Consignes.surLaSelection(message))
+        elseif invite.id == 'classer' then
+            ajouter("Bouton Classer de la Demande rapide, qui propose seulement, pour chaque photo sélectionnée",
+                Consignes.classerRapideMessage(choix))
+        end
+    end
+    return liste
+end
+
+-- Ce qu'une invite réglée ne fera pas, en fin d'infobulle ("" quand tout est à Oui) : les
+-- infobulles qui ne montrent pas le message (Noter, Classer, Proposer et appliquer) le disent
+-- ainsi. `choix` : nil, lus dans le fichier.
+function Consignes.noteReglage(id, choix)
+    local invite = Consignes.configurable(id)
+    choix = choix or Consignes.choix(invite.id)
+    local nePas = {}
+    for _, e in ipairs(invite.etapes) do
+        if not oui(choix, e.id) then
+            nePas[#nePas + 1] = e.titre
+        end
+    end
+    if #nePas == 0 then
+        return ""
+    end
+    return " Réglée au Gestionnaire de modules externes, elle ne fera pas : " .. table.concat(nePas, " ; ") .. "."
 end
 
 -- Ajouté au message envoyé (pas affiché) tant que la conversation n'a pas de titre : la consigne

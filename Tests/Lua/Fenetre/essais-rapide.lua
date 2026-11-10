@@ -242,7 +242,7 @@ essai("Le 4ᵉ bouton, Classer : sa demande part avec Consignes.classerRapide (p
     -- Gestionnaire, après la 1.8) ; sans réglage, celui de Consignes.classerRapide.
     egal('function', type(action.message), 'fait au clic')
     egal(Consignes.classerRapide, action.message(), 'Classer de la Demande rapide, pour chaque photo')
-    contient(action.tooltip, "rien d'écrit sans votre accord", 'infobulle')
+    contient(FenetreRapide.infobulle(action), "rien d'écrit sans votre accord", 'infobulle')
     -- Plusieurs photos sélectionnées ; toute écriture au catalogue (ordinaire ou privée) et tout
     -- champ ou mot-clé posé sur une photo est compté.
     photo(971)
@@ -268,7 +268,7 @@ essai("Le 4ᵉ bouton, Classer : sa demande part avec Consignes.classerRapide (p
         vrai(bouton, 'le 4ᵉ carré, à la suite des trois autres')
         egal(FenetreRapide.CARRE, bouton.args.width, 'même taille')
         egal(FenetreRapide.HAUTEUR_DEMANDE, bouton.args.height, 'même hauteur')
-        egal(action.tooltip, bouton.args.tooltip)
+        egal(FenetreRapide.infobulle(action), bouton.args.tooltip)
         contient(bouton.args.image_name, 'rapide-classer', 'son icône')
         taches = #S.taches
         bouton.args.action()
@@ -336,8 +336,8 @@ essai("Le 5ᵉ bouton, Proposer et appliquer : la retouche complète appliquée 
     local action = FenetreRapide.ACTIONS[5]
     egal('rapide-proposer', action.icone)
     egal('function', type(action.message), 'le texte se fait au clic, d\'après le mode')
-    contient(action.tooltip, 'Proposer et appliquer', 'infobulle')
-    contient(action.tooltip, "En mode « Proposer d'abord », il propose seulement", 'infobulle : le mode')
+    contient(FenetreRapide.infobulle(action), 'Proposer et appliquer', 'infobulle')
+    contient(FenetreRapide.infobulle(action), "En mode « Proposer d'abord », il propose seulement", 'infobulle : le mode')
     photo(981)
     photo(982)
     photo(983)
@@ -357,7 +357,7 @@ essai("Le 5ᵉ bouton, Proposer et appliquer : la retouche complète appliquée 
             vrai(bouton, 'le 5ᵉ carré, à la suite des quatre autres')
             egal(FenetreRapide.CARRE, bouton.args.width, 'même taille')
             egal(FenetreRapide.HAUTEUR_DEMANDE, bouton.args.height, 'même hauteur')
-            egal(action.tooltip, bouton.args.tooltip)
+            egal(FenetreRapide.infobulle(action), bouton.args.tooltip)
             contient(bouton.args.image_name, 'rapide-proposer', 'son icône')
             taches = #S.taches
             bouton.args.action()

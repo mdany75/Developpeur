@@ -10,13 +10,16 @@
   qu'elle fait s'affiche, étape par étape, chacune avec Oui ou Non. Par exemple, pour la Retouche
   pro : le diagnostic chiffré, les deux passes, les passes correctives, le redressement, le
   recadrage, le débruitage, les retouches locales, le visage, éclaircir et assombrir, le vignetage.
-  À Non, Claude ne fait pas l'étape, même si sa méthode ou votre guide de style la prévoit.
+  À Non, Claude ne fait pas l'étape, même si sa méthode, votre guide de style ou le style choisi
+  la prévoit.
   Dessous, un résumé de ce que l'invite fera et ne fera pas, « Remettre comme à l'origine » et
   « Voir le message à Claude ».
 - Vos choix sont gardés tout de suite et servent dès le clic suivant, dans la fenêtre Claude
   comme dans la Demande rapide (Retouche pro, Portrait et Classer se règlent une seule fois pour
   les deux ; Proposer et appliquer règle aussi Obtenir). Avec le dossier commun, ils suivent
-  l'autre Mac. Tant que tout reste à Oui, chaque bouton fait exactement ce qu'il faisait.
+  l'autre Mac. Tant que tout reste à Oui, chaque bouton fait exactement ce qu'il faisait. Les
+  infobulles des boutons montrent aussi le réglage. Un fichier de réglage abîmé n'est jamais
+  écrasé : il est mis de côté (`invites-illisible-<date>.json`) avant d'en écrire un nouveau.
 
 ### Changé
 - **Classer monte en haut de la fenêtre Claude**, dans la rangée du titre, juste à gauche de

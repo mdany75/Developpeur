@@ -34,7 +34,7 @@ public struct DossierDonnees: Equatable {
     public static let elementsCommuns = [
         "guide-de-style.md", "Conversations", "suivi.json", "suivi.journal", "suivi-illisible-*",
         "carnet.json", "carnet-illisible-*", "notation.json", "mes-demandes.json", "mes-demandes-illisible-*",
-        "invites.json",
+        "invites.json", "invites-illisible-*",
         "publication.json", "consommation.json", "rendus.json", "Etapes", "Index", "Modeles", "Claude Code",
     ]
 

@@ -206,9 +206,9 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   servant aussi à Obtenir) : ses étapes s'affichent, chacune avec Oui ou Non, par exemple pour
   Retouche pro le diagnostic chiffré, les deux passes, le redressement, le recadrage, le
   débruitage, les retouches locales, le vignetage. À Non, Claude ne fait pas l'étape, même si sa
-  méthode ou votre guide de style la prévoit : la demande la lui nomme (« Ne fais pas ceci… »).
+  méthode, votre guide de style ou le style choisi la prévoit : la demande la lui nomme (« Ne fais pas ceci… »).
   Dessous, ce que l'invite fera et ne fera pas, « Remettre comme à l'origine », et « Voir le
-  message à Claude ». Chaque choix est gardé tout de suite et vaut dès le clic suivant, dans la
+  message à Claude » (chaque message que l'invite envoie, un par bouton). Chaque choix est gardé tout de suite et vaut dès le clic suivant, dans la
   fenêtre Claude comme dans la Demande rapide (Retouche pro, Portrait et Classer y sont réglés une
   seule fois pour les deux). Tout à Oui, chaque invite fait exactement ce qu'elle faisait.
 - Une carte Note, dans l'onglet Note : la note posée de la photo active, vos étoiles et vos
@@ -1252,7 +1252,9 @@ Ce qui reste sur le Mac :
   images vont dans un dossier temporaire, effacé quand on les quitte et au chargement suivant du
   module) ; vos demandes
   de l'ancien menu Mes demandes (`mes-demandes.json`, retiré de la fenêtre : le fichier reste tel
-  quel, jamais lu), le guide de style, les profils de publication, le
+  quel, jamais lu), le réglage des invites des boutons (`invites.json` : Oui ou Non pour chaque
+  étape, section Invites du Gestionnaire de modules externes ; un réglage illisible est mis de côté
+  dans `invites-illisible-<date>.json`, jamais écrasé), le guide de style, les profils de publication, le
   registre de consommation, les notes proposées avec l'évaluation de chaque photo
   (`notation.json`), le carnet de progrès (`carnet.json` : une table par catalogue, une entrée par
   photo originale, 3 000 au plus par catalogue, les plus anciennes sortent au-delà ; les leçons
@@ -1401,7 +1403,7 @@ Claude Desktop fermé comme pour l'installation (sinon, le script dit quoi véri
 retire l'inscription dans Claude, le connecteur, le module, ses paramètres prédéfinis invisibles
 (Lightroom fermé) et ses fichiers de travail, dont le jeton de la liaison (un Lightroom ouvert le
 réécrit : relancer le script après l'avoir quitté), et garde votre guide de style, vos
-conversations, vos demandes (`mes-demandes.json`), vos profils de publication, le registre de
+conversations, vos demandes (`mes-demandes.json`), le réglage des invites (`invites.json`), vos profils de publication, le registre de
 consommation, les notes proposées, le carnet de progrès (`carnet.json`, leçons d'avant le
 correctif 1.3.6 comprises), le suivi des photos (`suivi.json`), l'avant/après des étapes
 (`Etapes/`) et les journaux ; `bash uninstall.sh --tout` les retire aussi. Les retouches déjà faites restent dans le

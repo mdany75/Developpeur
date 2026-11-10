@@ -12,7 +12,8 @@
 #         --tout : retire aussi ce que le module et le serveur ont gardé pour l'utilisateur, qui
 #                  reste sans cette option : guide de style, conversations de la fenêtre Claude,
 #                  mes demandes de la fenêtre Claude (mes-demandes.json), réglage des invites
-#                  (invites.json), profils de
+#                  (invites.json, et invites-illisible-*.json, un réglage illisible mis de
+#                  côté), profils de
 #                  publication, registre de consommation, notes proposées (notation.json),
 #                  carnet de progrès et leçons des photos (carnet.json), suivi des photos
 #                  ouvertes (suivi.json, son journal suivi.journal et suivi-illisible-*.json,
@@ -132,7 +133,7 @@ else
         rmdir "${DEST_DIR}" 2>/dev/null && printf 'Supprimé : %s\n' "${DEST_DIR}"
     fi
     GARDES=()
-    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, profils de publication, consommation, notes proposées, carnet de progrès et leçons, suivi des photos ouvertes, index et modèles de la recherche par le sens, avant/après des étapes, photos de Fibo 2 non importées)")
+    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, réglage des invites, profils de publication, consommation, notes proposées, carnet de progrès et leçons, suivi des photos ouvertes, index et modèles de la recherche par le sens, avant/après des étapes, photos de Fibo 2 non importées)")
     [[ -d "${JOURNAUX}" ]] && GARDES+=("${JOURNAUX} (journaux)")
     [[ -n "${DOSSIER_COMMUN}" ]] && GARDES+=("${DOSSIER_COMMUN} (dossier commun, jamais touché par ce script, même avec --tout)")
     if [[ ${#GARDES[@]} -gt 0 ]]; then

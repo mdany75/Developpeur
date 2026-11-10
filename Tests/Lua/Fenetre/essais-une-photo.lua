@@ -1246,6 +1246,37 @@ essai("Obtenir : la demande part dans la conversation de la photo (neuve gardée
     end)
 end)
 
+essai("Obtenir suit le réglage de l'invite Proposer et appliquer (section Invites du Gestionnaire), relu au clic ; sans réglage, la demande d'origine", function()
+    local fichier = Chemins.donnee('invites.json')
+    Fichiers.supprimer(fichier)
+    photo(831)
+    depart({})
+    choisir(831)
+    ouvrir(function(p, contenu)
+        local bouton = boutonObtenir(contenu)
+        p.onglet = 'proposition'
+        -- Réglé après l'ouverture de la fenêtre : le clic le lit.
+        egal(true, Consignes.poserChoix('proposer_appliquer', { tsl = false, recadrage = false }))
+        local recu = cliquerObtenir(bouton)
+        contient(recu.message, Consignes.demandeObtenir(), 'la demande réglée')
+        contient(recu.message, Consignes.NE_PAS_FAIRE .. 'toucher au mélangeur TSL ; recadrer.', 'les étapes à Non dites')
+        vrai(not recu.message:find(', TSL,', 1, true), 'le mélangeur TSL retiré')
+        vrai(not recu.message:find('un recadrage seulement', 1, true), 'le recadrage retiré')
+        vrai(not recu.message:find(Consignes.obtenir.demande, 1, true), "pas la demande d'origine")
+        local c = Moteur.courante
+        egal(Consignes.obtenir.fil, c.elements[#c.elements].texte, 'le fil montre toujours la phrase courte')
+        finirTour()
+        -- Remis comme à l'origine : la demande de toujours.
+        egal(true, Consignes.poserChoix('proposer_appliquer', nil))
+        Fenetre.rafraichir()
+        recu = cliquerObtenir(bouton)
+        contient(recu.message, Consignes.obtenir.demande, "comme à l'origine")
+        finirTour()
+        p.onglet = 'notation'
+    end)
+    Fichiers.supprimer(fichier)
+end)
+
 -- Pièces pures ----------------------------------------------------------------------------------
 
 essai("Historique (pur) : nouvelles entrées après la dernière vue, par date quand elle n'y est plus ; clé d'une photo seule", function()

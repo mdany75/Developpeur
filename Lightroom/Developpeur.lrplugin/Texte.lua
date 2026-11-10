@@ -76,6 +76,33 @@ function Texte.lignes(s)
     return lignes
 end
 
+-- Le nombre de lignes d'un texte coupé aux espaces, `largeur` caractères au plus par ligne (un mot
+-- plus long prend les lignes qu'il lui faut), comme un `static_text` de `width_in_chars = largeur`
+-- (une estimation : la police n'a pas une largeur fixe). Chaque fin de ligne ouvre une ligne.
+function Texte.nombreDeLignes(s, largeur)
+    local total = 0
+    for _, ligne in ipairs(Texte.lignes(s)) do
+        local n, courante = 1, 0
+        for mot in ligne:gmatch('%S+') do
+            local l = Texte.longueur(mot)
+            if courante == 0 then
+                courante = l
+            elseif courante + 1 + l <= largeur then
+                courante = courante + 1 + l
+            else
+                n = n + 1
+                courante = l
+            end
+            while courante > largeur do
+                n = n + 1
+                courante = courante - largeur
+            end
+        end
+        total = total + n
+    end
+    return total
+end
+
 -- Entoure un texte de guillemets simples pour /bin/sh.
 function Texte.shell(s)
     return "'" .. tostring(s):gsub("'", "'\\''") .. "'"

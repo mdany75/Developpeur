@@ -290,7 +290,9 @@ function Vues.boutonClasser(f, F, D)
     local invite = Consignes.invite('classer')
     return F.bouton(f, { carre = true, size = 'small', title = invite.titre, font = F.POLICES.petit, width = D.boutonClasser,
         place_vertical = 0.5, enabled = F.bind 'libre',
-        tooltip = "Classer la photo active (ou la sélection) : Claude propose des mots-clés, un lieu s'il est sûr et une légende, puis attend votre accord avant de rien écrire",
+        -- L'infobulle dit aussi ce que l'invite réglée ne fera pas, au moment de l'ouverture.
+        tooltip = "Classer la photo active (ou la sélection) : Claude propose des mots-clés, un lieu s'il est sûr et une légende, puis attend votre accord avant de rien écrire."
+            .. Consignes.noteReglage(invite.id),
         -- Le message suit le réglage de l'invite au Gestionnaire (Consignes.message, lu au clic).
         action = function() F.envoyer(Consignes.message(invite.id), invite.modele) end })
 end
