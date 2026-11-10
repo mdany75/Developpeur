@@ -279,8 +279,7 @@ function Fil.lignesCarte(texte, largeur, police, emphase)
 end
 
 -- Un texte tronqué à `largeur` points : tel quel s'il tient, sinon son plus long début suivi de
--- « … » ('' si même « … » ne tient pas). Sans balise. Aussi pour les éléments du menu Mes demandes
--- (Fenetre.titreDemande).
+-- « … » ('' si même « … » ne tient pas). Sans balise.
 function Fil.tronquer(texte, largeur, police)
     if Fil.largeur(texte, police) <= largeur then
         return texte

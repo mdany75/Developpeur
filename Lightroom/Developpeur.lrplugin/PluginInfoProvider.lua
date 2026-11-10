@@ -473,7 +473,7 @@ local function sectionDossierCommun(f, propertyTable, ligne)
         synopsis = bind { key = 'dossierCommun', bind_to_object = propertyTable },
 
         f:static_text {
-            title = "Deux Mac, un même SSD : conversations, carnet, Suivi, notes, mes demandes, publication, consommation, guide de style et avant/après dans un dossier commun. Sur l'un ou l'autre Mac, vous reprenez le travail où vous l'avez laissé (jamais les deux en même temps).",
+            title = "Deux Mac, un même SSD : conversations, carnet, Suivi, notes, publication, consommation, guide de style et avant/après dans un dossier commun. Sur l'un ou l'autre Mac, vous reprenez le travail où vous l'avez laissé (jamais les deux en même temps).",
             width_in_chars = 66, height_in_lines = 3,
         },
         ligne("Dossier commun :", f:static_text {

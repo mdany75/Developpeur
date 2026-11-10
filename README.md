@@ -49,11 +49,11 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   du même Gestionnaire (« Avant d'appliquer ») : la fenêtre suit ce réglage, et l'infobulle de son
   voyant Lightroom le rappelle (la rangée Mode de l'en-tête est retirée au correctif 1.3.6).
 - Deux colonnes :
-  - au centre, l'en-tête (le titre de la conversation et, à sa droite, quatre petits boutons côte à
-    côte : « Repartir à neuf », Suivi, Publication… et Consommation… ; dessous, les voyants Claude
-    Code et Lightroom, la photo active et le nombre de photos sélectionnées), le
+  - au centre, l'en-tête (le titre de la conversation et, à sa droite, cinq petits boutons côte à
+    côte : Classer, « Repartir à neuf », Suivi, Publication… et Consommation… ; dessous, les
+    voyants Claude Code et Lightroom, la photo active et le nombre de photos sélectionnées), le
     fil, ▲ ▼ Fin, puis la saisie : les invites, le champ de demande, 📎, 📋, « Style » et son menu,
-    Mes demandes, le bandeau des messages et Envoyer ;
+    le bandeau des messages et Envoyer ;
   - à droite, les onglets Focus (montré à l'ouverture), Note, Aperçu et Proposition, l'aperçu
     commun aux quatre (◀ légende ▶ et ⤢ Agrandir dessous), puis la carte de l'onglet choisi.
 
@@ -190,8 +190,10 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   de la photo). La fenêtre ne prépare plus de proposition d'elle-même à son ouverture : la case
   À l'ouverture du Gestionnaire de modules externes est retirée.
 - Claude reçoit avec chaque demande la photo active et la sélection de Lightroom.
-- Huit invites en raccourcis : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé,
-  Composition, Sports, Classer. Classer propose des mots-clés (ceux de votre catalogue d'abord), un
+- Sept invites en raccourcis sous le champ : Retouche pro, Portrait, Paysage, Noir et blanc, ISO
+  élevé, Composition, Sports ; et Classer, en haut de la fenêtre, à gauche de « Repartir à neuf »
+  (son infobulle dit ce qu'il fait ; grisé, comme les invites, pendant que Claude travaille).
+  Classer propose des mots-clés (ceux de votre catalogue d'abord), un
   lieu seulement s'il est sûr (un champ ou un mot-clé de lieu déjà posé ; d'une position GPS seule,
   Claude donne les coordonnées et vous nommez le lieu) et une légende courte, sans remplacer celle
   que vous avez écrite : Claude n'écrit rien avant votre accord, même en mode Appliquer. Portrait, Paysage et Noir et blanc passent en fin de retouche par éclaircir
@@ -212,14 +214,6 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   l'autre. Ce sont des recettes de départ, à ajuster à votre goût. « Peau douce » passe par un
   masque de la peau à la dose « Adoucir la peau (Lite) », la moitié pour un homme ou une personne
   âgée, rien pour un enfant, jamais par un réglage de toute la photo.
-- Mes demandes, le menu à droite de Style : vos demandes à vous, gardées pour ne pas les réécrire
-  à chaque fois, chacune « Nom — description ». En choisir une met son texte dans le champ, à la
-  place de ce qui y était, sans l'envoyer : changez-la au besoin, puis Retour (ou Envoyer). Au bas
-  du menu, Ajouter… (un nom, une courte description et le texte ; celui du champ y est déjà, s'il y
-  en a un), Renommer… (le nom, la description ou le texte d'une demande) et Supprimer… (après
-  confirmation). Un nom vide ou déjà pris est refusé, avec la raison ; le menu est grisé pendant
-  que Claude travaille. (« ＋ Garder la demande », qui gardait la demande que Claude écrivait à la
-  fin d'une retouche, est retiré au correctif 1.3.6.)
 - Joindre une photo du disque (📎 : JPEG, PNG, HEIC, TIFF, WebP) ou coller l'image du
   presse-papiers (📋 : capture d'écran, image copiée, photo copiée dans le Finder), comme exemple
   ou comme référence de style. Les photos jointes s'affichent dans le bandeau ; un clic les retire.
@@ -279,7 +273,7 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
   accepter : prenez le mode Appliquer, ou la fenêtre Claude. Classer, lui, ne fait que proposer
   (mots-clés, lieu, légende), quel que soit le mode, et n'écrit rien. Pour écrire : sur une photo
   seule (case Autre photo cochée), répondez dans la fenêtre Claude, qui reprend la conversation ;
-  sur plusieurs, la proposition n'est pas gardée : passez par l'invite Classer de la fenêtre Claude,
+  sur plusieurs, la proposition n'est pas gardée : passez par le bouton Classer de la fenêtre Claude (en haut),
   ou faites une nouvelle demande qui nomme ce qu'il faut écrire (« pose les mots-clés lac et
   automne sur ces photos »).
 - Le cinquième bouton, « Proposer et appliquer » (1.6.5, la photo à la coche) : en mode Appliquer,
@@ -1246,7 +1240,8 @@ Ce qui reste sur le Mac :
   plusieurs photos et des demandes rapides sur plusieurs photos ne sont jamais gardées (leurs
   images vont dans un dossier temporaire, effacé quand on les quitte et au chargement suivant du
   module) ; vos demandes
-  du menu Mes demandes (`mes-demandes.json`), le guide de style, les profils de publication, le
+  de l'ancien menu Mes demandes (`mes-demandes.json`, retiré de la fenêtre : le fichier reste tel
+  quel, jamais lu), le guide de style, les profils de publication, le
   registre de consommation, les notes proposées avec l'évaluation de chaque photo
   (`notation.json`), le carnet de progrès (`carnet.json` : une table par catalogue, une entrée par
   photo originale, 3 000 au plus par catalogue, les plus anciennes sortent au-delà ; les leçons
@@ -1449,7 +1444,7 @@ photos (jamais les deux Mac en même temps) :
   copiées, puis mises de côté sur le Mac dans « Avant le dossier commun … » (rien n'est effacé).
   Sur l'autre Mac, choisir le même dossier prend ces données telles quelles. Y vont : guide de
   style, conversations et échanges de Claude Code (une conversation se reprend sur l'autre Mac),
-  Suivi, carnet, notes proposées, Mes demandes, profils de publication, consommation, avant/après
+  Suivi, carnet, notes proposées, profils de publication, consommation, avant/après
   des étapes, index et modèles du sens et des espèces. Restent sur chaque Mac : le connecteur, le
   jeton de la liaison, les journaux, Fibo 2 et Lightroom lui-même. « Revenir au dossier de ce Mac »
   retire le réglage sans rien copier.

@@ -168,7 +168,9 @@ Consignes.invites = {
     -- outil ne traduit la position GPS en ville, Claude la donne et Dany nomme le lieu (relecture
     -- du 2 novembre 2026). Après Sports, la dernière invite ; la Demande rapide en a sa version
     -- (Consignes.classerRapide). Pendant du connecteur : l'invite classer (Prompts.classer).
-    { id = 'classer', titre = "Classer",
+    -- Dans la fenêtre Claude, son bouton est en haut, à gauche de « Repartir à neuf » (`entete`,
+    -- Vues.boutonClasser ; demandé par Dany le 10 novembre 2026), plus dans la rangée des invites.
+    { id = 'classer', titre = "Classer", entete = true,
         message = CLASSER .. " Montre ta proposition et attends mon accord avant set_metadata, même en mode Appliquer." },
 }
 

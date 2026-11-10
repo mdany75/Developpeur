@@ -140,7 +140,7 @@ défait ensuite.
 - Clic sur une étape qui change d'onglet puis pose l'image, retour à Focus, Agrandir à 2 000 × 1 250 — à la main dans Lightroom ([1.3.6, points 11 et 12](#correctif-136--une-photo-une-conversation)).
 - Plusieurs photos (conversation de groupe, résumé de 500 photos), « Repartir à neuf », un seul Claude Code pour la fenêtre et la Demande rapide — à la main dans Lightroom ([1.3.6, points 3, 4 et 6](#correctif-136--une-photo-une-conversation)).
 - Avec le vrai Claude : `compare = before_claude` et `rendu_reproductible`, résumé des réglages (JPEG, paramètre prédéfini à l'importation), résumé en haut du fil, `editCount` à 0, modèle ou effort changé (`--resume`) — à la main dans Lightroom ([1.3.6, points 2, 8, 13 et 15](#correctif-136--une-photo-une-conversation) ; [fenêtre, point 10](#à-constater-dans-lightroom-11-111-et-après)).
-- Mes demandes : choix, Ajouter…, Renommer…, Supprimer…, menu fermé sans choix — à la main dans Lightroom ([1.3, point 23](#à-constater-dans-lightroom-13)).
+- « Classer » dans la rangée du titre, à gauche de « Repartir à neuf » : place, taille, infobulle, grisé pendant que Claude travaille — à la main dans Lightroom ([Classer dans l'en-tête](#classer-dans-len-tête-demandé-par-dany-le-10-novembre-2026) ; Mes demandes, retiré après la 1.8, n'a plus rien à constater).
 - Onglet Focus : autre marque, HEIF, original déplacé, copie recadrée ou tournée, recadrage du boîtier, zone de 5 × 5, aperçu commun sans image après une retouche — à la main dans Lightroom ([1.3, point 22](#à-constater-dans-lightroom-13) ; [Onglet Focus](#onglet-focus-demandé-par-dany-le-22-octobre-2026)).
 - Cadre de mise au point : rouge, photo tournée ou recadrée, zoom (`region`), case « Mise au point » — à la main dans Lightroom ([fenêtre, points 12 et 13](#à-constater-dans-lightroom-11-111-et-après)).
 - Composition : `--horizon` sur une copie au vrai horizon (mer, lac, plaine) — dans la recette, une fois la copie choisie avec Dany et rangée dans Essais ; le cadre dans Agrandir à la main ([1.3, point 16](#à-constater-dans-lightroom-13)).
@@ -1428,7 +1428,8 @@ la fenêtre B de la 1.3 ; le correctif la change ainsi :
   rangée du titre : `D.placeBoutons`, voir Correctif 1.3.8). La rangée Mode est retirée
   (`Vues.mode`, `Fenetre.modeMontre`, `Fenetre.modeAuto`, `Fenetre.changerMode`,
   `Fenetre.reposerMode`, `TOUR_REPOSER_MODE`) : la fenêtre suit la préférence `mode` du
-  Gestionnaire ; `Fenetre.lierRadio` reste pour le menu Mes demandes ;
+  Gestionnaire ; `Fenetre.lierRadio` restait pour le menu Mes demandes (retirés tous deux après la
+  1.8) ;
 - le fil : l'élément `historique` (l'historique de la photo, « Depuis la dernière fois », le
   résumé d'un groupe ; depuis le correctif 1.3.8, seul « Depuis la dernière fois » a des lignes :
   `Fil.HISTORIQUES_CACHES`, voir Correctif 1.3.8) reprend le genre `note` (gris, ⓘ sur sa première ligne, ses puces « •  » en
@@ -1603,7 +1604,7 @@ Focus (la vignette de secours comprise) et Agrandir. Essais : `essais-integratio
 La fenêtre construite (simulation) compte 2 317 vues, dont 1 490 simples (1 368 et 857 à
 1 280 × 800) ; Mes demandes (22 octobre 2026) en ajoute 86 : le menu et son espace, et par ligne du
 fil une rangée et « ＋ Garder la demande » (2 289 vues, dont 1 473 simples, avant lui ; 2 375, dont
-1 516, après, au compte de toutes les vues de l'arbre) : son temps d'ouverture est à mesurer. Elle ne tient pas sur un écran de portable
+1 516, après, au compte de toutes les vues de l'arbre ; le menu est retiré après la 1.8) : son temps d'ouverture est à mesurer. Elle ne tient pas sur un écran de portable
 (1 440 × 900) : son contenu est de taille fixe, sans défilement.
 
 **Volet** (`Vues.volet`, de la 1.3 à la 1.3.5 ; retiré au correctif 1.3.6) : « ＋ Nouvelle
@@ -1660,16 +1661,17 @@ droite l'activité de Claude (orange) ou le relevé du forfait. Un clic sur une 
 `Fenetre.sorteDeClic` (`Fenetre.clics`) : image, ligne du carnet, leçon, étape, sinon détail de
 l'outil.
 
-**Saisie** (`Vues.saisie`) : les huit invites en carrés (Classer, la dernière, après la 1.6) (bezel 24, `Vues.invites` ; ni « ★ Noter »
+**Saisie** (`Vues.saisie`) : les sept invites en carrés (Classer, ajoutée après la 1.6, est montée dans l'en-tête après la 1.8 : voir Classer dans l'en-tête) (bezel 24, `Vues.invites` ; ni « ★ Noter »
 ni séparateur), le champ de demande sur deux lignes (`immediate = false`), puis 📎 et 📋 (carrés à
 icône seule, `image_name`), l'étiquette « Style » et son menu (décision de Dany après le lot B3 :
-comme la maquette, à la place du « sans étiquette » du 20 octobre 2026), le menu Mes demandes (280,
-`D.mesDemandes` ; voir Mes demandes), le bandeau, et Envoyer.
+comme la maquette, à la place du « sans étiquette » du 20 octobre 2026), le bandeau, et Envoyer (le
+menu Mes demandes, de 280, entre Style et le bandeau depuis le 22 octobre 2026, est retiré après la
+1.8 : voir Mes demandes).
 Pas de menu Modèle (décision de Dany : Modèle et Effort sont dans le Gestionnaire de modules
 externes). Envoyer (`Vues.envoi`) est un bouton bleu en image (`Vues.boutonBleu`), Arrêter un carré
 superposé, montré pendant le travail ; aucun bouton par défaut (repli décidé après D1). Le bandeau
-(`Vues.bandeau`, à la place du menu Modèle de la maquette, `D.bandeau` 324 depuis Mes demandes, 612
-avant) : deux lignes de petit
+(`Vues.bandeau`, à la place du menu Modèle de la maquette, `D.bandeau` 612 ; 324 du 22 octobre 2026
+à la 1.8, avec Mes demandes) : deux lignes de petit
 texte (`Fenetre.LIGNES_BANDEAU`), coupées d'après la chasse mesurée (`Fenetre.texteBandeau`, « … »
 au bout de la seconde) ; l'infobulle donne le message entier, un clic l'aide entière. Les messages
 de la fenêtre sont des constantes raccourcies pour y tenir (`CHOISIR_CONVERSATION`,
@@ -1964,110 +1966,41 @@ relit la photo active (`Fenetre.majPhoto`, toutes les 2 s et après une écritur
 registre sur sa note et son drapeau (`Notation.recaler`, avec la version lue avant) : une note
 acceptée ou changée puis annulée (undo_last, ⌘Z) rend la proposition de nouveau « à vérifier ».
 
-### Mes demandes (demandé par Dany le 22 octobre 2026)
+### Mes demandes (demandé par Dany le 22 octobre 2026, retiré après la 1.8)
 
-Ses mots : « un menu déroulant à droite de Style. Ce menu aurait une liste de mes prompts
-personnels, donc j'ai pas à recréer à chaque fois », avec ajouter, supprimer et renommer, et,
-« suite à une correction d'une photo », la demande de Claude à ajouter. Ses choix : choisir une
-demande remplit le champ (sans l'envoyer : Retour l'envoie) ; après une retouche, un bouton
-« Garder la demande » sur la ligne d'actions du tour de Claude ; la gestion au bas du menu.
+Le menu Mes demandes, à droite du menu Style sous le champ (un `popup_menu` de 280 : les
+demandes personnelles de Dany, Ajouter…, Renommer… et Supprimer…, rangées dans
+`mes-demandes.json`), est **retiré après la 1.8** (demandé par Dany le 10 novembre 2026 : il ne
+s'en servait jamais). Partent avec lui `Vues.mesDemandes`, `Dispositions.TAILLES.mesDemandes`, la
+section « Mes demandes » de `Stockage.lua` (`lireDemandes`, `garderDemande`, `changerDemande`,
+`retirerDemande`), ses fonctions et messages dans `Fenetre.lua` (`elementsMesDemandes`,
+`choisirMesDemandes`, `mettreDemande`, `titreDemande`, Ajouter…, Renommer…, Supprimer…), et ce
+qui ne servait qu'à lui : `Fenetre.lierRadio` (fait pour les radios du Mode, retirés au correctif
+1.3.6) et `Fenetre.lierSaisie` (le champ de demande est lié à `saisie` comme une autre clé).
+« ＋ Garder la demande » et la ligne « Demande à garder : « … » » de Claude l'étaient déjà depuis
+le correctif 1.3.6. Le bandeau reprend sa place (`D.bandeau` 612, comme avant le menu).
 
-**Le menu** (`Vues.mesDemandes`) : un `popup_menu` de 280 (`Dispositions.TAILLES.mesDemandes`),
-à droite du menu Style, 8 points après lui, dans la rangée sous le champ ; le bandeau prend ce
-qu'il laisse (`D.bandeau` 324). Ses éléments (`Fenetre.elementsMesDemandes`, tables neuves, liés
-par `mesDemandesItems`) : son titre « Mes demandes » (valeur `Fenetre.MENU_TITRE`, la valeur
-montrée quand rien n'est choisi), un séparateur, chaque demande « Nom — description » (valeur :
-son indice), coupée par « … » à la largeur du menu moins ses flèches (`Fenetre.titreDemande`,
-`Fenetre.FLECHES_MENU` 32, mesurée dans la police du menu, `texte` de `Metriques`), un séparateur,
-puis Ajouter…, Renommer… et Supprimer… ; sans demande, « Aucune demande gardée » grisé et Ajouter…
-seul. Relevé dans `AgViewUtils.getPopupMenu` de Lightroom 15.6 (code compilé, lecture seule, sans
-l'avoir vu) : un élément `{ separator = true }` est un séparateur, `enabled = false` grise un
-élément (`updateStatus`), un élément-table sans `title` montrerait `tostring` de la table ;
-`value_equal` et « < no_match_found > » (une valeur sans élément) existent : d'où le titre en
-élément, toujours choisi. La simulation de la fenêtre en tient : `S.refusElements` (à la création
-et à chaque nouvelle valeur liée), `S.choisir` (ni séparateur, ni élément grisé, ni valeur
-absente ; le champ tapé validé d'abord, comme par un clic). Grisé pendant que Claude travaille
-(`enabled = libre`), comme le Mode (retiré au correctif 1.3.6).
+`mes-demandes.json` déjà écrit reste sur le disque, **jamais lu ni effacé** : il reste dans
+`Chemins.NOMS_DONNEES` (et `DossierDonnees` côté serveur), pour suivre les autres données au
+dossier commun sans se perdre ; seul `uninstall.sh --tout` le retire, avec tout le dossier.
 
-**Choisir une demande** (`Fenetre.choisirMesDemandes`, l'observateur de `mesDemandes`) : sa valeur
-passe par `Fenetre.lierRadio`, comme le Mode : un choix, même du titre rechoisi, annule l'envoi
-automatique de la demande que ce clic aurait validée (supposé pour un menu ; constaté D3 pour un
-calque, un radio, un segment et un bouton). Le menu revient aussitôt à son titre (pour rechoisir
-la même demande). La demande va dans le champ, à la place du texte tapé (`Fenetre.mettreDemande` :
-la clé `saisie` posée sous `Fenetre.ignorerSaisie`, `Fenetre.demandeMise` gardée,
-`Fenetre.DEMANDE_DANS_LE_CHAMP` au bandeau) : ni envoi automatique, ni bouton, ni bascule
-d'onglet. Retour l'envoie : validé sans y rien changer, le champ ne change pas la clé, et la table
-ne prévient pas son observateur (supposé, comme la simulation) ; la valeur liée du champ passe donc
-par `Fenetre.lierSaisie`, dont le `transform` (de la vue vers la table) lance l'envoi automatique
-quand la valeur poussée est la demande mise. Changée dans le champ, la demande part par
-l'observateur, comme une demande tapée ; Envoyer l'envoie aussi.
+Essais : `Tests/Lua/Fenetre/essais-fenetre-b.lua` (« Mes demandes retiré »).
 
-**Ajouter…, Renommer…, Supprimer…** (dans une tâche, `Fenetre.enTache`) : de petites fenêtres
-modales. Ajouter… (`Fenetre.ajouterDemande`) : Nom, Description (courte, montrée dans le menu
-après le nom) et Texte (six lignes), pré-remplis du texte du champ (depuis le menu ; de la demande
-de Claude depuis « ＋ Garder la demande » jusqu'au correctif 1.3.6, un nom proposé déjà pris
-recevant un libre, « … 2 », `Stockage.nomLibre`, retirés avec lui). Renommer…
-(`Fenetre.renommerDemande`) : un menu « Demande : »
-(les noms), puis les mêmes champs, remplis de la demande choisie. Supprimer…
-(`Fenetre.supprimerDemande`) : le même menu, le texte de la demande, puis `LrDialogs.confirm`. Le
-refus (`Stockage.refusDemande` : `NOM_VIDE`, `NOM_PRIS` — majuscules et accents ne comptent pas
-—, `TEXTE_VIDE`) se dit en direct sous les champs, et le bouton d'action est grisé tant qu'il reste
-(`actionBinding = { enabled = { bind_to_object = q, key = 'valide' } }` de
-`LrDialogs.presentModalDialog`, relevé dans `LrDialogs.lua`) ; un refus après le clic (le bouton
-resté actif, le fichier changé entre-temps, une écriture impossible) rouvre la fenêtre, champs
-gardés et raison dite. Le bandeau dit `DEMANDE_GARDEE`, `DEMANDE_CHANGEE`, `DEMANDE_RETIREE`.
+### Classer dans l'en-tête (demandé par Dany le 10 novembre 2026)
 
-**Rangement** (`Stockage.lua`, section « Mes demandes ») : `mes-demandes.json` dans
-`Chemins.racine()`, `{ format = 1, demandes = [ { nom, description, texte } ] }`, trié par nom
-(`Texte.plier`), écrit d'un coup (`Fichiers.ecrire` : provisoire, puis renommé), relu à chaque
-ouverture de la fenêtre et avant chaque changement (`Stockage.garderDemande`,
-`Stockage.changerDemande`, `Stockage.retirerDemande`). Une entrée sans nom ou sans texte, ou d'un
-nom déjà lu, ne se lit pas. Un fichier illisible (ou d'un autre format) n'est jamais perdu en
-silence : dit au journal et au bandeau (`Fenetre.DEMANDES_ILLISIBLES`), il est mis de côté
-(`mes-demandes-illisible-<date>.json`) avant la première écriture, comme `carnet.json` ; s'il ne
-peut pas l'être, rien n'est écrit. Tout ce qui en sort est fait de tables neuves. `uninstall.sh
---tout` le retire (tout le dossier) ; sans `--tout`, il reste, dit avec le reste.
+Le bouton « Classer » (l'invite `classer` de `Consignes.invites`, marquée `entete`) quitte la
+rangée des invites, sous le champ, pour la rangée du titre, juste à gauche de « Repartir à neuf »
+(`Vues.boutonClasser`) : un carré small comme les autres boutons de cette rangée, son titre en
+petit, de 64 (`Dispositions.TAILLES.boutonClasser` : « Classer » mesure environ 39 en petit, et 22
+de jeu). Il garde exactement son comportement : le message et le modèle de l'invite, envoyés par
+`Fenetre.envoyer`, grisé pendant que Claude travaille (`enabled = libre`, comme les invites). Son
+infobulle dit ce qu'il fait : mots-clés, lieu s'il est sûr et légende proposés, rien d'écrit sans
+l'accord de Dany. La rangée du titre tient dans le centre de 1 024 : les cinq boutons et leurs
+écarts prennent 462 (`D.placeBoutons`), le titre de la conversation garde 562 (632 avant). La
+Demande rapide garde son propre bouton Classer (`Consignes.classerRapide`), inchangé.
 
-**La demande de Claude** (retirée au correctif 1.3.6, voir plus bas) : la section « Demande à
-garder » des consignes de la fenêtre (`Consignes.texte`) : après une retouche (une étape écrite ;
-pas une proposition, une notation, un classement ou une leçon seuls), Claude finit sa réponse par
-une ligne seule « Demande à garder :
-« … » », une ou deux phrases qui referaient son travail sur une photo semblable, sans identifiant
-ni nom de fichier ; la section Leçon dit « rien après (sauf Demande à garder) » (au correctif
-1.3.6, la section Leçon part, et la leçon de la liste : « pas une proposition, notation ou
-classement seuls »). Le texte des
-consignes y a fait de la place (7 489 → 7 476 caractères pour un plafond de 7 500) en raccourcissant
-l'introduction, Pour qui, Mise en forme, Contexte, la puce Proposer d'abord, la puce Notes, Titre,
-Style et Leçon, sans en changer le sens. La fenêtre reconnaît la ligne
-(`Conversation.demandeAGarder` : gras ou puce Markdown, guillemets « », “ ” ou " ", point final
-après eux, espaces insécables ; la dernière du texte ; le gabarit « <ta demande> » refusé). La
-ligne d'actions du tour (`Fil.lignes`) gagne « ＋ Garder la demande » quand ce tour a retouché
-(`Conversation.estRetouche` : un outil de `OUTILS_ETAPES` hors des classements, abouti, avec une
-étape écrite ; `match_series` abouti) et que le texte de Claude, arrivé en entier, porte la ligne :
-`actions` prend le suffixe `+demande` (`Fil.valeurActions`, `Fil.lireActions`), `demande`
-l'indice du texte. Le bouton (`Vues.ligneFil` : carré small de 136, en petit) se pose au bout de
-la ligne, à droite, dans une rangée poussée par `margin_left` (D6), comme « Pourquoi ? » : une vue
-masquée garde sa place, et le poser après les deux autres boutons demanderait une variante par
-place (quatre boutons par ligne au lieu d'un). Son clic (`Fenetre.garderDemande`) ouvre Ajouter…
-pré-rempli : le nom proposé est ce qui précède « : » (40 caractères au plus), sinon les quatre
-premiers mots, sans la ponctuation de sa fin (« … » retiré en entier, jamais dans une classe de
-Lua 5.1, qui en prendrait chaque octet à part : « Retouche ÉTÉ À » perdait l'octet 0x80 de « À »,
-relu le 22 octobre 2026) ; la description, la suite, coupée aux mots (60 caractères au plus,
-`Conversation.preparerDemande`) ; le texte entier. La ligne reste dans le fil : Dany la lit.
-
-**Retirée au correctif 1.3.6** (deuxième retour de Dany du 25 octobre 2026, accepté tel quel) :
-« ＋ Garder la demande », la ligne « Demande à garder : « … » » que Claude écrivait à la fin d'une
-retouche et la section « ## Demande à garder » des consignes (`Consignes.texte` : 6 331 → 5 922
-caractères ; `Consignes.rapide` et `Consignes.rapidePhoto` disent « Pas de titre. » au lieu de « Ni
-titre, ni « Demande à garder ». »), avec `Conversation.estRetouche` (qui ne servait qu'à elle),
-`Conversation.demandeAGarder`, `Conversation.preparerDemande`, `Fenetre.garderDemande`,
-`Stockage.nomLibre`, le suffixe `+demande` des actions (`Fil.valeurActions`, `Fil.lireActions`,
-`Fenetre.lireActions`), `D.garderDemande` et `D.ecartActions`. La ligne d'actions d'un tour ne
-porte plus que « ☆ Voir la note » (`actions` : 'note'). Une ligne « Demande à garder » d'une
-conversation d'avant reste un texte de Claude comme un autre. Le menu Mes demandes reste, avec
-Ajouter… (pré-rempli du texte du champ), Renommer… et Supprimer….
-
-Essais : `Tests/Lua/Fenetre/essais-mes-demandes.lua`.
+Essais : `Tests/Lua/Fenetre/essais-fenetre-b.lua` (inventaire de l'en-tête et « Classer en haut »)
+et `tests.lua` (la rangée des invites).
 
 ### Carte Note B (1.3)
 
@@ -6903,7 +6836,7 @@ Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou
     cliquée) ; un HEIF de l'appareil et un original déplacé (« non lue (format pas encore lu…) »,
     « non lue (original introuvable) ») ; une photo prise en recadrage 1,25× ou au viseur sport
     (les positions décalées ou non par rapport à l'image de Lightroom).
-23. **En partie fait** (captures : le menu à droite de Style ; « ＋ Garder la demande » : sans objet depuis le correctif 1.3.6) ; **ouvert** : les choix, Ajouter…, Renommer…, Supprimer…, le menu fermé sans choix. Mes demandes (non publié ; essais dans les simulations seulement ; voir Mes demandes). Après un
+23. **Sans objet après la 1.8** (le menu Mes demandes est retiré, demandé par Dany le 10 novembre 2026 : voir Mes demandes). Avant : **en partie fait** (captures : le menu à droite de Style ; « ＋ Garder la demande » : sans objet depuis le correctif 1.3.6) ; **ouvert** : les choix, Ajouter…, Renommer…, Supprimer…, le menu fermé sans choix. Mes demandes (non publié ; essais dans les simulations seulement ; voir Mes demandes). Après un
     rechargement du module (aucun fichier `.lua` nouveau) : le menu à droite de Style, à 280, sa
     flèche et son titre « Mes demandes » ; ses séparateurs et « Aucune demande gardée » grisé
     (relevés dans `AgViewUtils`, jamais vus) ; « Nom — description » coupé à la largeur du menu, la
@@ -8069,7 +8002,7 @@ retours après cet essai (numéro gardé). Le module gagne deux fichiers (`Histo
   un résumé en haut du fil (sous l'historique, au-dessus de la première demande ; d'abord en bas,
   déplacé à la demande de Dany du même jour), fait par la fenêtre à l'ouverture et à chaque autre
   photo ou autre groupe, jamais gardé ni envoyé à Claude ; « ＋ Garder la demande » et la ligne
-  « Demande à garder » de Claude sont retirés (le menu Mes demandes reste). Voir Fenêtre B ›
+  « Demande à garder » de Claude sont retirés (le menu Mes demandes reste, jusqu'à la 1.8). Voir Fenêtre B ›
   Agrandir, Une photo, une conversation (Le résumé en haut du fil) et Mes demandes.
 - **Retirés** : la leçon de la photo et « Je le fais », partout (voir leurs sections, gardées comme
   historique) ; dans le protocole, la commande `lecon`, `journal` avec `detaille`, `exercice` et

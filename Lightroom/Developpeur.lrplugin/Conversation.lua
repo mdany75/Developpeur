@@ -831,7 +831,7 @@ end
 -- (Conversation.estRetouche, Conversation.demandeAGarder et Conversation.preparerDemande sont
 -- retirées au correctif 1.3.6, avec « ＋ Garder la demande » et la ligne « Demande à garder : « … » »
 -- que Claude écrivait à la fin d'une retouche : deuxième retour de Dany du 25 octobre 2026. Le menu
--- Mes demandes reste, avec Ajouter…, Renommer… et Supprimer….)
+-- Mes demandes est retiré à son tour après la 1.8, le 10 novembre 2026.)
 
 -- Les étapes de la conversation pour une photo, dans l'ordre du fil : { element (indice),
 -- elementId, photo, id, nom, fichier, etape, raison, changements, outil, annulee, enCours,

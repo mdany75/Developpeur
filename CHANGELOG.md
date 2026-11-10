@@ -1,5 +1,19 @@
 # Changements
 
+## Non publié
+
+### Changé
+- **Classer monte en haut de la fenêtre Claude**, dans la rangée du titre, juste à gauche de
+  « Repartir à neuf », de la même forme que les petits boutons de cette rangée. Il fait exactement
+  la même chose qu'avant (Claude propose des mots-clés, un lieu s'il est sûr et une légende, puis
+  attend votre accord avant d'écrire quoi que ce soit) et se grise de même pendant que Claude
+  travaille. Son infobulle le rappelle. Sous le champ de demande, il reste sept invites.
+
+### Retiré
+- **Mes demandes**, le menu à droite de Style : vous ne vous en serviez pas. Le bandeau des
+  messages reprend sa place. Le fichier de vos demandes déjà gardées (`mes-demandes.json`) n'est
+  ni lu ni effacé : il reste sur le disque, et seul `uninstall.sh --tout` le retire, avec le reste.
+
 ## 1.8 — 2026-11-10
 
 La 1.8 suit Lightroom Classic 16 : Développeur y a été vérifié en entier (recette de 88 étapes

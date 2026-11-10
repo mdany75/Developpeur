@@ -86,7 +86,6 @@ local function cheminsDonnees()
         publication = require('Publication').fichierProfils(),
         suivi = require('Releve').fichier(),
         journal = require('Releve').fichierJournal(),
-        demandes = require('Stockage').fichierDemandes(),
         conversations = Chemins.conversations(),
         conversation = require('Stockage').fichier('abc'),
         etapes = Chemins.etapes(),
@@ -193,7 +192,7 @@ essai('Introuvable : Chemins.donnees refuse avec le message, jamais la racine lo
     for _, f in ipairs({ function() return require('Carnet').fichier() end, function() return require('Notation').fichier() end,
         function() return require('Consommation').fichier() end, function() return require('Publication').fichierProfils() end,
         function() return require('Releve').fichier() end, function() return require('Releve').fichierJournal() end,
-        function() return require('Stockage').fichierDemandes() end, Chemins.conversations, Chemins.etapes, Chemins.claudeCode }) do
+        Chemins.conversations, Chemins.etapes, Chemins.claudeCode }) do
         local okF, e = pcall(f)
         egal(false, okF, 'chemin rendu : ' .. tostring(e))
         egal(MESSAGE, e)
@@ -204,12 +203,9 @@ essai('Introuvable : Chemins.donnees refuse avec le message, jamais la racine lo
     rienEcrit()
 end)
 
-essai('Introuvable : écritures refusées (Mes demandes, consommation, carnet, notes, conversation), rien d’écrit ailleurs', function()
+essai('Introuvable : écritures refusées (consommation, carnet, notes, conversation), rien d’écrit ailleurs', function()
     poserPointeur(absent)
     local Stockage = require 'Stockage'
-    local ok, raison = Stockage.garderDemande({ nom = 'Ciel', texte = 'Assombris le ciel' })
-    egal(false, ok)
-    egal(MESSAGE, raison)
     local Consommation = require 'Consommation'
     Consommation.oublier()
     egal(false, (pcall(Consommation.charger)))

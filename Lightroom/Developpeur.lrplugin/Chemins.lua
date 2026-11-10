@@ -37,8 +37,8 @@
 --                                              par catalogue (suivi-illisible-<date>.json : un
 --                                              relevé illisible mis de côté ; suivi.journal : les
 --                                              entrées changées depuis, rejouées à la relecture)
---       mes-demandes.json                      les demandes du menu Mes demandes de la fenêtre
---                                              (Stockage.lua)
+--       mes-demandes.json                      les demandes de l'ancien menu Mes demandes (retiré
+--                                              après la 1.8) : gardé tel quel, jamais lu ni effacé
 --       Etapes/                                avant/après de chaque étape de Claude (1.3)
 --   ~/Library/Logs/Developpeur/conversation.log   (à côté de module.log, le journal de la liaison)
 

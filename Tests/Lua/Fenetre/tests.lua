@@ -969,8 +969,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         table.sort(fleches)
         egal('etapeDescend etapeMonte focusDescend focusMonte noteDescend noteMonte propositionDescend propositionMonte',
             table.concat(fleches, ' '), nom .. ' : flèches des cartes')
-        -- Les huit invites (1.3 : Composition ajoutée avant Sports ; Classer après la 1.6), en carrés de
-        -- 24 de bezel, tiennent dans le centre.
+        -- Les sept invites de la rangée (1.3 : Composition ajoutée avant Sports ; Classer, ajouté après
+        -- la 1.6, monté dans l'en-tête après la 1.8), en carrés de 24 de bezel, tiennent dans le centre.
         local largeurInvites = largeurEstimee(rangeeSports, p)
         vrai(largeurInvites <= D.fil, string.format('%s : invites de %d points dans %d', nom, largeurInvites, D.fil))
         local invites = {}
@@ -981,7 +981,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 egal(24, S.bezelVisible(enfant), nom .. ' : bezel de 24 (maquette)')
             end
         end
-        egal('Retouche pro Portrait Paysage Noir et blanc ISO élevé Composition Sports Classer', table.concat(invites, ' '), nom .. ' : invites')
+        egal('Retouche pro Portrait Paysage Noir et blanc ISO élevé Composition Sports', table.concat(invites, ' '), nom .. ' : invites, sans Classer (dans l\'en-tête)')
         -- La carte Proposition (fenêtre B, lot B5), sur son image : Accepter, un bouton bleu en image
         -- dont le calque dit que la photo ne change qu'à son clic ; sur sa rangée, sous la carte comme
         -- celle de la carte Note, ▲ ▼ puis Obtenir, Refuser et Ajuster… en carrés (Obtenir et plus de

@@ -366,16 +366,19 @@ essai('Cadre : la fenêtre demandée par Dany, sans son volet (1 623 × 1 200), 
     -- titre en petit et le jeu du carré.
     egal(nil, D.placeRepartir, "plus de place à part pour « Repartir à neuf »")
     egal(nil, D.placeMode)
-    egal(D.ecartVoyants + D.repartir + D.ecartBoutons + D.boutonSuivi + D.ecartBoutons + D.boutonPublication + D.ecartBoutons
-        + D.boutonConsommation, D.placeBoutons, 'les quatre boutons et leurs écarts')
-    egal(D.fil, D.titre + D.placeBoutons, 'le titre et les quatre boutons')
-    vrai(D.titre >= 600, 'le titre garde de la place : ' .. D.titre)
+    -- « Classer » (après la 1.8, demandé par Dany le 10 novembre 2026) monte de la rangée des invites
+    -- à gauche de « Repartir à neuf » : cinq boutons, et le titre garde plus de la moitié du centre.
+    egal(D.ecartVoyants + D.boutonClasser + D.ecartBoutons + D.repartir + D.ecartBoutons + D.boutonSuivi + D.ecartBoutons
+        + D.boutonPublication + D.ecartBoutons + D.boutonConsommation, D.placeBoutons, 'les cinq boutons et leurs écarts')
+    egal(D.fil, D.titre + D.placeBoutons, 'le titre et les cinq boutons')
+    egal(562, D.titre, 'le titre garde 562 points')
+    vrai(D.titre >= D.fil / 2, 'le titre garde plus de la moitié du centre : ' .. D.titre)
     egal(nil, D.voyantEcran, 'plus de voyant Écran')
     egal(D.fil, (8 + 6 + D.voyantClaude) + D.ecartVoyants + (8 + 6 + D.voyantLightroom) + D.ecartVoyants + D.info,
         'les voyants et la photo active')
     vrai(D.info >= 600, 'la photo active a la place des boutons : ' .. D.info)
-    for titre, largeur in pairs({ ['Repartir à neuf'] = D.repartir, ['Suivi'] = D.boutonSuivi, ['Publication…'] = D.boutonPublication,
-        ['Consommation…'] = D.boutonConsommation }) do
+    for titre, largeur in pairs({ ['Classer'] = D.boutonClasser, ['Repartir à neuf'] = D.repartir, ['Suivi'] = D.boutonSuivi,
+        ['Publication…'] = D.boutonPublication, ['Consommation…'] = D.boutonConsommation }) do
         vrai(largeur >= Fenetre.largeurLibelle(titre, 'petit') + 20, titre .. ' : son titre et le jeu du carré (' .. largeur .. ')')
     end
     -- Les images de Dispositions.IMAGES concordent avec les tailles (plus de fond de sélection ni de
@@ -641,7 +644,7 @@ essai("Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Rechercher, c
     end)
 end)
 
-essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, à sa droite « Repartir à neuf », Suivi, Publication… et Consommation…, de la même taille, au bout en haut à droite ; voyants Claude Code et Lightroom (versions et mode dans son infobulle), photo active en texte riche', function()
+essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, à sa droite « Classer », « Repartir à neuf », Suivi, Publication… et Consommation…, de la même taille, au bout en haut à droite ; voyants Claude Code et Lightroom (versions et mode dans son infobulle), photo active en texte riche', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
@@ -656,19 +659,21 @@ essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, à sa droite « Re
         for _, v in ipairs(vues(contenu)) do
             vrai(v.genre ~= 'radio_button', 'plus de radio')
         end
-        -- La rangée du titre (correctif 1.3.8) : le titre, 14, « Repartir à neuf », puis Suivi,
-        -- Publication… et Consommation…, 6 entre deux, le dernier au bout.
+        -- La rangée du titre (correctif 1.3.8) : le titre, 14, « Classer » (après la 1.8),
+        -- « Repartir à neuf », puis Suivi, Publication… et Consommation…, 6 entre deux, le dernier au bout.
         local rangeeTitre = rangeeDe(contenu, titre)
-        egal(9, #rangeeTitre.args, 'le titre, puis les quatre boutons et leurs écarts')
+        egal(11, #rangeeTitre.args, 'le titre, puis les cinq boutons et leurs écarts')
         egal(D.ecartVoyants, rangeeTitre.args[2].args.width)
-        local repartir = rangeeTitre.args[3]
+        egal('Classer', rangeeTitre.args[3].args.title, '« Classer » juste à gauche de « Repartir à neuf »')
+        egal(D.boutonClasser, rangeeTitre.args[3].args.width)
+        local repartir = rangeeTitre.args[5]
         egal('square_button', repartir.genre)
         egal('Repartir à neuf', repartir.args.title)
         egal(D.repartir, repartir.args.width)
         egal('peutRepartir', repartir.args.enabled.key, 'grisé selon peutRepartir')
         vrai(Fenetre.parBouton(repartir.args.action), 'par Fenetre.bouton (annule l\'envoi automatique)')
         local ordre = {}
-        for k = 3, 9, 2 do
+        for k = 3, 11, 2 do
             local b = rangeeTitre.args[k]
             ordre[#ordre + 1] = b.args.title
             -- De la même taille que Suivi, Publication… et Consommation… (« de la grosseur de l'image 1 ») :
@@ -677,12 +682,12 @@ essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, à sa droite « Re
             egal('small', b.args.size, b.args.title)
             egal(Fenetre.POLICES.petit, b.args.font, b.args.title)
             egal(nil, b.args.bezel, b.args.title)
-            if k < 9 then
+            if k < 11 then
                 egal(D.ecartBoutons, rangeeTitre.args[k + 1].args.width)
             end
             vrai(S.bezelVisible(b) + S.MARGE_BEZEL <= D.entete, "dans l'en-tête")
         end
-        egal('Repartir à neuf|Suivi|Publication…|Consommation…', table.concat(ordre, '|'))
+        egal('Classer|Repartir à neuf|Suivi|Publication…|Consommation…', table.concat(ordre, '|'))
         -- Deux voyants, dans la rangée de la photo active : Claude Code sans clic, Lightroom qui
         -- démarre la liaison (son infobulle, liée : les versions et le mode de la liaison) ; plus de
         -- voyant Écran (correctif 1.3.6).
@@ -778,18 +783,23 @@ essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position
         -- finit sur la marge de droite, comme dans la maquette.
         egal(D.fil, largeurDonnee(rangeeDe(contenu, position)), 'la barre : ▲ ▼ Fin, position, activité')
         egal(D.fin, parTitre(contenu, 'Fin').args.width)
-        -- Les invites, dans l'ordre de Consignes.invites, envoient leur message.
+        -- Les invites, dans l'ordre de Consignes.invites, envoient leur message ; Classer, monté en
+        -- haut (après la 1.8), envoie le sien depuis l'en-tête, en carré small.
         local envois = {}
         avec(Fenetre, 'envoyer', function(message) envois[#envois + 1] = message end, function()
             for _, invite in ipairs(Consignes.invites) do
                 local b = parTitre(contenu, invite.titre)
                 egal('square_button', b.genre, invite.titre)
-                egal(24, S.bezelVisible(b), invite.titre .. ' : bezel de 24 (maquette)')
-                egal(12, b.args.font.size)
+                if invite.id == 'classer' then
+                    egal('small', b.args.size, 'Classer : carré small de l\'en-tête')
+                else
+                    egal(24, S.bezelVisible(b), invite.titre .. ' : bezel de 24 (maquette)')
+                    egal(12, b.args.font.size)
+                end
                 S.cliquer(b)
             end
         end)
-        egal(8, #envois, 'huit invites (Classer après la 1.6)')
+        egal(8, #envois, 'huit invites (Classer après la 1.6), Classer compris')
         egal(Consignes.invites[6].message, envois[6], 'Composition')
         egal(Consignes.invite('classer').message, envois[8], 'Classer, la dernière')
         -- Le champ : deux lignes, à la largeur du centre, Retour le valide.
@@ -972,12 +982,111 @@ essai('Segments : Focus | Note | Aperçu | Proposition en images sous calques ; 
     end)
 end)
 
+-- Classer en haut, Mes demandes retiré (après la 1.8, demandés par Dany le 10 novembre 2026) --------
+
+essai("« Classer » en haut, à gauche de « Repartir à neuf » : plus dans la rangée des invites, son message tel quel, grisé pendant que Claude travaille comme les invites, son infobulle", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    ouvrirFenetre(function(p, contenu)
+        local classer = parTitre(contenu, 'Classer')
+        local titre = liee(contenu, 'static_text', 'titre')
+        egal(rangeeDe(contenu, titre), rangeeDe(contenu, classer), 'sur la rangée du titre')
+        -- Un seul bouton Classer : la rangée des invites ne l'a plus.
+        local n = 0
+        for _, b in ipairs(S.boutons(contenu)) do
+            if b.args.title == 'Classer' then
+                n = n + 1
+            end
+        end
+        egal(1, n, 'un seul bouton Classer')
+        local invites = rangeeDe(contenu, parTitre(contenu, 'Sports'))
+        local titres = {}
+        for _, enfant in ipairs(invites.args) do
+            if type(enfant) == 'table' and S.BOUTONS[enfant.genre] then
+                titres[#titres + 1] = enfant.args.title
+            end
+        end
+        egal('Retouche pro Portrait Paysage Noir et blanc ISO élevé Composition Sports', table.concat(titres, ' '), 'les invites, sans Classer')
+        -- Sa forme : celle des carrés de la rangée (small, titre en petit), à sa largeur.
+        egal('square_button', classer.genre)
+        egal('small', classer.args.size)
+        egal(Fenetre.POLICES.petit, classer.args.font)
+        egal(D.boutonClasser, classer.args.width)
+        vrai(Fenetre.parBouton(classer.args.action), 'par Fenetre.bouton (annule l\'envoi automatique)')
+        local infobulle = valeur(classer, 'tooltip', p)
+        contient(infobulle, 'Classer la photo active', 'infobulle')
+        contient(infobulle, 'votre accord', 'infobulle : rien d\'écrit sans accord')
+        -- Grisé comme les invites : la même clé `libre`.
+        local sports = parTitre(contenu, 'Sports')
+        egal(sports.args.enabled.key, classer.args.enabled.key, 'grisé dans les mêmes cas que les invites')
+        egal('libre', classer.args.enabled.key)
+        p.libre = false
+        egal(false, valeur(classer, 'enabled', p), 'grisé pendant que Claude travaille')
+        p.libre = true
+        egal(true, valeur(classer, 'enabled', p))
+        -- Son clic : le message et le modèle de l'invite classer, tels quels.
+        local envoi
+        avec(Fenetre, 'envoyer', function(message, modele) envoi = { message, modele } end, function() S.cliquer(classer) end)
+        vrai(envoi, 'Classer envoie')
+        egal(Consignes.invite('classer').message, envoi[1], 'le message de l\'invite classer')
+        egal(Consignes.invite('classer').modele, envoi[2], 'son modèle')
+        -- La rangée du haut tient dans le centre (le titre prend ce que les boutons laissent).
+        egal(D.fil, largeurDonnee(rangeeDe(contenu, titre)), 'la rangée du titre fait la largeur utile du centre')
+    end)
+end)
+
+essai("Mes demandes retiré : ni menu, ni clé, ni fonction ; mes-demandes.json déjà écrit n'est ni lu ni effacé ; le bandeau reprend sa place", function()
+    local Fichiers = require 'Fichiers'
+    local Stockage = require 'Stockage'
+    -- Un fichier de l'ancien menu, même illisible : la fenêtre ne le lit pas (rien au bandeau) et
+    -- n'y touche pas, ni ne le met de côté.
+    Fichiers.creerDossier(Chemins.donnees())
+    local fichier = Chemins.donnees() .. '/mes-demandes.json'
+    local ancien = '{"format":1,"demandes":[{"nom":"Ciel"'
+    Fichiers.ecrire(fichier, ancien)
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    ouvrirFenetre(function(p, contenu)
+        refuse(function() liee(contenu, 'popup_menu', 'mesDemandes') end, 'introuvable', 'plus de menu Mes demandes')
+        egal(nil, p.mesDemandes)
+        egal(nil, p.mesDemandesItems)
+        egal('', p.message, 'rien au bandeau sur mes-demandes.json')
+        for _, v in ipairs(vues(contenu)) do
+            for _, cle in ipairs({ 'title', 'tooltip' }) do
+                local t = v.args and v.args[cle]
+                vrai(type(t) ~= 'string' or not t:find('Mes demandes', 1, true), 'plus de « Mes demandes » : ' .. tostring(t))
+            end
+        end
+        -- Le menu Style est suivi du bandeau : la place du menu lui revient.
+        local message = liee(contenu, 'static_text', 'message')
+        egal(D.bandeau, message.args.width)
+        egal(612, D.bandeau, 'le bandeau : ce que laissent 📎 📋, Style et Envoyer')
+        egal(D.fil, largeurDonnee(rangeeDe(contenu, message)), 'la rangée du bas de la saisie')
+        p.saisie = 'Assombris le ciel'
+    end)
+    egal(ancien, Fichiers.lire(fichier), 'mes-demandes.json gardé tel quel')
+    for _, nom in ipairs(Fichiers.entrees(Chemins.donnees())) do
+        vrai(not nom:find('mes%-demandes%-illisible'), 'rien mis de côté : ' .. nom)
+    end
+    egal(nil, Dispositions.TAILLES.mesDemandes, 'plus de largeur pour le menu')
+    egal(nil, D.mesDemandes)
+    egal(nil, Vues.mesDemandes)
+    for _, nom in ipairs({ 'elementsMesDemandes', 'rafraichirMesDemandes', 'lireMesDemandes', 'choisirMesDemandes',
+        'mettreDemande', 'titreDemande', 'lierSaisie', 'lierRadio', 'MES_DEMANDES', 'MENU_TITRE', 'DEMANDES_ILLISIBLES' }) do
+        egal(nil, Fenetre[nom], 'Fenetre.' .. nom .. ' retiré')
+    end
+    for _, nom in ipairs({ 'lireDemandes', 'garderDemande', 'changerDemande', 'retirerDemande', 'fichierDemandes' }) do
+        egal(nil, Stockage[nom], 'Stockage.' .. nom .. ' retiré')
+    end
+    Fichiers.supprimer(fichier)
+end)
+
 -- Mode -----------------------------------------------------------------------------------------------
 
 -- Correctif 1.3.6 : la rangée Mode de l'en-tête (Appliquer, Proposer d'abord, Je le fais) est
 -- retirée, avec ce qui la tirait de l'état et la reposait (D12) ; la fenêtre suit la préférence
--- `mode`, que le Gestionnaire de modules externes règle. Fenetre.lierRadio reste : Mes demandes s'en
--- sert.
+-- `mode`, que le Gestionnaire de modules externes règle. Fenetre.lierRadio, gardé pour Mes demandes,
+-- est retiré avec lui après la 1.8.
 essai("Mode : plus de radios ni de valeur reposée ; la préférence du Gestionnaire reste telle quelle, la fenêtre n'y touche pas", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
@@ -992,7 +1101,7 @@ essai("Mode : plus de radios ni de valeur reposée ; la préférence du Gestionn
             'EXERCICE_CONTINUE', 'jeLeFais', 'suivreExercice' }) do
             egal(nil, Fenetre[nom], 'Fenetre.' .. nom .. ' retiré')
         end
-        egal('function', type(Fenetre.lierRadio), 'gardé pour Mes demandes')
+        egal(nil, Fenetre.lierRadio, 'retiré avec Mes demandes')
         Fenetre.rafraichir()
         -- La boucle tourne quelques tours sans rien reposer.
         local LrTasks = S.modules.LrTasks

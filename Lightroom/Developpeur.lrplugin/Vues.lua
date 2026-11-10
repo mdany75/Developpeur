@@ -281,6 +281,19 @@ function Vues.boutonSuivi(f, F, D)
         action = function() F.ouvrirSuivi() end })
 end
 
+-- « Classer », en haut, à gauche de « Repartir à neuf » (demandé par Dany le 10 novembre 2026 :
+-- il était dans la rangée des invites, sous le champ) : l'invite classer de Consignes.invites
+-- (`entete`), son message et son modèle tels quels, comme les invites (F.envoyer) ; grisé pendant
+-- que Claude travaille, comme elles (`libre`). Un carré small comme les autres boutons de la
+-- rangée, son titre en petit.
+function Vues.boutonClasser(f, F, D)
+    local invite = Consignes.invite('classer')
+    return F.bouton(f, { carre = true, size = 'small', title = invite.titre, font = F.POLICES.petit, width = D.boutonClasser,
+        place_vertical = 0.5, enabled = F.bind 'libre',
+        tooltip = "Classer la photo active (ou la sélection) : Claude propose des mots-clés, un lieu s'il est sûr et une légende, puis attend votre accord avant de rien écrire",
+        action = function() F.envoyer(invite.message, invite.modele) end })
+end
+
 -- Publication… et Consommation…, à droite du bouton Suivi (correctif 1.3.7, décision de Dany du
 -- 25 octobre 2026 : perdus avec le volet au correctif 1.3.6, ils reviennent dans l'en-tête et
 -- restent au menu Module externe - Extras) : leurs fenêtres de la 1.2 (F.ouvrirPublication,
@@ -332,12 +345,13 @@ end
 -- En-tête --------------------------------------------------------------------------------------
 
 -- L'en-tête du centre : le titre de la conversation (gras 16, sans ✎ : celui que Claude donne ;
--- Renommer… est retiré avec le volet au correctif 1.3.6), et à sa droite, côte à côte, « Repartir à
+-- Renommer… est retiré avec le volet au correctif 1.3.6), et à sa droite, côte à côte, « Classer »
+-- (Vues.boutonClasser, après la 1.8), « Repartir à
 -- neuf » (F.repartir : une conversation neuve pour la photo seule, l'ancienne mise de côté ; grisé
 -- pendant que Claude travaille et sans photo seule ; à la place du Mode, dont les trois radios sont
 -- retirés au correctif 1.3.6 : la fenêtre suit la préférence `mode` du Gestionnaire), puis les
 -- boutons Suivi, Publication… et Consommation… (Vues.boutonSuivi, Vues.boutonPublication,
--- Vues.boutonConsommation), le dernier au bout, en haut à droite : quatre carrés small de la même
+-- Vues.boutonConsommation), le dernier au bout, en haut à droite : cinq carrés small de la même
 -- taille (correctif 1.3.8, demandé par Dany le 26 octobre 2026 : les trois boutons étaient dans la
 -- rangée des voyants, « Repartir à neuf », plus grand, seul à droite du titre) ; dessous, les voyants
 -- Claude Code et Lightroom et la photo active (`infoPhoto`, texte riche : nom et sélection en <EM>).
@@ -353,6 +367,8 @@ function Vues.entete(f, F, D)
             f:static_text { title = bind 'titre', font = P.titre, text_color = C.texte, width = D.titre, truncation = 'tail',
                 place_vertical = 0.5 },
             f:spacer { width = D.ecartVoyants },
+            Vues.boutonClasser(f, F, D),
+            f:spacer { width = D.ecartBoutons },
             F.bouton(f, { carre = true, size = 'small', title = "Repartir à neuf", font = P.petit, width = D.repartir,
                 place_vertical = 0.5, enabled = bind 'peutRepartir',
                 tooltip = "Une conversation neuve pour la photo choisie, avec son historique ; l'ancienne reste sur le disque, mise de côté",
@@ -380,19 +396,22 @@ end
 
 -- Les invites en raccourcis (Consignes.invites, Composition comprise), en carrés de 24 points de
 -- bezel (cadre de 26, D5), police 12. Ni « ★ Noter » ni séparateur (décision de Dany), et le menu
--- Style est passé sous le champ.
+-- Style est passé sous le champ. Classer (`entete`) n'y est plus : son bouton est en haut
+-- (Vues.boutonClasser, après la 1.8).
 function Vues.invites(f, F, D)
     local rangee = { spacing = 6 }
     for _, invite in ipairs(Consignes.invites) do
-        rangee[#rangee + 1] = F.bouton(f, {
-            carre = true,
-            bezel = 24,
-            font = F.POLICES.systeme12,
-            title = invite.titre,
-            tooltip = invite.message,
-            enabled = F.bind 'libre',
-            action = function() F.envoyer(invite.message, invite.modele) end,
-        })
+        if not invite.entete then
+            rangee[#rangee + 1] = F.bouton(f, {
+                carre = true,
+                bezel = 24,
+                font = F.POLICES.systeme12,
+                title = invite.titre,
+                tooltip = invite.message,
+                enabled = F.bind 'libre',
+                action = function() F.envoyer(invite.message, invite.modele) end,
+            })
+        end
     end
     return f:row(rangee)
 end
@@ -409,19 +428,8 @@ function Vues.style(f, F, D)
         tooltip = "Style de retouche joint à chaque demande, invites comprises (Standard : rien d'ajouté)" }
 end
 
--- Le menu Mes demandes (D.mesDemandes de large, demandé par Dany le 22 octobre 2026), à droite du
--- menu Style : les demandes personnelles de Dany (« Nom — description », `mesDemandesItems`, refaits
--- par Fenetre.rafraichirMesDemandes), un séparateur, puis Ajouter…, Renommer… et Supprimer… ; son
--- titre « Mes demandes » quand rien n'est choisi. Choisir une demande la met dans le champ, sans
--- l'envoyer (Fenetre.choisirMesDemandes) ; le menu revient à son titre. Sa valeur passe par
--- F.lierRadio (faite pour les radios du Mode, retirés au correctif 1.3.6) : un choix, même du
--- titre, annule l'envoi de la demande que ce clic aurait validée. Grisé pendant que Claude
--- travaille.
-function Vues.mesDemandes(f, F, D)
-    return f:popup_menu { items = F.bind 'mesDemandesItems', value = F.lierRadio 'mesDemandes', width = D.mesDemandes,
-        enabled = F.bind 'libre', place_vertical = 0.5,
-        tooltip = "Mes demandes : une demande choisie remplit le champ (Retour l'envoie) ; Ajouter…, Renommer… et Supprimer… en bas du menu" }
-end
+-- (Le menu Mes demandes, à droite du menu Style, est retiré après la 1.8, demandé par Dany le
+-- 10 novembre 2026 : il ne s'en servait jamais.)
 
 -- ▲ et ▼ en petit, pour faire défiler un texte trop long d'une carte (clés `cle .. 'Monte'` et
 -- `cle .. 'Descend'`, action F.defilerTexte(cle, sens)).
@@ -453,9 +461,8 @@ function Vues.envoi(f, F, D)
 end
 
 -- La zone de saisie (marges 12/20/14) : les invites, le champ de demande sur deux lignes
--- (`immediate = false` : Retour le valide, Fenetre.saisieValidee ; sa valeur passe par
--- F.lierSaisie, pour une demande mise par Mes demandes), puis 📎 et 📋 (carrés à icône seule),
--- « Style » et son menu, Mes demandes, le bandeau, Envoyer.
+-- (`immediate = false` : Retour le valide, Fenetre.saisieValidee), puis 📎 et 📋 (carrés à icône
+-- seule), « Style » et son menu, le bandeau, Envoyer.
 function Vues.saisie(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return f:column {
@@ -463,7 +470,7 @@ function Vues.saisie(f, F, D)
         margin_top = 12,
         spacing = 8,
         Vues.invites(f, F, D),
-        f:edit_field { value = F.lierSaisie(), immediate = false, height_in_lines = 2, width = D.champ, enabled = bind 'libre',
+        f:edit_field { value = bind 'saisie', immediate = false, height_in_lines = 2, width = D.champ, enabled = bind 'libre',
             placeholder_string = "Demander à Claude… (par exemple : « Retouche la photo active, rendu naturel »)",
             tooltip = "Retour envoie la demande. Dictée : touche 🌐 deux fois." },
         f:row {
@@ -478,8 +485,6 @@ function Vues.saisie(f, F, D)
             f:static_text { title = "Style", font = P.systeme12, text_color = C.grisEntete, width = D.etiquetteStyle, place_vertical = 0.5 },
             f:spacer { width = 6 },
             Vues.style(f, F, D),
-            f:spacer { width = 8 },
-            Vues.mesDemandes(f, F, D),
             f:spacer { width = 8 },
             Vues.bandeau(f, F, D.bandeau),
             f:spacer { width = 8 },

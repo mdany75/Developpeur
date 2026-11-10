@@ -73,10 +73,8 @@ Dispositions.TAILLES = {
     -- (« ＋ Garder la demande », 136, retiré au même correctif).
     hauteurLigne = 21, margeHautFil = 20, margeBasFil = 16,
     auteur = 60, ecartAuteur = 12, voirNote = 96,
-    -- Le menu Mes demandes, à droite du menu Style sous le champ (demandé par Dany le 22 octobre
-    -- 2026) : assez large pour « Nom — petite description » (Fenetre.titreDemande coupe chaque
-    -- élément à sa largeur, moins la place de ses flèches) ; le bandeau prend ce qu'il laisse (324).
-    mesDemandes = 280,
+    -- (Le menu Mes demandes, de 280, à droite du menu Style sous le champ depuis le 22 octobre 2026,
+    -- est retiré après la 1.8, demandé par Dany le 10 novembre 2026 : le bandeau reprend sa place.)
     -- Les deux voyants de l'en-tête (Claude Code, Lightroom ; le voyant Écran, de 150, est retiré
     -- au correctif 1.3.6), chacun avec sa pastille de 8 et 6 d'écart, 14 entre eux ; la photo active
     -- prend le reste de leur rangée.
@@ -88,8 +86,11 @@ Dispositions.TAILLES = {
     -- (le Suivi dans sa fenêtre, décision de Dany du 25 octobre 2026), Publication… et Consommation…
     -- (correctif 1.3.7). Des carrés small, comme les boutons d'actions du fil (bezel de 15, D6), leur
     -- titre en petit (« Repartir à neuf » environ 78, « Suivi » 25, « Publication… » 67,
-    -- « Consommation… » 88, Metriques) et 22 de jeu.
-    repartir = 100, boutonSuivi = 56, boutonPublication = 92, boutonConsommation = 112, ecartBoutons = 6,
+    -- « Consommation… » 88, Metriques) et 22 de jeu. « Classer » (l'invite classer de
+    -- Consignes.invites, montée de la rangée des invites à gauche de « Repartir à neuf » après la 1.8,
+    -- demandé par Dany le 10 novembre 2026) : un carré small comme eux, son titre en petit (environ
+    -- 39) et 22 de jeu ; le titre de la conversation garde 562 points.
+    boutonClasser = 64, repartir = 100, boutonSuivi = 56, boutonPublication = 92, boutonConsommation = 112, ecartBoutons = 6,
     -- « Obtenir », sous la carte Proposition (correctif 1.3.6, décision de Dany du 25 octobre 2026),
     -- comme Refuser (80) : un carré de bezel 26, son titre en 13 et le jeu du carré. Avec ▲ ▼,
     -- Refuser, Ajuster… et Accepter en bleu, la rangée tient dans l'intérieur du panneau
@@ -415,15 +416,16 @@ function Dispositions.dimensions()
     -- Le contenu de la fenêtre (D7) : 1 621 × 1 166 pour 1 623 × 1 200.
     D.largeurContenu = D.largeurFenetre - 2 * D.margeDialogue
     D.hauteurContenu = hauteurContenu(D)
-    -- Centre : 1 024 utiles. L'en-tête : le titre (gras 16) et, à sa droite, « Repartir à neuf »,
-    -- Suivi, Publication… et Consommation… (correctif 1.3.8 : les trois derniers étaient dans la
+    -- Centre : 1 024 utiles. L'en-tête : le titre (gras 16) et, à sa droite, « Classer » (après la
+    -- 1.8), « Repartir à neuf », Suivi, Publication… et Consommation… (correctif 1.3.8 : les trois
+    -- derniers étaient dans la
     -- rangée des voyants), le dernier sur la marge ; puis les voyants Claude Code et Lightroom et la
     -- photo active, alignée à droite, sur la marge (la rangée fait les 1 024 : un texte de taille fixe
     -- ne s'étire pas) ; le fil ; la barre, dont l'activité (ou le forfait) finit de même sur la marge
-    -- de droite, comme dans la maquette ; la saisie (Style, Mes demandes, bandeau, Envoyer). Les
+    -- de droite, comme dans la maquette ; la saisie (Style, bandeau, Envoyer). Les
     -- boutons ont leur place (D.placeBoutons : eux, leurs écarts, et 14 devant), le titre le reste.
     D.fil = D.centre - 2 * D.margeCentre
-    D.placeBoutons = D.ecartVoyants + D.repartir + D.ecartBoutons + D.boutonSuivi + D.ecartBoutons + D.boutonPublication
+    D.placeBoutons = D.ecartVoyants + D.boutonClasser + D.ecartBoutons + D.repartir + D.ecartBoutons + D.boutonSuivi + D.ecartBoutons + D.boutonPublication
         + D.ecartBoutons + D.boutonConsommation
     D.titre = D.fil - D.placeBoutons
     D.info = D.fil - (8 + 6 + D.voyantClaude) - D.ecartVoyants - (8 + 6 + D.voyantLightroom) - D.ecartVoyants
@@ -444,8 +446,9 @@ function Dispositions.dimensions()
     D.style = 170
     D.etiquetteStyle = 30
     D.envoyer = Dispositions.IMAGES['bouton-bleu'].largeur
-    -- La rangée sous le champ : 📎 📋, « Style » et son menu, Mes demandes, le bandeau (324), Envoyer.
-    D.bandeau = D.fil - (D.joindre + 4 + D.joindre + 10 + D.etiquetteStyle + 6 + D.style + 8 + D.mesDemandes + 8 + 8 + D.envoyer)
+    -- La rangée sous le champ : 📎 📋, « Style » et son menu, le bandeau (612 : la place de Mes
+    -- demandes, retiré après la 1.8, lui revient), Envoyer.
+    D.bandeau = D.fil - (D.joindre + 4 + D.joindre + 10 + D.etiquetteStyle + 6 + D.style + 8 + 8 + D.envoyer)
     -- Colonne droite : le panneau de 528, à 14 du bord ; les segments centrés en tête, à cheval sur
     -- son bord (bande transparente de 12) ; son contenu de 498 sous une marge de 13 (12 + 1 + 22 =
     -- 35 depuis le haut des segments, comme la maquette) et à 15 du bord (14 + 1).
