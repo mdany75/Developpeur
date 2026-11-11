@@ -139,6 +139,11 @@ public final class ToolHandler {
     /// liste. Nil par défaut (species refuse alors sans rien lancer) : seul main.swift le pose (serve()
     /// et --call) ; les essais passent un faux encodeur, jamais le vrai modèle.
     public var especes: MoteurEspeces?
+    /// Le dossier des paramètres prédéfinis de Lightroom (Camera Raw/Settings), lu en lecture seule
+    /// pour « Claude / Poussière » et « Claude / Imperfections » (remove_distractions, `PresetSuppression`).
+    /// Nil par défaut (dust et imperfections refusent alors sans rien envoyer) : seul main.swift pose
+    /// le vrai dossier ; les essais passent un dossier temporaire, jamais le vrai.
+    public var dossierParametresPredefinis: URL?
     /// Le classeur des espèces, ouvert au premier usage et gardé pour le processus.
     var classeurEspeces: ClasseurEspeces?
     /// Les candidates d'une recherche par le sens passées au module par appel (Sens.candidatsMax ;

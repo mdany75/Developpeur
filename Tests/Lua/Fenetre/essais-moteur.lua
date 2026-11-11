@@ -92,6 +92,9 @@ essai('Consignes : les passants se retirent par remove_distractions avec people 
     local Texte = require 'Texte'
     local gardeFous = Consignes.texte:sub(debut, fin)
     contient(gardeFous, 'passants à retirer : remove_distractions avec people (Lightroom), pas generative_edit', 'puce du génératif')
+    -- Poussière et imperfections (10 novembre 2026, au soir) : par les paramètres prédéfinis
+    -- « Claude / Poussière » et « Claude / Imperfections », plus à la main.
+    contient(gardeFous, 'la poussière du capteur (dust) et les boutons d\'une peau (imperfections) aussi', 'puce du génératif')
     vrai(Texte.longueur(Consignes.texte) <= 7500, 'plafond des consignes : ' .. Texte.longueur(Consignes.texte))
 end)
 

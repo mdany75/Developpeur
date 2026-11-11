@@ -174,6 +174,9 @@ func outils() -> ToolHandler {
     tools.sens = moteurSens()
     // Les espèces (1.6.3) : le vrai BioCLIP 2 de ce Mac, ouvert au premier usage.
     tools.especes = moteurEspeces()
+    // Les paramètres prédéfinis « Claude / Poussière » et « Claude / Imperfections » de Dany, lus
+    // en lecture seule (remove_distractions) : jamais dans les tests.
+    tools.dossierParametresPredefinis = PresetXMP.defaultFolder.deletingLastPathComponent()
     // Développement : l'écrit et le relu des masques d'add_mask (DEVELOPPEUR_RELEVE_FORMES=1).
     tools.releveFormes = ProcessInfo.processInfo.environment["DEVELOPPEUR_RELEVE_FORMES"] == "1"
     return tools

@@ -132,7 +132,8 @@ Les pièges :
   change rien au filtre rangé : retirer puis reposer le filtre.
 - Une personne précise porte `InstanceIDs` **et** `InstanceBounds` (sauf la personne seule :
   `Locaux.personne`), sinon Lightroom ne la reconnaît pas.
-- Un module ne peut pas : lancer ni refaire la poussière (il ne fait que la retirer), convertir une
+- Un module ne peut pas : lancer ni refaire la poussière (il ne fait que la retirer ; le serveur
+  applique pour cela le paramètre prédéfini « Claude / Poussière », `Sources/CLAUDE.md`), convertir une
   version de processus 1 ou 2, mesurer la profondeur d'un cadre du flou d'objectif, calculer
   l'Upright avec repères : ne pas les réessayer sans nouvelle piste.
 - Une photo déjà agrandie par l'ancien connecteur (`Reglages.estAgrandie`) reste protégée : Claude

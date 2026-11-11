@@ -14,6 +14,22 @@
   ombres comprises, en 20 s environ ; une personne collée au sujet reste. Une suppression plus longue que quatre minutes garde son étape (elle peut
   encore arriver, `undo_last` la retirera) ; rendre les passants ne demande pas l'original ;
   annuler ce retour relance la suppression, avec un nouveau résultat.
+- **Claude retire la poussière du capteur et les imperfections de la peau** (Lightroom Classic
+  16), par vos paramètres prédéfinis « Claude / Poussière » et « Claude / Imperfections » (outil
+  Supprimer) : dans la Retouche pro, quand une poussière se voit (un ciel, un fond uni) ; dans
+  Portrait, pour les boutons et petites taches (sinon, comme avant, des taches une à une) ; et
+  quand vous le demandez (« retire la poussière », « retire les imperfections »). Ce n'est plus à
+  faire à la main. Claude lit d'abord le paramètre et ne fait rien s'il manque, s'il ne porte
+  qu'un effacement (créé d'une photo où la suppression n'était pas faite : appliqué, il la
+  retirerait au lieu de la faire, c'est le cas de vos deux paramètres actuels) ou s'il ferait autre
+  chose (effacer des reflets ou des passants, d'autres réglages) ; il vous dit alors comment le
+  refaire : dans Développement, Supprimer › Poussière sur une photo où c'est fait, puis clic droit
+  sur « Claude / Poussière » › Mettre à jour avec les paramètres actuels, Ne rien sélectionner,
+  cochez seulement Supprimer › Poussière. L'étape « Claude · poussière » ou « Claude ·
+  imperfections » se défait par `undo_last` ou `revert_to_original` ; en mode « Proposer
+  d'abord », Claude attend votre accord. Dans le Gestionnaire de modules externes, la Retouche pro
+  a une étape de plus, « Poussière du capteur, si elle se voit », à Oui ou Non. Reste à constater
+  dans Lightroom que la détection se refait bien pour chaque photo.
 
 ## 1.9 — 2026-11-10
 

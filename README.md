@@ -617,6 +617,15 @@ cadre.
   remplissage génératif d'Adobe (réseau et compte Adobe, une à quelques minutes). L'étape
   « Claude · passants » se défait comme les autres ; si Lightroom ne voit aucun passant, rien ne
   change et Claude le dit.
+- Poussière du capteur et imperfections de la peau (Lightroom Classic 16, Supprimer › Poussière et
+  › Imperfections), par vos paramètres prédéfinis « Claude / Poussière » et « Claude /
+  Imperfections » : Claude s'en sert dans la Retouche pro (une poussière visible dans un ciel),
+  dans Portrait (boutons, petites taches) et quand vous le demandez (« retire la poussière »,
+  « retire les imperfections »). Il lit d'abord le paramètre : s'il manque, s'il ne porte qu'un
+  effacement (créé d'une photo où la suppression n'était pas faite : appliqué, il la retirerait)
+  ou s'il ferait autre chose, Claude ne fait rien et vous dit comment le refaire (voir Créer les
+  paramètres « Claude / Poussière » et « Claude / Imperfections », plus bas). L'étape
+  « Claude · poussière » ou « Claude · imperfections » se défait comme les autres.
 - Redresser et recadrer : angle, ratio (« 4:5 », « 16:9 »…), taille et centre, sans bord vide.
   Après Upright ou une perspective, le module coche « Contraindre le recadrage » et Lightroom
   resserre le cadre pour ne laisser aucun coin vide.
@@ -1310,9 +1319,14 @@ claude.ai.
 
 Le SDK de Lightroom ne donne pas tout aux modules. Claude vous propose de faire ceci à la main :
 
-- **Poussière du capteur** : Suppression des distractions › Poussière sur une photo ; pour une
-  série, Copier puis Coller de Lightroom avec la case Poussière (Lightroom la refait pour chaque
-  photo). Un module ne peut ni la lancer ni la faire refaire ; Claude peut seulement la retirer.
+- **Créer les paramètres « Claude / Poussière » et « Claude / Imperfections »**, une fois : un
+  module ne peut lancer ni Supprimer › Poussière ni › Imperfections, mais Claude applique ces deux
+  paramètres. Dans Développement, faites Supprimer › Poussière sur une photo où il y en a (la
+  suppression faite), puis Paramètres prédéfinis › + : nom « Poussière », groupe « Claude », Ne
+  rien sélectionner, cochez seulement Supprimer › Poussière, Créer (s'il existe déjà : clic droit
+  sur « Claude / Poussière » › Mettre à jour avec les paramètres actuels, mêmes cases). De même
+  pour Imperfections, sur un portrait. Sans eux, la poussière se fait à la main : Supprimer ›
+  Poussière sur une photo ; pour une série, Copier puis Coller de Lightroom avec la case Poussière.
 - **Suppression générative d'Adobe** : l'outil Supprimer avec l'IA générative ; les taches de
   Claude emploient l'outil Supprimer sans elle. Pour changer ou retirer un objet sur votre demande,
   Claude peut aussi passer par Fibo 2 (Retouche générative par Fibo 2, plus haut), qui crée une
@@ -1324,9 +1338,8 @@ Le SDK de Lightroom ne donne pas tout aux modules. Claude vous propose de faire 
 - **Fusion HDR et panorama** (Photo › Fusion de photos), et la correction de champ plat.
 - **Mise au point du flou d'objectif par un cadre tracé sur l'image** : Claude la règle sur le
   sujet ou sur une plage de profondeur.
-- **Imperfections de la peau en un clic** (Lightroom Classic 16 : Supprimer › Imperfections) et
-  **Projection automatique** (bouton Automatique du panneau Transformation) : Claude règle la
-  Projection lui-même, mais aucun module ne peut lancer ces deux boutons.
+- **Projection automatique** (bouton Automatique du panneau Transformation) : Claude règle la
+  Projection lui-même, mais aucun module ne peut lancer ce bouton.
 
 Le débruitage, les détails bruts, la super résolution et la suppression des reflets demandent
 Lightroom Classic 15.3 ou plus récent ; le contour d'un masque IA, 15.5. La plage de couleurs suit

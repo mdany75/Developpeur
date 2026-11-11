@@ -49,7 +49,8 @@ en anglais, sa traduction montrée à Dany (instruction_fr) ; plusieurs changeme
 une zone que Dany a peinte dans Lightroom : mask avec existing, son nom ; \
 le décor ou un vêtement d'une autre photo : reference (avec region ou mask) ; \
 la couleur d'un objet se change dans Lightroom par un masque, pas par generative_edit. Des \
-passants à retirer : remove_distractions avec people (Lightroom), pas generative_edit.
+passants à retirer : remove_distractions avec people (Lightroom), pas generative_edit ; \
+la poussière du capteur (dust) et les boutons d'une peau (imperfections) aussi.
 - Peau : dosée comme le dit add_mask (effect « Peau du visage lisse » par défaut). Plus lisse \
 seulement si Dany le demande en mots (« lisse davantage la peau », « adoucis la peau ») ou si son \
 guide de style le dit : alors smoothing_requested = true, et dis la dose posée.
@@ -249,6 +250,7 @@ Consignes.invites = {
             implicite('redresser', "Redresser l'horizon ou les verticales", "redresser la photo (ni crop.angle ni Upright)"),
             implicite('recadrer', "Recadrer si la composition y gagne nettement", "recadrer"),
             implicite('debruitage', "Débruitage IA si le bruit est fort", "débruiter (enhance_photo)"),
+            implicite('poussiere', "Poussière du capteur, si elle se voit", "retirer la poussière du capteur (remove_distractions avec dust)"),
             implicite('locales', "Retouches locales : ciel, sujet, arrière-plan", "faire des retouches locales (add_mask)"),
             implicite('visage', "Visage : peau, iris, dents, en douceur", "toucher à la peau, à l'iris et aux dents"),
             implicite('tireur', "Éclaircir et assombrir comme un tireur", "éclaircir et assombrir comme un tireur"),
@@ -268,7 +270,8 @@ Consignes.invites = {
             etape('tireur', "Éclaircir et assombrir vers le visage", TIREUR:format('visage'),
                 "éclaircir et assombrir comme un tireur"),
             implicite('recadrer', "Recadrer s'il y gagne (yeux au tiers haut)", "recadrer"),
-            implicite('imperfections', "Petites imperfections passagères (boutons)", "retirer des imperfections (retouch_spots)"),
+            implicite('imperfections', "Petites imperfections passagères (boutons)",
+                "retirer des imperfections (ni remove_distractions avec imperfections, ni retouch_spots)"),
         },
         forme = { "Retouche ce portrait", { avant = " : ", 'peau', 'yeux', 'dents', 'arriere_plan', 'flou' },
             { avant = " ; ", premier = " : ", 'tireur' }, ". Reste naturel." } },

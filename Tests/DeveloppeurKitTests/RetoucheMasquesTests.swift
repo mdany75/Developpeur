@@ -363,6 +363,7 @@ final class RetoucheMasquesTests: XCTestCase {
         let lancer = call("remove_distractions", ["dust": [:], "photo_id": 7, "step_name": "poussière"])
         XCTAssertTrue(lancer.isError)
         XCTAssertTrue(lancer.text.contains("Copier puis Coller de Lightroom"), "la poussière d'une série se fait à la main")
+        XCTAssertFalse(fake.calls.contains { $0.command == "appliquer" }, "sans paramètre « Claude / Poussière » lu, rien n'est envoyé")
         XCTAssertTrue(call("remove_distractions", ["dust": ["remove": false], "reflections": [:], "step_name": "x"]).isError)
         XCTAssertTrue(call("remove_distractions", ["step_name": "x"]).isError)
     }

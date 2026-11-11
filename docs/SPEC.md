@@ -77,6 +77,10 @@ défait ensuite.
 
 - Suppression des passants (`remove_distractions` avec `people`, `Suppression.lua`) : lancée une fois le 10 novembre 2026 (filtre `Distracting People Removal`, 20 s, annulation qui rend les passants : constatés). Reste à voir : ce que rend `hasFilterWithName('remove_people')` ; si `countAllSpots('distractingPeopleRemoval')` compte les passants détectés (sinon le module attend 20 s, puis réessaie la suppression toutes les 5 s), et s'il les compte au fil de l'eau ou d'un coup à la fin ; la durée de la détection (régler `ATTENTE_SANS_COMPTE` 20 s, `DUREE_ZERO` 15 s et `DUREE_STABLE` 2 s d'après elle) et de la suppression (au-delà de 4 min, l'étape reste « en cours ») ; le nom que le module a gardé dans l'étape (`Suppression.filtre`) ; si le rappel vient aussi quand Dany annule dans la fenêtre de progression ; si `resetFilterWithName('remove_people')` retire la suppression (sinon le module réécrit `FilterList` sans ce filtre) ; le message d'un refus du service génératif d'Adobe (hors ligne) — à la main dans Lightroom ([Suppression des passants](#suppression-des-passants-supprimer-avec-personnes-remove_distractions-avec-people)).
 
+**Poussière et imperfections par un paramètre prédéfini (après la 1.9)**
+
+- Refaire « Claude / Poussière » et « Claude / Imperfections » d'une photo où la suppression est faite (ce soir-là, les deux ne portaient qu'un signal d'effacement : le serveur les refuse), puis : `remove_distractions` avec `dust` sur une AUTRE photo (copie d'Essais) : Lightroom refait-il la détection pour cette photo (comme Personnes, en 6 s) ou colle-t-il les taches de la photo source (comme un filtre copié par un module, constat du 18 octobre 2026) ? De même pour `imperfections` sur un portrait (grains de beauté gardés ?) ; durée ; `undo_last` et `revert_to_original` rendent-ils `FilterList` d'avant ; le `ProcessVersion` rangé dans le paramètre change-t-il la version de processus d'une photo plus ancienne — à la main dans Lightroom ([Poussière et imperfections](#poussière-et-imperfections-par-un-paramètre-prédéfini-remove_distractions-avec-dust-et-imperfections)).
+
 **Retouche générative : choix du modèle (1.9)**
 
 - Banc d'essai jamais lancé : `--generatif-banc` sur une copie d'Essais, jugé par Dany ; la table « genre → modèle » à régler d'après son jugement ([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)).
@@ -3351,7 +3355,8 @@ Constaté le 10 novembre 2026 sur la copie RAW 53918083 (« Essai mesures 16 »)
   (style gardé seulement si `Glow` > 0, valeurs entières) et ses écarts (trait courbé sans
   recalage, étalonnage local perdu, Lueur sans effet au rendu).
 
-Pas d'accès pour un module : la Projection automatique, Supprimer › Imperfections, le
+Pas d'accès pour un module : la Projection automatique, Supprimer › Imperfections (sauf par un
+paramètre prédéfini qui la porte, `remove_distractions` avec `imperfections`, après la 1.9), le
 vecteurscope, les points de mise au point affichés, l'optimisation du catalogue. Nouveau dans le
 SDK, non employé (non documenté) : `catalog:applyDevelopSettings` pour une série,
 `photo:copySettings` et `pasteSettings` (le Copier-Coller de Lightroom). `photo:applyDevelopSettings`
@@ -5036,6 +5041,64 @@ Constaté dans Lightroom Classic 16.0 (10 novembre 2026, copie « Essai passants
   (`tests.lua`, « supprimer : passants… », « filtre des passants au nom inattendu », « encore en
   cours après le délai », « détection au fil de l'eau », « compte lisible resté à 0 », « rendus
   sans l'original »).
+
+### Poussière et imperfections par un paramètre prédéfini (`remove_distractions` avec `dust` et `imperfections`)
+
+Demandé par Dany le 10 novembre 2026, au soir : il a créé dans Lightroom Classic 16, groupe
+« Claude », les paramètres prédéfinis « Claude / Poussière » et « Claude / Imperfections », qui
+portent l'outil Supprimer ; Claude s'en sert dans Retouche pro (poussière du capteur visible), dans
+Portrait (imperfections de la peau) et sur demande (« retire la poussière », « retire les
+imperfections »), au lieu de renvoyer Dany à la main. Points encore à constater : [À vérifier à la
+prochaine recette](#à-vérifier-à-la-prochaine-recette), Poussière et imperfections.
+
+Constaté dans Lightroom Classic 16.0 (10 novembre 2026) :
+
+- Le dialogue « Nouveau paramètre prédéfini de développement » a, sous Supprimer : Reflets,
+  Personnes, Imperfections, Poussière. Les fichiers .xmp vont dans
+  `~/Library/Application Support/Adobe/CameraRaw/Settings/` (ceux de Dany à sa racine, groupe
+  « Claude » dans `crs:Group`) ; `crs:UUID` est l'uuid que donne `list_presets`. Filtres de
+  `crs:FilterList` : `FilterID` 3 reflets (`Reflections`), 4 passants (`Distracting People
+  Removal`), 6 poussière, 7 imperfections ; chaque filtre rangé a `crs:CompressedSettings="<digest>"`
+  et sa recette codée dans `crs:Table_<digest>` du même fichier.
+- Créé d'une photo SANS la suppression faite, Lightroom ne range qu'un signal d'effacement
+  (`crs:IsSignalForDelete="true"`) : appliqué, le paramètre RETIRE la suppression au lieu de la
+  faire. C'est le cas des deux paramètres de Dany ce soir-là (un `FilterID` 7, un `FilterID` 6,
+  avec signal). Un paramètre peut aussi porter des signaux d'effacement d'autres filtres (le
+  « Personnes » de Dany en portait pour 3, 6 et 7).
+- `ProcessVersion` est rangé même quand seule la case Supprimer est cochée.
+- Le module ne voit, par `getDevelopSettings`, que le digest, jamais la table : il ne peut pas
+  fabriquer la recette.
+
+La règle (`PresetSuppression.swift`, `ToolHandler.appliquerParametreSuppression`) :
+
+- Le serveur lit le fichier en lecture seule, dans `ToolHandler.dossierParametresPredefinis` (nil
+  par défaut : seul `main.swift` pose le vrai dossier, `Camera Raw/Settings` ; les tests passent un
+  dossier temporaire), sous-dossiers compris : le paramètre dont `crs:Group` est « Claude » et
+  `crs:Name` « Poussière » ou « Imperfections » (sans casse ni accents).
+- Il ne l'applique que **valide** : le seul filtre voulu (6 ou 7), sans `IsSignalForDelete`, avec
+  sa table et un UUID. Il refuse sans rien envoyer au module, en disant comment le refaire (dans
+  Développement, Supprimer › Poussière sur une photo où c'est fait, puis clic droit sur « Claude /
+  Poussière » › Mettre à jour avec les paramètres actuels, Ne rien sélectionner, cocher seulement
+  Supprimer › Poussière), un paramètre absent, **seulement d'effacement**, incomplet (sans le
+  filtre, sans table, sans UUID), en double, ou **dangereux** : d'autres filtres (faits ou signaux
+  d'effacement) ou d'autres réglages que Supprimer (attributs `crs:` hors de ceux qui décrivent le
+  paramètre, `PresetSuppression.attributsDuParametre`, ou éléments hors de Name, ShortName,
+  SortName, Group, Description et FilterList) : jamais retoucher autre chose sans le dire.
+- Valide, il passe par le chemin des paramètres prédéfinis : `apply_settings` avec `preset` =
+  l'UUID (commande `appliquer`, `applyDevelopPreset` du module), étape « Claude · poussière » ou
+  « Claude · imperfections » (ou `step_name`), `undo_last` et `revert_to_original` comme toute
+  retouche ; le mode « Proposer d'abord » est jugé par le module (`confirm`), et son refus nomme
+  `remove_distractions` à rappeler. La réponse dit de vérifier par un zoom que les taches retirées
+  sont celles de cette photo.
+- `dust: {"remove": false}` garde son sens (retirer une suppression de la poussière, commande
+  `supprimer`). `imperfections: false` est refusé (undo_last les rend).
+- Invites : Retouche pro (étape 7 du connecteur ; étape réglable `poussiere` du module, implicite),
+  Portrait (`remove_distractions` avec `imperfections`, sinon `retouch_spots` ; l'étape
+  `imperfections` du module, à Non, refuse les deux), harmoniser une série (`dust` sur chaque photo,
+  sinon Copier-Coller de Lightroom à la main), consignes du connecteur et de la fenêtre.
+- Essais : `PresetSuppressionTests` (valide, effacement seul, dangereux, incomplet, absent, en
+  double, refus sans rien envoyer, mode « Proposer d'abord ») ; `essais-invites.lua` et
+  `essais-moteur.lua`.
 
 ## Aperçus et masques IA
 
@@ -10948,9 +11011,13 @@ image par tache (`Images`). Sans poussière trouvée, rien n'est gardé. Constat
   Le Coller de Lightroom, lui, invalide la référence (`invalidateReference`) et refait la recherche
   sur chaque photo.
 
-`remove_distractions` ne fait donc que retirer une suppression de la poussière (`dust: {"remove":
-false}`) ; la poussière d'une série reste à faire à la main : Supprimer › Poussière sur une photo,
-puis Copier et Coller de Lightroom avec la case Poussière.
+Un module ne la lance donc pas lui-même. Depuis le 10 novembre 2026 (après la 1.9),
+`remove_distractions` avec `dust: {"remove": true}` la fait par le paramètre prédéfini « Claude /
+Poussière » de Dany, lu d'abord par le serveur ([Poussière et imperfections par un paramètre
+prédéfini](#poussière-et-imperfections-par-un-paramètre-prédéfini-remove_distractions-avec-dust-et-imperfections)) ;
+`dust: {"remove": false}` retire toujours une suppression de la poussière. Sans paramètre valide,
+la poussière reste à faire à la main : Supprimer › Poussière sur une photo, puis Copier et Coller
+de Lightroom avec la case Poussière.
 
 ## Synchronisation automatique
 

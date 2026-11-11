@@ -166,6 +166,14 @@ essai('Une étape à Non : son texte retiré, et dite à Claude (« Ne fais pas 
     -- le message à Oui : à Non, elle est dite.
     egal("Retouche la photo active comme un professionnel : diagnostic chiffré, deux passes vérifiées, puis au plus deux passes correctives si un défaut reste. "
         .. Consignes.NE_PAS_FAIRE .. "recadrer. " .. Consignes.LIRE_GUIDE, Consignes.message('retouche_pro', { recadrer = false }))
+    -- La poussière du capteur (10 novembre 2026) : une étape de la Retouche pro, faite par la méthode
+    -- du connecteur (remove_distractions avec dust) ; à Non, dite. Les imperfections du portrait, à
+    -- Non, refusent aussi remove_distractions avec imperfections.
+    egal("Retouche la photo active comme un professionnel : diagnostic chiffré, deux passes vérifiées, puis au plus deux passes correctives si un défaut reste. "
+        .. Consignes.NE_PAS_FAIRE .. "retirer la poussière du capteur (remove_distractions avec dust). " .. Consignes.LIRE_GUIDE,
+        Consignes.message('retouche_pro', { poussiere = false }))
+    contient(Consignes.message('portrait', { imperfections = false }),
+        "retirer des imperfections (ni remove_distractions avec imperfections, ni retouch_spots)")
     -- Le grain du noir et blanc : la liste se finit sans lui, sans « et puis » (le tireur porte déjà
     -- son « puis »).
     egal("Passe la photo active en noir et blanc : profil, mélangeur, contraste local, puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape. "

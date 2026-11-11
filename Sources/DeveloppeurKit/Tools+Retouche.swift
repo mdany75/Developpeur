@@ -146,7 +146,7 @@ extension ToolHandler {
                  ] + writeProperties,
                  required: ["step_name"]),
             tool("remove_distractions",
-                 "Supprime les reflets d'une vitre (Suppression des distractions › Reflets), calculés par Lightroom sur ce Mac, par ses modèles IA, ou les passants (› Personnes) ; retire une suppression de la poussière du capteur (› Poussière). Reflets : dans le module Développement, où il affiche la photo le temps du calcul (de quelques secondes à une minute), puis remet la vue d'avant ; à faire avant toute autre retouche (aide d'Adobe), sur une photo prise derrière une vitre. Poussière : Lightroom ne la cherche que dans son interface (constaté : un module ne peut ni la lancer, ni la faire refaire sur une autre photo) : la proposer à la main, Supprimer › Poussière sur une photo, puis pour une série Copier et Coller de Lightroom avec la case Poussière (il la refait pour chaque photo). L'étape « Claude · <step_name> » va au journal ; undo_last et revert_to_original la défont. Passants (› Personnes, Lightroom Classic 16) : people = true ; Lightroom les détecte (modèle local) puis les retire par le remplissage génératif d'Adobe (réseau et compte Adobe, une à quelques minutes) ; s'il n'en voit aucun, rien n'est fait : un passant qu'il ne voit pas, retouch_spots (mode remove) ou generative_edit. Pas de proposition visuelle : en mode « Proposer d'abord », décrire le traitement, attendre l'accord, puis rappeler avec confirm = true. Vérifier ensuite avec view_photo (un zoom sur le ciel pour la poussière).",
+                 "Suppression des distractions de Lightroom : reflets d'une vitre (› Reflets), passants (› Personnes, people), poussière du capteur (› Poussière, dust) et imperfections de la peau (› Imperfections, imperfections). Reflets : dans le module Développement, où il affiche la photo le temps du calcul (de quelques secondes à une minute), puis remet la vue d'avant ; à faire avant toute autre retouche (aide d'Adobe), sur une photo prise derrière une vitre. Poussière et imperfections : un module ne peut pas les lancer ; Lightroom les fait par les paramètres prédéfinis « Claude / Poussière » et « Claude / Imperfections » de l'utilisateur, que le serveur lit d'abord : il refuse, sans rien faire, un paramètre absent, qui ne porterait qu'un signal d'effacement (il retirerait la suppression) ou qui ferait autre chose, et dit comment le refaire. Poussière : sur une poussière du capteur visible (ciel, fond uni). Imperfections : boutons et petites taches d'un portrait (sinon retouch_spots). L'étape « Claude · <step_name> » va au journal ; undo_last et revert_to_original la défont. Passants (Lightroom Classic 16) : people = true ; Lightroom les détecte (modèle local) puis les retire par le remplissage génératif d'Adobe (réseau et compte Adobe, une à quelques minutes) ; s'il n'en voit aucun, rien n'est fait : un passant qu'il ne voit pas, retouch_spots (mode remove) ou generative_edit. Pas de proposition visuelle : en mode « Proposer d'abord », décrire le traitement, attendre l'accord, puis rappeler avec confirm = true. Vérifier ensuite avec view_photo (un zoom sur le ciel pour la poussière, sur le visage pour les imperfections).",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("reflections", objectProp("Suppression des reflets ; {\"remove\": false} les rend.", [
@@ -155,9 +155,10 @@ extension ToolHandler {
                         "quality": enumProp(["preview", "standard", "best"], "Qualité du calcul (défaut : celle de Lightroom, standard) : best est plus lent."),
                     ])),
                     ("people", prop("boolean", "Passants (Suppression des distractions › Personnes, Lightroom Classic 16) : true les détecte et les retire ; false rend une suppression des passants (undo_last de ce retour la relance : nouveau résultat génératif). Un appel à part des reflets.")),
-                    ("dust", objectProp("{\"remove\": false} retire la suppression de la poussière du capteur (faite à la main dans Lightroom).", [
-                        "remove": prop("boolean", "false = retirer la suppression de la poussière."),
+                    ("dust", objectProp("Poussière du capteur : {\"remove\": true} la retire par le paramètre prédéfini « Claude / Poussière » ; {\"remove\": false} rend une suppression de la poussière.", [
+                        "remove": prop("boolean", "true (défaut) = retirer la poussière ; false = rendre la suppression de la poussière."),
                     ])),
+                    ("imperfections", prop("boolean", "Imperfections de la peau (boutons, petites taches) : true les retire par le paramètre prédéfini « Claude / Imperfections ». Un appel à part.")),
                  ] + writeProperties,
                  required: ["step_name"]),
         ]
@@ -166,10 +167,11 @@ extension ToolHandler {
     // MARK: Exécution
 
     func removeDistractions(_ args: Arguments) throws -> JSONValue {
+        let demandes = ["reflections", "people", "dust", "imperfections"].filter { args.has($0) }
+        if demandes.count > 1 {
+            throw LightroomError.invalid("Reflets, passants, poussière et imperfections : un appel chacun.")
+        }
         if args.has("people") {
-            guard !args.has("reflections"), !args.has("dust") else {
-                throw LightroomError.invalid("Passants, reflets et poussière : un appel chacun.")
-            }
             guard let people = args.bool("people") else {
                 throw LightroomError.invalid("« people » : true retire les passants, false les rend.")
             }
@@ -186,21 +188,27 @@ extension ToolHandler {
             // Le module attend la détection (une minute au plus), puis la suppression (quatre minutes au plus).
             return Self.withLabels(try lightroom.send("supprimer", params, timeout: 660))
         }
-        if let dust = args.object("dust") {
-            guard !args.has("reflections") else {
-                throw LightroomError.invalid("Reflets et poussière : un appel chacun.")
+        if args.has("imperfections") {
+            guard args.bool("imperfections") == true else {
+                throw LightroomError.invalid("« imperfections » : true les retire (paramètre « Claude / Imperfections ») ; pour les rendre, undo_last.")
             }
-            guard dust["remove"]?.bool == false else {
-                throw LightroomError.invalid("Poussière : Lightroom ne la cherche que dans son interface (Développement › Supprimer › Poussière) ; un module ne peut pas la lancer. La proposer à la main ; pour une série, Copier puis Coller de Lightroom avec la case Poussière, qui la refait pour chaque photo. « dust » : {\"remove\": false} la retire.")
+            return try appliquerParametreSuppression(.imperfections, args)
+        }
+        if args.has("dust") {
+            guard let dust = args.object("dust") else {
+                throw LightroomError.invalid("« dust » : {\"remove\": true} retire la poussière (paramètre « Claude / Poussière »), {\"remove\": false} rend une suppression de la poussière.")
+            }
+            if dust["remove"]?.bool != false {
+                return try appliquerParametreSuppression(.poussiere, args)
             }
             var params: [String: JSONValue] = ["poussiere": ["actif": false],
                                                "libelles": DevelopCatalogue.labels(for: ["Suppression.poussiere"])]
             if let id = args.int("photo_id") { params["photo"] = .number(Double(id)) }
-            params.merge(writeParameters(args, defaultStep: "poussière")) { _, new in new }
+            params.merge(writeParameters(args, defaultStep: "sans poussière")) { _, new in new }
             return Self.withLabels(try lightroom.send("supprimer", params, timeout: 300))
         }
         guard let reflections = args.object("reflections") else {
-            throw LightroomError.invalid("« reflections » : {\"remove\": true, \"amount\": 80}, « people » : true (passants), ou « dust » : {\"remove\": false} (la poussière se fait à la main dans Lightroom).")
+            throw LightroomError.invalid("« reflections » : {\"remove\": true, \"amount\": 80}, « people » : true (passants), « dust » : {\"remove\": true} (poussière du capteur) ou « imperfections » : true (peau).")
         }
         var reflets: [String: JSONValue] = ["actif": .bool(reflections["remove"]?.bool ?? true)]
         if let raw = reflections["amount"], !raw.isNull {
@@ -220,6 +228,66 @@ extension ToolHandler {
         params.merge(writeParameters(args, defaultStep: "reflets")) { _, new in new }
         // Le module attend la fin du calcul (trois minutes au plus).
         return Self.withLabels(try lightroom.send("supprimer", params, timeout: 660))
+    }
+
+    /// Poussière du capteur ou imperfections de la peau : un module ne peut pas lancer Supprimer ›
+    /// Poussière ni › Imperfections, mais Lightroom 16 les range dans un paramètre prédéfini. Le
+    /// serveur lit d'abord le fichier de « Claude / Poussière » ou « Claude / Imperfections »
+    /// (`PresetSuppression`, lecture seule) et ne l'applique que s'il porte ce seul filtre, fait
+    /// (pas un signal d'effacement), avec sa recette ; puis par le chemin des paramètres prédéfinis
+    /// (apply_settings avec preset → applyDevelopPreset du module) : étape « Claude · poussière »,
+    /// mode « Proposer d'abord », undo_last et revert_to_original comme toute retouche.
+    func appliquerParametreSuppression(_ genre: PresetSuppression.Genre, _ args: Arguments) throws -> JSONValue {
+        guard let dossier = dossierParametresPredefinis else {
+            throw LightroomError.invalid("\(genre.nomComplet) : les paramètres prédéfinis de Lightroom ne sont pas lus ici. Rien n'a été fait. " + Self.aLaMain(genre))
+        }
+        let uuid: String
+        switch PresetSuppression.chercher(genre, dans: dossier) {
+        case .valide(let trouve, _):
+            uuid = trouve
+        case .absent:
+            throw LightroomError.invalid("Pas de paramètre prédéfini « \(genre.nomComplet) » dans Lightroom. Rien n'a été fait. Pour le créer, une fois : " + Self.refaire(genre, creer: true) + " " + Self.aLaMain(genre))
+        case .effacementSeul:
+            throw LightroomError.invalid("« \(genre.nomComplet) » ne porte qu'un signal d'effacement (créé d'une photo sans Supprimer › \(genre.nom) fait) : appliqué, il RETIRERAIT la suppression au lieu de la faire. Rien n'a été fait. Pour le refaire, une fois : " + Self.refaire(genre, creer: false) + " " + Self.aLaMain(genre))
+        case .incomplet(_, let raison):
+            throw LightroomError.invalid("« \(genre.nomComplet) » n'est pas utilisable : \(raison). Rien n'a été fait. Pour le refaire, une fois : " + Self.refaire(genre, creer: false) + " " + Self.aLaMain(genre))
+        case .dangereux(_, let raisons):
+            throw LightroomError.invalid("« \(genre.nomComplet) » ferait autre chose que Supprimer › \(genre.nom) : " + raisons.joined(separator: " ; ") + ". Rien n'a été fait. Pour le refaire, une fois : " + Self.refaire(genre, creer: false) + " " + Self.aLaMain(genre))
+        case .plusieurs(let fichiers):
+            throw LightroomError.invalid("Plusieurs paramètres prédéfinis s'appellent « \(genre.nomComplet) » (\(fichiers.map(\.lastPathComponent).joined(separator: ", "))) : n'en garder qu'un dans Lightroom. Rien n'a été fait.")
+        }
+        var brut: [String: JSONValue] = ["preset": .string(uuid)]
+        brut["step_name"] = args.raw["step_name"].flatMap { $0.isNull ? nil : $0 } ?? .string(genre.etape)
+        for cle in ["confirm", "reason"] { if let valeur = args.raw[cle] { brut[cle] = valeur } }
+        if let id = args.int("photo_id") { brut["photo_ids"] = .array([.number(Double(id))]) }
+        let reponse: JSONValue
+        do {
+            reponse = try applySettings(Arguments(raw: brut))
+        } catch LightroomError.plugin(let message) {
+            // Le refus du mode « Proposer d'abord » nomme apply_settings : c'est remove_distractions qu'il faut rappeler.
+            throw LightroomError.plugin(message.replacingOccurrences(of: "apply_settings", with: "remove_distractions"))
+        }
+        guard var objet = reponse.object else { return reponse }
+        let remarque = genre == .poussiere
+            ? "Poussière : paramètre « \(genre.nomComplet) » appliqué ; Lightroom refait la détection pour cette photo (calcul IA). Vérifier par view_photo avec region (un ciel, un fond uni à 100 %) que les taches retirées sont bien celles de cette photo ; sinon undo_last, et Supprimer › Poussière à la main."
+            : "Imperfections : paramètre « \(genre.nomComplet) » appliqué ; Lightroom refait la détection pour cette photo (calcul IA). Vérifier par view_photo avec region sur le visage (grains de beauté gardés, aucune tache collée d'une autre photo) ; sinon undo_last, et retouch_spots."
+        objet["remarques_serveur"] = .array((objet["remarques_serveur"]?.array ?? []) + [.string(remarque)])
+        return .object(objet)
+    }
+
+    /// Comment refaire « Claude / Poussière » pour qu'il porte la suppression faite.
+    static func refaire(_ genre: PresetSuppression.Genre, creer: Bool) -> String {
+        let fin = creer
+            ? "puis Paramètres prédéfinis › + (Créer un paramètre prédéfini), nom « \(genre.nom) », groupe « \(PresetSuppression.groupe) », Ne rien sélectionner, cocher seulement Supprimer › \(genre.nom), Créer."
+            : "puis clic droit sur « \(genre.nomComplet) » › Mettre à jour avec les paramètres actuels, Ne rien sélectionner, cocher seulement Supprimer › \(genre.nom), Mettre à jour."
+        return "dans Développement, faire Supprimer › \(genre.nom) sur une photo où il y en a (la suppression faite), " + fin
+    }
+
+    /// Ce qui reste possible sans le paramètre prédéfini.
+    static func aLaMain(_ genre: PresetSuppression.Genre) -> String {
+        genre == .poussiere
+            ? "D'ici là, à la main : Supprimer › Poussière sur la photo ; pour une série, Copier puis Coller de Lightroom avec la case Poussière (il la refait pour chaque photo)."
+            : "D'ici là : retouch_spots (mode remove) sur chaque petite imperfection, jamais les grains de beauté."
     }
 
     func applySettings(_ args: Arguments) throws -> JSONValue {

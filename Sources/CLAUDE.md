@@ -117,6 +117,12 @@ toucher :
   écarte le vignetage).
 - Une tache Supprimer de Claude est toujours `patchmatch`, jamais générative ; `RetouchAreas` se
   dérive de `RemoveAreas` (`preparerTaches`).
+- **Poussière et imperfections** (`remove_distractions` avec `dust` et `imperfections`) : seulement
+  par « Claude / Poussière » et « Claude / Imperfections », lus d'abord en lecture seule
+  (`PresetSuppression`, `dossierParametresPredefinis` nil par défaut : jamais le vrai dossier dans
+  `swift test`) ; appliqués par leur UUID (apply_settings avec preset) seulement s'ils portent le
+  seul filtre voulu, fait (pas `IsSignalForDelete`), avec sa table ; sinon refus sans rien envoyer,
+  qui dit comment le refaire (`docs/SPEC.md`, Poussière et imperfections par un paramètre prédéfini).
 - Positions données dans l'image de `view_photo` : toute nouvelle position passe par
   `Geometrie.lua` (recalage `Recalage.swift`, `Tools+Recalage`).
 - Une écriture qui touche la géométrie d'une photo redressée coche « Contraindre le recadrage »

@@ -187,7 +187,7 @@ final class MCPServerTests: XCTestCase {
             "avant netteté, masques IA et retouch_spots",
             "Contraindre le recadrage", "coins vides", "un cadre demandé alors que la géométrie est déjà posée", "au centre et à la taille demandés",
             "JPEG sRGB", "le HDR ne se voit pas",
-            "Reflets d'une vitre : remove_distractions, avant toute autre retouche", "Personnes", "Poussière ; série : Copier puis Coller de Lightroom", "generative_edit, sur sa demande",
+            "Reflets d'une vitre : remove_distractions, avant toute autre retouche", "Personnes", "poussière du capteur (dust)", "imperfections d'un portrait (imperfections)", "« Claude / Poussière »", "generative_edit, sur sa demande",
             "cull_photos", "contact_sheet", "set_metadata après accord",
             "champ plat", "fusions HDR et panorama", "en HDR (HDREditMode), le rendu SDR", "yeux fermés ou plissés",
             "request_backup", "ne pas l'annoncer comme appliqué",
