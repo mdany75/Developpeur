@@ -46,7 +46,7 @@ public enum ServerInfo {
     Un outil « pas fini » à 50 s : le rappeler à l'identique. \
     Rester naturel sauf style demandé ; Vibrance plutôt que Saturation ; modéré sur Clarity2012, Dehaze, Texture et les réglages locaux. \
     Mode « Proposer d'abord » : montrer le rendu (preview_settings ou add_mask, preview = true) ou les changements, attendre l'accord, puis confirm = true. \
-    Reflets d'une vitre : remove_distractions, avant toute autre retouche ; aussi passants (people), poussière du capteur (dust), imperfections d'un portrait (imperfections). Changer un objet, un vêtement : generative_edit, sur sa demande. Original introuvable : le dire, avec sa raison. \
+    Reflets d'une vitre : remove_distractions, avant toute autre retouche. remove_distractions aussi pour passants (people), poussière du capteur (dust), imperfections d'un portrait (imperfections). Changer un objet, un vêtement : generative_edit, sur sa demande. Original introuvable : le dire, avec sa raison. \
     À proposer de faire à la main dans Lightroom : correction de champ plat, fusions HDR et panorama.
     """
 }

@@ -174,6 +174,11 @@ essai('Une étape à Non : son texte retiré, et dite à Claude (« Ne fais pas 
         Consignes.message('retouche_pro', { poussiere = false }))
     contient(Consignes.message('portrait', { imperfections = false }),
         "retirer des imperfections (ni remove_distractions avec imperfections, ni retouch_spots)")
+    -- La Retouche pro fait aussi les boutons d'une peau (étape 7 de l'invite) : une étape à elle, à
+    -- Non sans retirer l'iris ni les dents (revue du 11 novembre 2026).
+    egal("Retouche la photo active comme un professionnel : diagnostic chiffré, deux passes vérifiées, puis au plus deux passes correctives si un défaut reste. "
+        .. Consignes.NE_PAS_FAIRE .. "retirer des imperfections (ni remove_distractions avec imperfections, ni retouch_spots). " .. Consignes.LIRE_GUIDE,
+        Consignes.message('retouche_pro', { imperfections = false }))
     -- Le grain du noir et blanc : la liste se finit sans lui, sans « et puis » (le tireur porte déjà
     -- son « puis »).
     egal("Passe la photo active en noir et blanc : profil, mélangeur, contraste local, puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape. "

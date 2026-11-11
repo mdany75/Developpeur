@@ -625,7 +625,9 @@ cadre.
   effacement (créé d'une photo où la suppression n'était pas faite : appliqué, il la retirerait)
   ou s'il ferait autre chose, Claude ne fait rien et vous dit comment le refaire (voir Créer les
   paramètres « Claude / Poussière » et « Claude / Imperfections », plus bas). L'étape
-  « Claude · poussière » ou « Claude · imperfections » se défait comme les autres.
+  « Claude · poussière » ou « Claude · imperfections » se défait comme les autres. Si le
+  paramètre porte une autre version de processus que la photo, Claude attend votre accord. Après
+  chaque passage, Claude vérifie par un zoom que les taches retirées sont bien celles de la photo.
 - Redresser et recadrer : angle, ratio (« 4:5 », « 16:9 »…), taille et centre, sans bord vide.
   Après Upright ou une perspective, le module coche « Contraindre le recadrage » et Lightroom
   resserre le cadre pour ne laisser aucun coin vide.

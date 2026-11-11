@@ -114,18 +114,29 @@ public enum PresetSuppression {
         guard !voulus.isEmpty else {
             return .incomplet(fichier: fichier, raison: "il ne porte pas Supprimer › \(genre.nom)")
         }
-        let faits = voulus.filter { !signal($0) }
-        guard !faits.isEmpty else { return .effacementSeul(fichier: fichier) }
-        for filtre in faits {
-            guard let digest = filtre["CompressedSettings"], !digest.isEmpty,
-                  let table = lecture.attributs["Table_" + digest], !table.isEmpty else {
-                return .incomplet(fichier: fichier, raison: "la recette de Supprimer › \(genre.nom) manque")
-            }
+        // Exactement une entrée du filtre voulu : une suppression faite et un signal d'effacement
+        // ensemble, Lightroom ne dit pas lequel l'emporte (revue du 11 novembre 2026).
+        guard voulus.count == 1, let filtre = voulus.first else {
+            return .incomplet(fichier: fichier, raison: "il porte \(voulus.count) fois Supprimer › \(genre.nom) (une seule attendue)")
+        }
+        guard !signal(filtre) else { return .effacementSeul(fichier: fichier) }
+        guard let digest = filtre["CompressedSettings"], !digest.isEmpty,
+              let table = lecture.attributs["Table_" + digest], !table.isEmpty else {
+            return .incomplet(fichier: fichier, raison: "la recette de Supprimer › \(genre.nom) manque")
         }
         guard let uuid = lecture.attributs["UUID"]?.trimmingCharacters(in: .whitespaces), !uuid.isEmpty else {
             return .incomplet(fichier: fichier, raison: "il n'a pas d'identifiant (UUID)")
         }
         return .valide(uuid: uuid, fichier: fichier)
+    }
+
+    /// La version de processus que porte le fichier (`crs:ProcessVersion`, « 15.4 »), rangée même
+    /// quand la case n'est pas cochée : appliquée, elle pourrait changer celle de la photo, donc son
+    /// rendu (pas encore constaté) ; remove_distractions la compare d'abord à celle de la photo.
+    public static func versionProcessus(_ fichier: URL) -> String? {
+        guard let valeur = lire(fichier)?.attributs["ProcessVersion"]?.trimmingCharacters(in: .whitespaces),
+              !valeur.isEmpty else { return nil }
+        return valeur
     }
 
     static func signal(_ filtre: [String: String]) -> Bool {

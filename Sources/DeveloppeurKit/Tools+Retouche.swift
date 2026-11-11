@@ -198,8 +198,15 @@ extension ToolHandler {
             guard let dust = args.object("dust") else {
                 throw LightroomError.invalid("« dust » : {\"remove\": true} retire la poussière (paramètre « Claude / Poussière »), {\"remove\": false} rend une suppression de la poussière.")
             }
-            if dust["remove"]?.bool != false {
+            // Seulement true (ou rien) pour la retirer, false pour la rendre : une autre valeur
+            // (« "false" », 0) ne doit pas faire le contraire de ce qui était voulu.
+            switch dust["remove"] {
+            case nil, .some(.null), .some(.bool(true)):
                 return try appliquerParametreSuppression(.poussiere, args)
+            case .some(.bool(false)):
+                break
+            default:
+                throw LightroomError.invalid("« dust.remove » : true (la retirer) ou false (rendre une suppression de la poussière), sans guillemets. Rien n'a été fait.")
             }
             var params: [String: JSONValue] = ["poussiere": ["actif": false],
                                                "libelles": DevelopCatalogue.labels(for: ["Suppression.poussiere"])]
@@ -242,9 +249,11 @@ extension ToolHandler {
             throw LightroomError.invalid("\(genre.nomComplet) : les paramètres prédéfinis de Lightroom ne sont pas lus ici. Rien n'a été fait. " + Self.aLaMain(genre))
         }
         let uuid: String
+        let fichier: URL
         switch PresetSuppression.chercher(genre, dans: dossier) {
-        case .valide(let trouve, _):
+        case .valide(let trouve, let lu):
             uuid = trouve
+            fichier = lu
         case .absent:
             throw LightroomError.invalid("Pas de paramètre prédéfini « \(genre.nomComplet) » dans Lightroom. Rien n'a été fait. Pour le créer, une fois : " + Self.refaire(genre, creer: true) + " " + Self.aLaMain(genre))
         case .effacementSeul:
@@ -256,6 +265,16 @@ extension ToolHandler {
         case .plusieurs(let fichiers):
             throw LightroomError.invalid("Plusieurs paramètres prédéfinis s'appellent « \(genre.nomComplet) » (\(fichiers.map(\.lastPathComponent).joined(separator: ", "))) : n'en garder qu'un dans Lightroom. Rien n'a été fait.")
         }
+        // La version de processus rangée dans le paramètre pourrait changer celle de la photo, donc
+        // son rendu : comme process_version, la montrer et attendre l'accord (confirm = true).
+        if args.bool("confirm") != true, let duParametre = PresetSuppression.versionProcessus(fichier) {
+            var lecture: [String: JSONValue] = ["cles": .array([])]
+            if let id = args.int("photo_id") { lecture["photo"] = .number(Double(id)) }
+            if let deLaPhoto = try lightroom.send("reglages", lecture, timeout: 30)["version_processus"]?.string,
+               Double(deLaPhoto.trimmingCharacters(in: .whitespaces)) != Double(duParametre) {
+                throw LightroomError.invalid("« \(genre.nomComplet) » porte la version de processus \(duParametre) et la photo est en \(deLaPhoto) : l'appliquer pourrait la mettre à jour, et le rendu peut changer nettement. Rien n'a été fait. Le dire à l'utilisateur (preview_settings avec process_version pour le montrer), attendre son accord, puis rappeler remove_distractions avec confirm = true.")
+            }
+        }
         var brut: [String: JSONValue] = ["preset": .string(uuid)]
         brut["step_name"] = args.raw["step_name"].flatMap { $0.isNull ? nil : $0 } ?? .string(genre.etape)
         for cle in ["confirm", "reason"] { if let valeur = args.raw[cle] { brut[cle] = valeur } }
@@ -264,13 +283,18 @@ extension ToolHandler {
         do {
             reponse = try applySettings(Arguments(raw: brut))
         } catch LightroomError.plugin(let message) {
+            // Fichier valide, mais Lightroom ne connaît pas (encore) ce paramètre : créé ou refait
+            // hors de Lightroom, ou pas encore relu.
+            if message.contains("Paramètre prédéfini introuvable") {
+                throw LightroomError.plugin("Lightroom ne trouve pas « \(genre.nomComplet) » (\(uuid)), alors que son fichier est là : quitter et relancer Lightroom pour qu'il relise ses paramètres prédéfinis, puis rappeler remove_distractions. Rien n'a été fait. " + Self.aLaMain(genre))
+            }
             // Le refus du mode « Proposer d'abord » nomme apply_settings : c'est remove_distractions qu'il faut rappeler.
             throw LightroomError.plugin(message.replacingOccurrences(of: "apply_settings", with: "remove_distractions"))
         }
         guard var objet = reponse.object else { return reponse }
         let remarque = genre == .poussiere
-            ? "Poussière : paramètre « \(genre.nomComplet) » appliqué ; Lightroom refait la détection pour cette photo (calcul IA). Vérifier par view_photo avec region (un ciel, un fond uni à 100 %) que les taches retirées sont bien celles de cette photo ; sinon undo_last, et Supprimer › Poussière à la main."
-            : "Imperfections : paramètre « \(genre.nomComplet) » appliqué ; Lightroom refait la détection pour cette photo (calcul IA). Vérifier par view_photo avec region sur le visage (grains de beauté gardés, aucune tache collée d'une autre photo) ; sinon undo_last, et retouch_spots."
+            ? "Poussière : paramètre « \(genre.nomComplet) » appliqué ; Lightroom devrait refaire la détection pour cette photo (calcul IA, pas encore constaté : il pourrait reprendre les taches de la photo d'où vient le paramètre). Vérifier par view_photo avec region (un ciel, un fond uni à 100 %) que les taches retirées sont bien celles de cette photo ; sinon undo_last, et Supprimer › Poussière à la main."
+            : "Imperfections : paramètre « \(genre.nomComplet) » appliqué ; Lightroom devrait refaire la détection pour cette photo (calcul IA, pas encore constaté : il pourrait reprendre les taches de la photo d'où vient le paramètre). Vérifier par view_photo avec region sur le visage (grains de beauté gardés, aucune tache collée d'une autre photo) ; sinon undo_last, et retouch_spots."
         objet["remarques_serveur"] = .array((objet["remarques_serveur"]?.array ?? []) + [.string(remarque)])
         return .object(objet)
     }

@@ -22,7 +22,9 @@ final class PresetSuppressionTests: XCTestCase {
         var id: Int
         var signal = false
         var table = true
-        var digest: String { String(format: "%032X", id * 7919) }
+        /// Deux entrées du même filtre ont chacune leur table (sinon l'attribut serait en double).
+        var variante = 0
+        var digest: String { String(format: "%032X", id * 7919 + variante) }
     }
 
     /// Un fichier .xmp de paramètre prédéfini, de la forme de ceux de Lightroom 16.0.
@@ -226,6 +228,8 @@ final class PresetSuppressionTests: XCTestCase {
     func testConsignesInvitesEtDescriptionLesNomment() throws {
         XCTAssertFalse(ServerInfo.instructions.contains("main dans Lightroom : poussière"), "plus à la main")
         XCTAssertTrue(ServerInfo.instructions.contains("poussière du capteur (dust), imperfections d'un portrait (imperfections)"))
+        // Seuls les reflets se font avant toute autre retouche (revue du 11 novembre 2026).
+        XCTAssertTrue(ServerInfo.instructions.contains("avant toute autre retouche. remove_distractions aussi pour passants"), "les autres ne se font pas en premier")
         XCTAssertTrue(Prompts.retouchePro.render([:]).contains("remove_distractions avec dust"), "Retouche pro : la poussière du capteur")
         XCTAssertTrue(Prompts.portrait.render([:]).contains("remove_distractions avec imperfections"), "Portrait : les imperfections")
         XCTAssertTrue(Prompts.portrait.render([:]).contains("jamais les grains de beauté"))
@@ -241,5 +245,63 @@ final class PresetSuppressionTests: XCTestCase {
         XCTAssertFalse(result.isError, result.text)
         XCTAssertEqual(fake.lastParams["poussiere"]?["actif"]?.bool, false)
         XCTAssertNil(appliquer())
+    }
+
+    // MARK: Revue du 11 novembre 2026
+
+    func testDeuxEntreesDuFiltreVoulu() {
+        // Une suppression faite et un signal d'effacement du même filtre : ambigu, jamais valide.
+        ecrire(Self.xmp(nom: "Poussière", filtres: [Filtre(id: 6, signal: true), Filtre(id: 6, variante: 1)]), "Poussière.xmp")
+        guard case .incomplet(_, let raison) = PresetSuppression.chercher(.poussiere, dans: dossier) else {
+            return XCTFail("deux entrées du filtre 6 : incomplet attendu")
+        }
+        XCTAssertTrue(raison.contains("une seule attendue"), raison)
+        ecrire(Self.xmp(nom: "Poussière", filtres: [Filtre(id: 6), Filtre(id: 6, variante: 1)]), "Poussière.xmp")
+        guard case .incomplet = PresetSuppression.chercher(.poussiere, dans: dossier) else { return XCTFail("deux faites") }
+    }
+
+    func testDustMalTypeNeFaitRien() {
+        ecrire(Self.xmp(nom: "Poussière", filtres: [Filtre(id: 6)]), "Poussière.xmp")
+        for valeur: JSONValue in ["false", 0, "true", 1] {
+            let refus = tools.call(name: "remove_distractions", arguments: ["dust": ["remove": valeur], "step_name": "x", "confirm": true])
+            XCTAssertTrue(refus.isError, "\(valeur) : refus attendu")
+            XCTAssertTrue(refus.text.contains("« dust.remove » : true"), refus.text)
+        }
+        XCTAssertTrue(fake.calls.allSatisfy { $0.command != "appliquer" && $0.command != "supprimer" }, "rien envoyé au module")
+        XCTAssertFalse(tools.call(name: "remove_distractions", arguments: ["dust": ["remove": JSONValue.null], "step_name": "x", "confirm": true]).isError,
+                       "null : comme sans remove")
+    }
+
+    func testVersionDeProcessusDifferenteDemandeLAccord() throws {
+        ecrire(Self.xmp(nom: "Imperfections", filtres: [Filtre(id: 7)]), "Imperfections.xmp")
+        // Photo en version 5 (11.0), paramètre en 15.4 : refus sans confirm, rien appliqué.
+        fake.replies["reglages"] = ["version_processus": "11.0"]
+        let refus = tools.call(name: "remove_distractions", arguments: ["imperfections": true, "photo_id": 7, "step_name": "x"])
+        XCTAssertTrue(refus.isError)
+        XCTAssertTrue(refus.text.contains("version de processus 15.4 et la photo est en 11.0"), refus.text)
+        XCTAssertTrue(refus.text.contains("rappeler remove_distractions avec confirm = true"), refus.text)
+        XCTAssertEqual(fake.calls.last { $0.command == "reglages" }?.params["photo"]?.int, 7, "la version de cette photo")
+        XCTAssertNil(appliquer(), "rien envoyé à « appliquer »")
+        // Avec l'accord : appliqué.
+        XCTAssertFalse(tools.call(name: "remove_distractions", arguments: ["imperfections": true, "photo_id": 7, "step_name": "x", "confirm": true]).isError)
+        XCTAssertNotNil(appliquer())
+        // Même version : pas d'accord de plus.
+        fake.calls.removeAll()
+        fake.replies["reglages"] = ["version_processus": "15.4"]
+        XCTAssertFalse(tools.call(name: "remove_distractions", arguments: ["imperfections": true, "step_name": "x"]).isError)
+        XCTAssertNotNil(appliquer())
+    }
+
+    func testParametreInconnuDeLightroomEtRemarquePrudente() {
+        ecrire(Self.xmp(nom: "Poussière", filtres: [Filtre(id: 6)]), "Poussière.xmp")
+        let ok = tools.call(name: "remove_distractions", arguments: ["dust": [:], "step_name": "x", "confirm": true])
+        XCTAssertFalse(ok.isError, ok.text)
+        XCTAssertTrue(ok.text.contains("devrait refaire la détection"), "pas encore constaté : jamais affirmé")
+        XCTAssertFalse(ok.text.contains("Lightroom refait la détection"), ok.text)
+        fake.errors["appliquer"] = LightroomError.plugin("Paramètre prédéfini introuvable : « 4E52288140DA481F80CD64A55C066073 ». Voir list_presets.")
+        let refus = tools.call(name: "remove_distractions", arguments: ["dust": [:], "step_name": "x", "confirm": true])
+        XCTAssertTrue(refus.isError)
+        XCTAssertTrue(refus.text.contains("relancer Lightroom"), refus.text)
+        XCTAssertTrue(refus.text.contains("rappeler remove_distractions"), refus.text)
     }
 }

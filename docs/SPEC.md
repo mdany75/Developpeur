@@ -79,7 +79,7 @@ défait ensuite.
 
 **Poussière et imperfections par un paramètre prédéfini (après la 1.9)**
 
-- Refaire « Claude / Poussière » et « Claude / Imperfections » d'une photo où la suppression est faite (ce soir-là, les deux ne portaient qu'un signal d'effacement : le serveur les refuse), puis : `remove_distractions` avec `dust` sur une AUTRE photo (copie d'Essais) : Lightroom refait-il la détection pour cette photo (comme Personnes, en 6 s) ou colle-t-il les taches de la photo source (comme un filtre copié par un module, constat du 18 octobre 2026) ? De même pour `imperfections` sur un portrait (grains de beauté gardés ?) ; durée ; `undo_last` et `revert_to_original` rendent-ils `FilterList` d'avant ; le `ProcessVersion` rangé dans le paramètre change-t-il la version de processus d'une photo plus ancienne — à la main dans Lightroom ([Poussière et imperfections](#poussière-et-imperfections-par-un-paramètre-prédéfini-remove_distractions-avec-dust-et-imperfections)).
+- Refaire « Claude / Poussière » et « Claude / Imperfections » d'une photo où la suppression est faite (ce soir-là, les deux ne portaient qu'un signal d'effacement ; Dany les a refaits vers minuit : le serveur les juge maintenant valides, la fonction sert donc dès l'installation), puis : `remove_distractions` avec `dust` sur une AUTRE photo (copie d'Essais) : Lightroom refait-il la détection pour cette photo (comme Personnes, en 6 s) ou colle-t-il les taches de la photo source (comme un filtre copié par un module, constat du 18 octobre 2026) ? De même pour `imperfections` sur un portrait (grains de beauté gardés ?) ; durée ; `undo_last` et `revert_to_original` rendent-ils `FilterList` d'avant ; le `ProcessVersion` rangé dans le paramètre change-t-il la version de processus d'une photo plus ancienne — à la main dans Lightroom ([Poussière et imperfections](#poussière-et-imperfections-par-un-paramètre-prédéfini-remove_distractions-avec-dust-et-imperfections)).
 
 **Retouche générative : choix du modèle (1.9)**
 
@@ -5089,15 +5089,27 @@ La règle (`PresetSuppression.swift`, `ToolHandler.appliquerParametreSuppression
   « Claude · imperfections » (ou `step_name`), `undo_last` et `revert_to_original` comme toute
   retouche ; le mode « Proposer d'abord » est jugé par le module (`confirm`), et son refus nomme
   `remove_distractions` à rappeler. La réponse dit de vérifier par un zoom que les taches retirées
-  sont celles de cette photo.
+  sont celles de cette photo, et que la détection refaite pour cette photo n'est **pas encore
+  constatée** (jamais l'affirmer avant la recette). Un refus « Paramètre prédéfini introuvable » du
+  module (fichier valide que Lightroom n'a pas relu) devient « quitter et relancer Lightroom ».
+- Exactement une entrée du filtre voulu : deux (une faite et un signal d'effacement, ou deux
+  faites) font « incomplet », car Lightroom ne dit pas laquelle l'emporte.
+- **Version de processus** : le fichier porte `crs:ProcessVersion` (« 15.4 ») même case
+  décochée. Sans `confirm = true`, le serveur lit d'abord celle de la photo (commande `reglages`) ;
+  si elle diffère, il refuse sans rien appliquer et demande l'accord, comme `process_version`
+  (l'appliquer pourrait mettre la photo à jour et changer son rendu ; pas encore constaté).
 - `dust: {"remove": false}` garde son sens (retirer une suppression de la poussière, commande
-  `supprimer`). `imperfections: false` est refusé (undo_last les rend).
-- Invites : Retouche pro (étape 7 du connecteur ; étape réglable `poussiere` du module, implicite),
+  `supprimer`) ; `remove` absent, null ou `true` l'applique ; toute autre valeur (« "false" »,
+  0) est refusée. `imperfections: false` est refusé (undo_last les rend).
+- Invites : Retouche pro (étape 7 du connecteur ; étapes réglables `poussiere` et `imperfections`
+  du module, implicites),
   Portrait (`remove_distractions` avec `imperfections`, sinon `retouch_spots` ; l'étape
   `imperfections` du module, à Non, refuse les deux), harmoniser une série (`dust` sur chaque photo,
   sinon Copier-Coller de Lightroom à la main), consignes du connecteur et de la fenêtre.
 - Essais : `PresetSuppressionTests` (valide, effacement seul, dangereux, incomplet, absent, en
-  double, refus sans rien envoyer, mode « Proposer d'abord ») ; `essais-invites.lua` et
+  double, refus sans rien envoyer, mode « Proposer d'abord » ; revue du 11 novembre : deux entrées
+  du filtre, `dust.remove` mal typé, version de processus, paramètre inconnu de Lightroom,
+  remarque prudente) ; `essais-invites.lua` et
   `essais-moteur.lua`.
 
 ## Aperçus et masques IA

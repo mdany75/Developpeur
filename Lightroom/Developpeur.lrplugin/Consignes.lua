@@ -253,6 +253,8 @@ Consignes.invites = {
             implicite('poussiere', "Poussière du capteur, si elle se voit", "retirer la poussière du capteur (remove_distractions avec dust)"),
             implicite('locales', "Retouches locales : ciel, sujet, arrière-plan", "faire des retouches locales (add_mask)"),
             implicite('visage', "Visage : peau, iris, dents, en douceur", "toucher à la peau, à l'iris et aux dents"),
+            implicite('imperfections', "Boutons du visage",
+                "retirer des imperfections (ni remove_distractions avec imperfections, ni retouch_spots)"),
             implicite('tireur', "Éclaircir et assombrir comme un tireur", "éclaircir et assombrir comme un tireur"),
             implicite('vignetage', "Vignetage ou bords assombris", "assombrir les bords (ni vignetage ni radial inversé)"),
         },
