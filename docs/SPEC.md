@@ -79,7 +79,7 @@ défait ensuite.
 
 **Poussière et imperfections par un paramètre prédéfini (après la 1.9)**
 
-- Refaire « Claude / Poussière » et « Claude / Imperfections » d'une photo où la suppression est faite (ce soir-là, les deux ne portaient qu'un signal d'effacement ; Dany les a refaits vers minuit : le serveur les juge maintenant valides, la fonction sert donc dès l'installation), puis : `remove_distractions` avec `dust` sur une AUTRE photo (copie d'Essais) : Lightroom refait-il la détection pour cette photo (comme Personnes, en 6 s) ou colle-t-il les taches de la photo source (comme un filtre copié par un module, constat du 18 octobre 2026) ? De même pour `imperfections` sur un portrait (grains de beauté gardés ?) ; durée ; `undo_last` et `revert_to_original` rendent-ils `FilterList` d'avant ; le `ProcessVersion` rangé dans le paramètre change-t-il la version de processus d'une photo plus ancienne — à la main dans Lightroom ([Poussière et imperfections](#poussière-et-imperfections-par-un-paramètre-prédéfini-remove_distractions-avec-dust-et-imperfections)).
+- Refaire « Claude / Poussière » et « Claude / Imperfections » d'une photo où la suppression est faite (refaits par Claude vers minuit ; poussière recalculée sur une autre photo, constaté), puis : De même pour `imperfections` sur un portrait (grains de beauté gardés ?) ; durée ; `undo_last` et `revert_to_original` rendent-ils `FilterList` d'avant ; le `ProcessVersion` rangé dans le paramètre change-t-il la version de processus d'une photo plus ancienne — à la main dans Lightroom ([Poussière et imperfections](#poussière-et-imperfections-par-un-paramètre-prédéfini-remove_distractions-avec-dust-et-imperfections)).
 
 **Retouche générative : choix du modèle (1.9)**
 
@@ -5066,8 +5066,23 @@ Constaté dans Lightroom Classic 16.0 (10 novembre 2026) :
   avec signal). Un paramètre peut aussi porter des signaux d'effacement d'autres filtres (le
   « Personnes » de Dany en portait pour 3, 6 et 7).
 - `ProcessVersion` est rangé même quand seule la case Supprimer est cochée.
-- Le module ne voit, par `getDevelopSettings`, que le digest, jamais la table : il ne peut pas
-  fabriquer la recette.
+- Le module ne voit, par `getDevelopSettings`, que le digest du filtre des passants ; pour la
+  poussière, il voit aussi la table (`Table_<digest>`, relevée par `--dump`). Il ne fabrique
+  jamais la recette : elle vient d'une suppression faite une fois dans Lightroom.
+- Paramètres refaits par Claude vers minuit (contrôle de l'écran, sur l'ordre de Dany) : une
+  nouvelle copie d'Essais de chaque photo (« Copie 23 » de 20200710_193347.jpg, poussière ;
+  « Copie 28 » de DSCF2402.RAF, imperfections à 100), Supprimer › Poussière ou › Imperfections
+  › Appliquer, puis clic droit › Mettre à jour avec les paramètres actuels, Ne rien
+  sélectionner, seulement sa case ; puis « Appliquer » décoché sur les deux copies. Fichiers :
+  `Dust Removal` (`FilterID` 6) et `Blemish Removal` (`FilterID` 7), sans signal d'effacement.
+- Appliqué par `apply_settings` avec `preset` à une autre photo (IMG_8173, copie 54868923), le
+  paramètre Poussière y range un filtre au digest différent de la photo source, en 2 s :
+  recalculé pour cette photo ; `undo_last` le retire. Imperfections : rien sur IMG_8173 (visage
+  petit, vu de loin), même appliqué à la main ; sur une autre copie du portrait DSCF2402
+  (54867139), le filtre `Blemish Removal` est rangé ; `undo_last` le retire.
+- « Mettre à jour avec les paramètres actuels » écrit un fichier au nouvel `crs:UUID`, mais
+  Lightroom garde l'ancien en mémoire jusqu'à sa relance : `remove_distractions` refuse alors
+  (« quitter et relancer Lightroom »), comme prévu.
 
 La règle (`PresetSuppression.swift`, `ToolHandler.appliquerParametreSuppression`) :
 
