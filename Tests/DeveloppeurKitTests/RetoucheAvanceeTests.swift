@@ -43,6 +43,50 @@ final class RetoucheAvanceeTests: XCTestCase {
         XCTAssertEqual(fake.calls.count, count)
     }
 
+    // MARK: remove_distractions, passants (Lightroom Classic 16)
+
+    func testRemoveDistractionsSendsPeople() throws {
+        fake.replies["etat"] = ["lightroom": "16.0"]
+        fake.replies["supprimer"] = ["resultats": [["changements": [["cle": "Suppression.personnes", "avant": "présents", "apres": "retirés"]]]]]
+        let result = tools.call(name: "remove_distractions", arguments: ["photo_id": 7, "people": true, "reason": "Passants derrière le sujet.", "confirm": true])
+        XCTAssertFalse(result.isError, result.text)
+        let sent = try XCTUnwrap(fake.calls.last)
+        XCTAssertEqual(sent.command, "supprimer")
+        XCTAssertGreaterThanOrEqual(sent.timeout, 600, "le module attend la détection puis la suppression")
+        XCTAssertEqual(sent.params["personnes"]?.bool, true)
+        XCTAssertNil(sent.params["reflets"])
+        XCTAssertEqual(sent.params["photo"]?.int, 7)
+        XCTAssertEqual(sent.params["etape"]?.string, "passants", "nom d'étape par défaut")
+        XCTAssertEqual(sent.params["confirme"]?.bool, true)
+        XCTAssertTrue(result.text.contains("Passants (Suppression des distractions › Personnes)"), "libellé du changement")
+
+        XCTAssertFalse(tools.call(name: "remove_distractions", arguments: ["people": false, "step_name": "rendre"]).isError)
+        XCTAssertEqual(fake.lastParams["personnes"]?.bool, false)
+    }
+
+    func testRemoveDistractionsRefusesPeopleBeforeLightroom16() {
+        fake.replies["etat"] = ["lightroom": "15.6"]
+        let refus = tools.call(name: "remove_distractions", arguments: ["people": true, "step_name": "passants"])
+        XCTAssertTrue(refus.isError)
+        XCTAssertTrue(refus.text.contains("Lightroom Classic 16.0 ou plus récent (ici 15.6)"), refus.text)
+        XCTAssertFalse(fake.commands.contains("supprimer"))
+        // Avec reflets ou poussière, ou sans booléen : refusé avant Lightroom.
+        fake.replies["etat"] = ["lightroom": "16.0"]
+        XCTAssertTrue(tools.call(name: "remove_distractions", arguments: ["people": true, "reflections": [:], "step_name": "x"]).text.contains("un appel chacun"))
+        XCTAssertTrue(tools.call(name: "remove_distractions", arguments: ["people": "oui", "step_name": "x"]).isError)
+        XCTAssertFalse(fake.commands.contains("supprimer"))
+    }
+
+    func testPeopleAreDoneByClaudeNotByHand() throws {
+        let outil = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "remove_distractions" })
+        XCTAssertTrue(outil["description"]?.string?.contains("people = true") == true)
+        XCTAssertFalse(outil["description"]?.string?.contains("à proposer de faire à la main") == true)
+        XCTAssertNotNil(outil["inputSchema"]?["properties"]?["people"])
+        XCTAssertTrue(ServerInfo.instructions.contains("passants (Distractions › Personnes) : people."))
+        XCTAssertFalse(ServerInfo.instructions.contains("main dans Lightroom : passants"))
+        XCTAssertTrue(Prompts.retouchePro.render([:]).contains("les passants aussi (remove_distractions avec people)"))
+    }
+
     // MARK: Masques
 
     func testObjectBoxIsSentAsARectangle() throws {

@@ -1962,6 +1962,36 @@ function S.avancerAmeliorations()
         end
     end
     for _, photo in pairs(S.photos) do
+        if photo.detectionPersonnes then
+            photo.detectionPersonnes = photo.detectionPersonnes - 1
+            if photo.detectionPersonnes <= 0 then
+                photo.detectionPersonnes = nil
+                photo.personnesDetectees = photo.passants or 0
+            end
+        end
+        local calcul = photo.calculPersonnes
+        if calcul then
+            calcul.duree = calcul.duree - 1
+            if calcul.duree <= 0 then
+                photo.calculPersonnes = nil
+                if not S.personnesAnnulees then
+                    local filtres = {}
+                    for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
+                        filtres[#filtres + 1] = filtre
+                    end
+                    filtres[#filtres + 1] = { Name = 'remove_people', FilterID = 7,
+                        Title = '$$$/CRaw/Filter/DistractionRemoval/People=People Removal',
+                        CompressedSettings = 'passants ' .. tostring(photo.personnesDetectees) }
+                    photo.reglages.FilterList = { Filters = filtres }
+                    photo.reglages.EnableDistractionRemoval = true
+                end
+                if calcul.rappel then
+                    calcul.rappel(calcul.argument)
+                end
+            end
+        end
+    end
+    for _, photo in pairs(S.photos) do
         if photo.calculAmelioration then
             photo.calculAmelioration = photo.calculAmelioration - 1
             if photo.calculAmelioration <= 0 then
@@ -2050,7 +2080,61 @@ local controleur = {
         assert(not S.ecritureEnCours, "LrDevelopController dans withWriteAccessDo")
         if nom == 'dereflect' and filtreReflets(photo) then
             photo.calculReflets = { duree = 1, actif = false }
+        elseif nom == 'remove_people' and not S.resetPersonnesIgnore then
+            local filtres = {}
+            for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
+                if filtre.Name ~= 'remove_people' then
+                    filtres[#filtres + 1] = filtre
+                end
+            end
+            photo.reglages.FilterList = { Filters = filtres }
+            S.appelsPersonnes[#S.appelsPersonnes + 1] = { fonction = 'resetFilterWithName' }
         end
+    end,
+    -- Passants (relevé dans le code de Lightroom Classic 16.0, supposé pour le reste) :
+    -- detectDistractingPeople (outil Supprimer ouvert) lance la détection en arrière-plan, sans
+    -- rappel ; countAllSpots('distractingPeopleRemoval') compte les passants détectés ;
+    -- applyRemovalOnDetectedDistractingPeople refuse sans passant détecté ou s'ils sont déjà
+    -- retirés, sinon pose le filtre remove_people à la fin et appelle le rappel.
+    detectDistractingPeople = function()
+        local photo = dansDeveloppement()
+        assert(not S.ecritureEnCours, "LrDevelopController dans withWriteAccessDo")
+        if S.outil ~= 'dust' then
+            error("this operation can be executed only when Remove-tool is opened in Develop module", 0)
+        end
+        photo.personnesDetectees = nil
+        photo.detectionPersonnes = S.dureeDetection
+        S.appelsPersonnes[#S.appelsPersonnes + 1] = { fonction = 'detectDistractingPeople' }
+    end,
+    countAllSpots = function(mode)
+        local photo = dansDeveloppement()
+        if S.compteIllisible then
+            error("invalid mode", 0)
+        end
+        if mode == 'distractingPeopleRemoval' then
+            return photo.personnesDetectees or 0
+        end
+        return 0
+    end,
+    applyRemovalOnDetectedDistractingPeople = function(rappel, argument)
+        local photo = dansDeveloppement()
+        assert(not S.ecritureEnCours, "LrDevelopController dans withWriteAccessDo")
+        if S.outil ~= 'dust' then
+            error("this operation can be executed only when Remove-tool is opened in Develop module", 0)
+        end
+        for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
+            if filtre.Name == 'remove_people' then
+                error("Detected distracting people are already removed.", 0)
+            end
+        end
+        if photo.passantsDejaRetires then
+            error("Detected distracting people are already removed.", 0)
+        end
+        if not photo.personnesDetectees or photo.personnesDetectees <= 0 then
+            error("No distracting people spots are present for removal.", 0)
+        end
+        photo.calculPersonnes = { duree = S.dureePersonnes, rappel = rappel, argument = argument }
+        S.appelsPersonnes[#S.appelsPersonnes + 1] = { fonction = 'applyRemovalOnDetectedDistractingPeople', detectes = photo.personnesDetectees }
     end,
     toggleReflectionRemoval = function(intensite, qualite, rappel, argument)
         local photo = dansDeveloppement()
@@ -2204,7 +2288,7 @@ local modules = {
             for nom, id in pairs(S.presetsFiltre) do presets[nom] = id end
             return presets, S.filtrePreset
         end,
-        versionString = function() return '15.0' end,
+        versionString = function() return S.versionLightroom or '15.0' end,
         developPresetFolders = function()
             local dossiers = {}
             for _, d in ipairs(S.presets) do
@@ -2663,6 +2747,16 @@ function S.reinitialiser()
     S.delaiEmpilement = 0.5
     S.appelsAmelioration = {}
     S.appelsReflets = {}
+    -- Passants (Lightroom Classic 16) : détection (S.dureeDetection attentes), puis suppression
+    -- (S.dureePersonnes attentes) ; S.compteIllisible : countAllSpots en erreur ;
+    -- S.resetPersonnesIgnore : resetFilterWithName sans effet sur le filtre des passants.
+    S.appelsPersonnes = {}
+    S.versionLightroom = nil
+    S.dureeDetection = 4
+    S.dureePersonnes = 3
+    S.compteIllisible = false
+    S.resetPersonnesIgnore = false
+    S.personnesAnnulees = false
     S.bezels = {}
     S.revele = nil
     S.outil = 'loupe'

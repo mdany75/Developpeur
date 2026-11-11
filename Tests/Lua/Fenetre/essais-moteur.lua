@@ -84,6 +84,17 @@ end
 
 -- Consignes ------------------------------------------------------------------------------------
 
+-- Passants (après la 1.9, demandé par Dany le 10 novembre 2026) : Claude les retire lui-même par
+-- Suppression des distractions › Personnes de Lightroom Classic 16.
+essai('Consignes : les passants se retirent par remove_distractions avec people ; le texte sous 7 500', function()
+    local debut = Consignes.texte:find('## Garde-fous', 1, true)
+    local fin = Consignes.texte:find('## Composition', 1, true)
+    local Texte = require 'Texte'
+    local gardeFous = Consignes.texte:sub(debut, fin)
+    contient(gardeFous, 'passants à retirer : remove_distractions avec people (Lightroom), pas generative_edit', 'puce du génératif')
+    vrai(Texte.longueur(Consignes.texte) <= 7500, 'plafond des consignes : ' .. Texte.longueur(Consignes.texte))
+end)
+
 essai('Consignes : puce Notes des garde-fous, chaque photo traitée notée d\'abord', function()
     local debut = Consignes.texte:find('## Garde-fous', 1, true)
     local fin = Consignes.texte:find('## Titre de la conversation', 1, true)

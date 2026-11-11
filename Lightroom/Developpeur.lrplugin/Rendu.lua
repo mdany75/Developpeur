@@ -409,7 +409,7 @@ local function rendreAvant(photo, comparer, taille, params)
             echouer("La retouche à comparer ne touche que la Bibliothèque (note, drapeau, libellé, mots-clés…) : rien ne change à l'image.")
         end
         if ameliore then
-            echouer("La retouche à comparer est un traitement calculé par Lightroom (débruitage, détails bruts, super résolution, reflets) : "
+            echouer("La retouche à comparer est un traitement calculé par Lightroom (débruitage, détails bruts, super résolution, reflets, passants) : "
                 .. "la comparaison ne peut pas le défaire le temps d'un rendu. Comparer plutôt deux zooms (region), avant et après.")
         end
         echouer("Aucune retouche de Claude sur cette photo : rien à comparer.")
@@ -516,7 +516,7 @@ function Rendu.apercu(params)
         infos.cadre_actuel = entier.cadre
     end
     if ameliore then
-        infos.remarque_comparaison = "L'image d'avant garde le débruitage, les détails bruts, la super résolution ou la suppression des reflets : la comparaison ne défait pas ces traitements calculés."
+        infos.remarque_comparaison = "L'image d'avant garde le débruitage, les détails bruts, la super résolution ou la suppression des reflets ou des passants : la comparaison ne défait pas ces traitements calculés."
     end
     if calcules == false then
         infos.a_savoir = "Lightroom n'avait pas fini de calculer les réglages IA de cette photo (masques IA, profil adaptatif) : l'aperçu peut les montrer incomplets. "

@@ -146,7 +146,7 @@ extension ToolHandler {
                  ] + writeProperties,
                  required: ["step_name"]),
             tool("remove_distractions",
-                 "Supprime les reflets d'une vitre (Suppression des distractions › Reflets), calculés par Lightroom sur ce Mac, par ses modèles IA ; retire une suppression de la poussière du capteur (› Poussière). Reflets : dans le module Développement, où il affiche la photo le temps du calcul (de quelques secondes à une minute), puis remet la vue d'avant ; à faire avant toute autre retouche (aide d'Adobe), sur une photo prise derrière une vitre. Poussière : Lightroom ne la cherche que dans son interface (constaté : un module ne peut ni la lancer, ni la faire refaire sur une autre photo) : la proposer à la main, Supprimer › Poussière sur une photo, puis pour une série Copier et Coller de Lightroom avec la case Poussière (il la refait pour chaque photo). L'étape « Claude · <step_name> » va au journal ; undo_last et revert_to_original la défont. Les passants (› Personnes) passent par le remplissage génératif d'Adobe : à proposer de faire à la main. Pas de proposition visuelle : en mode « Proposer d'abord », décrire le traitement, attendre l'accord, puis rappeler avec confirm = true. Vérifier ensuite avec view_photo (un zoom sur le ciel pour la poussière).",
+                 "Supprime les reflets d'une vitre (Suppression des distractions › Reflets), calculés par Lightroom sur ce Mac, par ses modèles IA, ou les passants (› Personnes) ; retire une suppression de la poussière du capteur (› Poussière). Reflets : dans le module Développement, où il affiche la photo le temps du calcul (de quelques secondes à une minute), puis remet la vue d'avant ; à faire avant toute autre retouche (aide d'Adobe), sur une photo prise derrière une vitre. Poussière : Lightroom ne la cherche que dans son interface (constaté : un module ne peut ni la lancer, ni la faire refaire sur une autre photo) : la proposer à la main, Supprimer › Poussière sur une photo, puis pour une série Copier et Coller de Lightroom avec la case Poussière (il la refait pour chaque photo). L'étape « Claude · <step_name> » va au journal ; undo_last et revert_to_original la défont. Passants (› Personnes, Lightroom Classic 16) : people = true ; Lightroom les détecte (modèle local) puis les retire par le remplissage génératif d'Adobe (réseau et compte Adobe, une à quelques minutes) ; s'il n'en voit aucun, rien n'est fait : un passant qu'il ne voit pas, retouch_spots (mode remove) ou generative_edit. Pas de proposition visuelle : en mode « Proposer d'abord », décrire le traitement, attendre l'accord, puis rappeler avec confirm = true. Vérifier ensuite avec view_photo (un zoom sur le ciel pour la poussière).",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("reflections", objectProp("Suppression des reflets ; {\"remove\": false} les rend.", [
@@ -154,6 +154,7 @@ extension ToolHandler {
                         "amount": prop("number", "Intensité, de 1 à 100 (défaut de Lightroom : 100) ; sur des reflets déjà supprimés, change seulement l'intensité."),
                         "quality": enumProp(["preview", "standard", "best"], "Qualité du calcul (défaut : celle de Lightroom, standard) : best est plus lent."),
                     ])),
+                    ("people", prop("boolean", "Passants (Suppression des distractions › Personnes, Lightroom Classic 16) : true les détecte et les retire ; false rend une suppression des passants. Un appel à part des reflets.")),
                     ("dust", objectProp("{\"remove\": false} retire la suppression de la poussière du capteur (faite à la main dans Lightroom).", [
                         "remove": prop("boolean", "false = retirer la suppression de la poussière."),
                     ])),
@@ -165,6 +166,26 @@ extension ToolHandler {
     // MARK: Exécution
 
     func removeDistractions(_ args: Arguments) throws -> JSONValue {
+        if args.has("people") {
+            guard !args.has("reflections"), !args.has("dust") else {
+                throw LightroomError.invalid("Passants, reflets et poussière : un appel chacun.")
+            }
+            guard let people = args.bool("people") else {
+                throw LightroomError.invalid("« people » : true retire les passants, false les rend.")
+            }
+            // Suppression des distractions › Personnes : Lightroom Classic 16.0 et plus.
+            do {
+                try verifierVersion([("people", "16.0")])
+            } catch {
+                throw LightroomError.invalid("Passants : Suppression des distractions › Personnes demande Lightroom Classic 16.0 ou plus récent (ici \(versionLightroom ?? "?")). Rien n'a été fait.")
+            }
+            var params: [String: JSONValue] = ["personnes": .bool(people),
+                                               "libelles": DevelopCatalogue.labels(for: ["Suppression.personnes"])]
+            if let id = args.int("photo_id") { params["photo"] = .number(Double(id)) }
+            params.merge(writeParameters(args, defaultStep: "passants")) { _, new in new }
+            // Le module attend la détection (une minute au plus), puis la suppression (quatre minutes au plus).
+            return Self.withLabels(try lightroom.send("supprimer", params, timeout: 660))
+        }
         if let dust = args.object("dust") {
             guard !args.has("reflections") else {
                 throw LightroomError.invalid("Reflets et poussière : un appel chacun.")
@@ -179,7 +200,7 @@ extension ToolHandler {
             return Self.withLabels(try lightroom.send("supprimer", params, timeout: 300))
         }
         guard let reflections = args.object("reflections") else {
-            throw LightroomError.invalid("« reflections » : {\"remove\": true, \"amount\": 80}, ou « dust » : {\"remove\": false} (la poussière et les passants se font à la main dans Lightroom).")
+            throw LightroomError.invalid("« reflections » : {\"remove\": true, \"amount\": 80}, « people » : true (passants), ou « dust » : {\"remove\": false} (la poussière se fait à la main dans Lightroom).")
         }
         var reflets: [String: JSONValue] = ["actif": .bool(reflections["remove"]?.bool ?? true)]
         if let raw = reflections["amount"], !raw.isNull {

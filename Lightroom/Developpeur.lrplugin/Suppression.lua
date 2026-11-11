@@ -1,5 +1,6 @@
 -- Suppression.lua : suppression des reflets (Suppression des distractions › Reflets), calculée
--- par Lightroom sur ce Mac (commande supprimer), et sa remise à l'annulation.
+-- par Lightroom sur ce Mac, et des passants (› Personnes, Lightroom Classic 16, remplissage
+-- génératif d'Adobe) (commande supprimer), et leur remise à l'annulation.
 --
 -- Relevé dans le code de Lightroom Classic 15.6 (LrDevelopController, compilé, lu en lecture
 -- seule), voir docs/SPEC.md, Suppression des reflets :
@@ -16,7 +17,18 @@
 --     amount, quality, enabled (pleine qualité), isSupported ; getSelectedTool, selectTool.
 -- Comme le débruitage, ces fonctions agissent sur la photo affichée dans le module Développement
 -- (Amelioration.afficherEnDeveloppement), hors de withWriteAccessDo. L'état d'avant va dans la
--- mémoire sous la clé Suppression, qui n'est pas un réglage, écrite avant le calcul.
+-- mémoire sous la clé Suppression ({reflets, intensite} et {personnes}), qui n'est pas un
+-- réglage, écrite avant le calcul.
+--
+-- Passants (relevé dans le code de Lightroom Classic 16.0, rien encore constaté par un module :
+-- lectures défensives ; voir docs/SPEC.md, Passants) :
+--   detectDistractingPeople() (outil Supprimer ouvert) ouvre la section Personnes ; la détection
+--     suit en arrière-plan (modèle local), sans rappel de fin : le module l'attend par
+--     countAllSpots('distractingPeopleRemoval') (supposé), ou en réessayant la suppression ;
+--   applyRemovalOnDetectedDistractingPeople(rappel, argument) refuse « Detected distracting people
+--     are already removed. » ou « No distracting people spots are present for removal. », sinon
+--     lance la suppression en arrière-plan (fenêtre de progression annulable) et appelle
+--     rappel(argument) à la fin ; le résultat est un filtre remove_people de FilterList (supposé).
 
 local LrApplication = import 'LrApplication'
 local LrDate = import 'LrDate'
@@ -209,8 +221,9 @@ local function supprimerAffichee(photo, dc, voulu, vue, etape, prefs, params, pl
     local original = lireJson(photo, 'avantClaude', {})
     local premiere = sansRetouche(original)
     local etapes = lireJson(photo, 'etapesClaude', {})
-    if original.Suppression == nil then
-        original.Suppression = memoire(avant)
+    original.Suppression = type(original.Suppression) == 'table' and original.Suppression or {}
+    if original.Suppression.reflets == nil then
+        original.Suppression.reflets, original.Suppression.intensite = avant.actif, avant.intensite
     end
     -- L'étape et son id (1.3) : repris par resultatsPlans (etape_id de la réponse) et le journal.
     local etapeId = nouvelleEtape(etapes, etape, { Suppression = memoire(avant) })
@@ -255,6 +268,308 @@ local function supprimerAffichee(photo, dc, voulu, vue, etape, prefs, params, pl
     end)
 end
 
+-- Passants (Suppression des distractions › Personnes) -------------------------------------------
+
+Suppression.FILTRE_PERSONNES = 'remove_people'           -- nom du filtre (supposé)
+Suppression.MODE_PERSONNES = 'distractingPeopleRemoval'  -- mode de countAllSpots (supposé)
+Suppression.VERSION_PERSONNES = 16
+Suppression.DUREE_DETECTION = 60     -- secondes d'attente de la détection au plus
+Suppression.DUREE_PERSONNES = 240    -- secondes de suppression au plus
+Suppression.ESSAI_SANS_COMPTE = 5    -- secondes entre deux essais quand le compte ne se lit pas
+local DEJA_RETIRES = 'already removed'
+local AUCUN_PASSANT = 'No distracting people'
+
+-- Le module LrDevelopController, s'il offre la suppression des passants (Lightroom Classic 16.0 ou
+-- plus récent, et ses deux fonctions).
+local function controleurPersonnes()
+    local version = tostring(LrApplication.versionString())
+    local majeure = tonumber(version:match('^(%d+)'))
+    if majeure and majeure < Suppression.VERSION_PERSONNES then
+        echouer("Lightroom " .. version .. " ne retire pas les passants pour un module : il faut Lightroom Classic 16.0 ou plus récent. Rien n'a été fait.")
+    end
+    local ok, module = pcall(import, 'LrDevelopController')
+    if not ok or type(module) ~= 'table' or type(module.detectDistractingPeople) ~= 'function'
+        or type(module.applyRemovalOnDetectedDistractingPeople) ~= 'function' or type(module.goToRemove) ~= 'function'
+        or type(module.getEnhancePanelState) ~= 'function' then
+        echouer("Lightroom " .. version .. " n'offre pas aux modules la suppression des passants (detectDistractingPeople, applyRemovalOnDetectedDistractingPeople) : rien n'a été fait. La faire à la main : Développement › Supprimer › Personnes.")
+    end
+    return module
+end
+
+-- Le filtre des passants dans FilterList, ou nil. Son nom exact reste à constater : remove_people
+-- (relevé dans le code), ou un nom ou un titre qui parle de personnes.
+function Suppression.filtrePersonnes(reglages)
+    local liste = type(reglages) == 'table' and type(reglages.FilterList) == 'table' and reglages.FilterList.Filters
+    for _, filtre in ipairs(type(liste) == 'table' and liste or {}) do
+        if type(filtre) == 'table' then
+            local nom = tostring(filtre.Name or ''):lower()
+            local titre = tostring(filtre.Title or ''):lower()
+            if nom == Suppression.FILTRE_PERSONNES or nom:find('people', 1, true) or titre:find('people', 1, true) then
+                return filtre
+            end
+        end
+    end
+    return nil
+end
+
+-- FilterList sans le filtre des passants, les autres filtres (débruitage, reflets…) gardés.
+function Suppression.sansPersonnes(filterList)
+    local filtres = {}
+    local liste = type(filterList) == 'table' and filterList.Filters
+    for _, filtre in ipairs(type(liste) == 'table' and liste or {}) do
+        if not Suppression.filtrePersonnes({ FilterList = { Filters = { filtre } } }) then
+            filtres[#filtres + 1] = pourLightroom(filtre)
+        end
+    end
+    if #filtres == 0 then
+        return {}
+    end
+    return { Filters = filtres }
+end
+
+-- État des passants de la photo affichée : retirés ou non.
+local function etatPersonnes(photo, dc)
+    if Suppression.filtrePersonnes(photo:getDevelopSettings()) then
+        return { actif = true }
+    end
+    if type(dc.hasFilterWithName) == 'function' then
+        local ok, actif = LrTasks.pcall(dc.hasFilterWithName, Suppression.FILTRE_PERSONNES)
+        return { actif = ok and actif == true }
+    end
+    return { actif = false }
+end
+
+-- Passants détectés par Lightroom (nil : le compte ne se lit pas).
+local function compterPersonnes(dc)
+    if type(dc.countAllSpots) ~= 'function' then
+        return nil
+    end
+    local ok, nombre = LrTasks.pcall(dc.countAllSpots, Suppression.MODE_PERSONNES)
+    return ok and tonumber(nombre) or nil
+end
+
+local function outilActuel(dc)
+    if type(dc.getSelectedTool) ~= 'function' then
+        return nil
+    end
+    local ok, nom = LrTasks.pcall(dc.getSelectedTool)
+    return ok and nom or nil
+end
+
+local function remettreOutil(dc, outil)
+    if type(dc.selectTool) == 'function' then
+        LrTasks.pcall(dc.selectTool, (outil and outil ~= 'dust') and outil or 'loupe')
+    end
+end
+
+-- Lance la suppression des passants détectés ; renvoie 'lance', 'deja', 'aucun' ou le refus.
+local function appliquerPersonnes(dc, fin)
+    local ok, retour = LrTasks.pcall(dc.applyRemovalOnDetectedDistractingPeople, function() fin.rappel = true end, nil)
+    local message = (not ok) and tostring(Liaison.messageErreur(retour)) or (type(retour) == 'string' and retour or nil)
+    if not message then
+        return 'lance'
+    end
+    if message:find(DEJA_RETIRES, 1, true) then
+        return 'deja'
+    end
+    if message:find(AUCUN_PASSANT, 1, true) then
+        return 'aucun'
+    end
+    return 'refus', message
+end
+
+-- Détection puis suppression des passants sur la photo affichée, outil Supprimer ouvert. Renvoie
+-- {fait, raison, lance, deja, aucun, detectes}.
+local function lancerPersonnes(photo, dc)
+    local filtresAvant = pourLightroom(photo:getDevelopSettings().FilterList)
+    local ok, erreur = LrTasks.pcall(dc.goToRemove)
+    if ok then
+        ok, erreur = LrTasks.pcall(dc.detectDistractingPeople)
+    end
+    if not ok then
+        return { raison = "Lightroom refuse la détection des passants : " .. (tostring(Liaison.messageErreur(erreur)):gsub('%.+$', '')) }
+    end
+    -- Détection en arrière-plan, sans rappel : le compte des passants, stable deux fois de suite ;
+    -- sans compte (ou à 0), la suppression réessayée tant que Lightroom dit n'en voir aucun.
+    local fin, statut, refus = {}, nil, nil
+    local precedent, stables, detectes = nil, 0, nil
+    local dernierEssai = 0
+    local debut = LrDate.currentTime()
+    repeat
+        LrTasks.sleep(PAUSE)
+        local nombre = compterPersonnes(dc)
+        local ecoule = LrDate.currentTime() - debut
+        if nombre and nombre > 0 then
+            stables = (nombre == precedent) and stables + 1 or 0
+            precedent, detectes = nombre, nombre
+            if stables >= 2 then
+                statut, refus = appliquerPersonnes(dc, fin)
+            end
+        elseif ecoule - dernierEssai >= Suppression.ESSAI_SANS_COMPTE then
+            dernierEssai = ecoule
+            statut, refus = appliquerPersonnes(dc, fin)
+            if statut == 'aucun' then
+                statut = nil
+            end
+        end
+    until statut or LrDate.currentTime() - debut > Suppression.DUREE_DETECTION
+    if not statut then
+        statut, refus = appliquerPersonnes(dc, fin)
+    end
+    if statut == 'deja' then
+        return { deja = true, detectes = detectes }
+    elseif statut == 'aucun' then
+        return { aucun = true, detectes = 0 }
+    elseif statut == 'refus' then
+        return { raison = "Lightroom refuse la suppression des passants : " .. refus:gsub('%.+$', ''), detectes = detectes }
+    end
+    -- Suppression en arrière-plan : le rappel, ou le filtre rangé (deux lectures de suite).
+    stables = 0
+    local rappelA
+    debut = LrDate.currentTime()
+    repeat
+        LrTasks.sleep(PAUSE)
+        local fini = etatPersonnes(photo, dc).actif and not egal(photo:getDevelopSettings().FilterList, filtresAvant)
+        stables = fini and stables + 1 or 0
+        if stables >= 2 or (fini and fin.rappel) then
+            return { fait = true, lance = true, detectes = detectes }
+        end
+        if fin.rappel and not rappelA then
+            rappelA = LrDate.currentTime()
+        end
+        if rappelA and LrDate.currentTime() - rappelA > 10 then
+            return { lance = true, detectes = detectes,
+                raison = "Lightroom a fini sans ranger de suppression des passants (annulée dans sa fenêtre de progression, ou refusée par le service génératif d'Adobe : réseau, compte)" }
+        end
+    until LrDate.currentTime() - debut > Suppression.DUREE_PERSONNES
+    return { lance = true, detectes = detectes,
+        raison = string.format("Lightroom retire encore les passants après %d minutes (service génératif d'Adobe)", Suppression.DUREE_PERSONNES / 60) }
+end
+
+-- Retire la suppression des passants de la photo affichée : resetFilterWithName, sinon la liste des
+-- filtres sans elle (écriture ordinaire). Renvoie si elle est retirée, la raison sinon.
+local function retirerPersonnes(photo, dc, etape)
+    if type(dc.resetFilterWithName) == 'function' then
+        LrTasks.pcall(dc.resetFilterWithName, Suppression.FILTRE_PERSONNES)
+        local debut = LrDate.currentTime()
+        repeat
+            LrTasks.sleep(PAUSE)
+            if not etatPersonnes(photo, dc).actif then
+                return true
+            end
+        until LrDate.currentTime() - debut > 10
+    end
+    ecrire(etape, function()
+        photo:applyDevelopSettings({ FilterList = Suppression.sansPersonnes(photo:getDevelopSettings().FilterList) }, etape)
+    end)
+    if etatPersonnes(photo, dc).actif then
+        return false, "Lightroom garde la suppression des passants"
+    end
+    return true
+end
+
+-- La suppression des passants demandée, sur la photo affichée. La mémoire est écrite avant le
+-- calcul, et remise telle qu'elle était si rien n'a changé.
+local function supprimerPersonnesAffichee(photo, dc, voulu, vue, etape, prefs, params, plan)
+    local avant = etatPersonnes(photo, dc)
+    plan.apres = { personnes = avant.actif }
+    if avant.actif == voulu then
+        noter(plan, voulu and "Passants déjà retirés sur cette photo (Suppression des distractions › Personnes) : rien à refaire."
+            or "Pas de suppression des passants sur cette photo : rien à retirer.")
+        return
+    end
+    if voulu and not vue.pret then
+        noter(plan, Amelioration.PAS_PRETE .. ".")
+        return
+    end
+
+    local champs, precedent = { 'avantClaude', 'etapesClaude', 'journalClaude', 'retoucheeParClaude', 'proprietaireMemoire' }, {}
+    for _, champ in ipairs(champs) do
+        precedent[champ] = photo:getPropertyForPlugin(_PLUGIN, champ)
+    end
+    local original = lireJson(photo, 'avantClaude', {})
+    local premiere = sansRetouche(original)
+    local etapes = lireJson(photo, 'etapesClaude', {})
+    original.Suppression = type(original.Suppression) == 'table' and original.Suppression or {}
+    if original.Suppression.personnes == nil then
+        original.Suppression.personnes = avant.actif
+    end
+    local etapeId = nouvelleEtape(etapes, etape, { Suppression = { personnes = avant.actif } })
+    plan.etapeId = etapeId
+    if premiere and prefs.instantane then
+        ecrire(etape, function() creerInstantane(photo) end)
+    end
+    ecrireMemoire(etape, function()
+        garder(photo, 'avantClaude', Json.encode(original))
+        garder(photo, 'etapesClaude', Json.encode(Json.tableau(etapes)))
+        garder(photo, 'retoucheeParClaude', 'oui')
+    end)
+
+    local outil = outilActuel(dc)
+    local resultat
+    if voulu then
+        resultat = lancerPersonnes(photo, dc)
+    else
+        local fait, raison = retirerPersonnes(photo, dc, etape)
+        resultat = { fait = fait, raison = raison, lance = true }
+    end
+    remettreOutil(dc, outil)
+    if resultat.deja then
+        noter(plan, "Lightroom dit ces passants déjà retirés : rien à refaire.")
+    elseif resultat.aucun then
+        noter(plan, "Lightroom n'a détecté aucun passant sur cette photo (Suppression des distractions › Personnes) : rien n'a été fait. Un passant qu'il ne voit pas se retire par retouch_spots (mode remove) ou generative_edit.")
+    elseif resultat.raison then
+        noter(plan, "Passants : " .. resultat.raison .. ".")
+    end
+    local apres = etatPersonnes(photo, dc)
+    plan.apres = { personnes = apres.actif, detectes = resultat.detectes }
+    if apres.actif ~= avant.actif then
+        plan.changements[#plan.changements + 1] = { cle = 'Suppression.personnes',
+            avant = avant.actif and "retirés" or "présents", apres = apres.actif and "retirés" or "présents" }
+    else
+        ecrireMemoire("Claude · rien lancé", function()
+            for _, champ in ipairs(champs) do
+                photo:setPropertyForPlugin(_PLUGIN, champ, precedent[champ])
+            end
+        end)
+        plan.etapeId = nil
+        return
+    end
+    local journal = lireJson(photo, 'journalClaude', {})
+    ajouterJournal(journal, { etape = etape, etape_id = etapeId, type = 'retouche', raison = params.raison, changements = plan.changements })
+    ecrireMemoire(etape, function()
+        garder(photo, 'journalClaude', Json.encode(Json.tableau(journal)))
+    end)
+end
+
+-- Commande « supprimer » avec personnes = true (retirer les passants) ou false (les rendre).
+local function supprimerPersonnes(params, prefs)
+    if type(params.personnes) ~= 'boolean' then
+        echouer("Passants : personnes = true (les retirer) ou false (les rendre).")
+    end
+    local dc = controleurPersonnes()
+    local photo = photoVisee(params)
+    Photos.exigerOriginal(photo, "La suppression des passants se calcule sur l'original : rien n'a été fait.")
+    verifierProtection({ photo }, prefs, params, 'remove_distractions')
+    local etape = nomEtape(params, "passants")
+    local plan = { photo = photo, changements = Json.tableau(), notes = Json.tableau() }
+    avecVerrou(function()
+        local vue = afficherEnDeveloppement(photo, dc)
+        local ok, erreur = LrTasks.pcall(supprimerPersonnesAffichee, photo, dc, params.personnes, vue, etape, prefs, params, plan)
+        remettreVue(vue)
+        if not ok then
+            error(erreur, 0)
+        end
+    end)
+    if #plan.changements > 0 then
+        Ecriture.noterEtatFinal({ photo }, etape)
+    end
+    local resultats = resultatsPlans({ plan }, etape, params)
+    resultats[1].personnes = plan.apres
+    Liaison.noter("Passants : " .. etape .. " sur " .. nomFichier(photo))
+    return { mode = modeTexte(prefs), resultats = resultats }
+end
+
 -- Poussière du capteur (Suppression des distractions › Poussière) : le module ne fait que la
 -- retirer (la liste des filtres sans elle ; l'étape garde FilterList d'avant : undo_last le remet).
 -- Constaté dans Lightroom Classic 15.6 (18 octobre 2026) : aucune fonction du SDK ne la lance ;
@@ -281,11 +596,18 @@ local function supprimerPoussiere(photo, demande, etape, prefs, params)
 end
 
 -- Suppression des reflets (commande « supprimer ») : reflets = {actif, intensite (1 à 100),
--- qualite ('preview', 'standard', 'best')} ; poussiere = {actif}. Voir l'en-tête de ce fichier.
+-- qualite ('preview', 'standard', 'best')} ; personnes = true ou false ; poussiere = {actif}. Voir
+-- l'en-tête de ce fichier.
 function Suppression.supprimer(params)
     verifierPause(params)
     local prefs = Preferences.lire()
     verifierAccord(prefs, params, 'remove_distractions')
+    if params.personnes ~= nil then
+        if type(params.reflets) == 'table' or type(params.poussiere) == 'table' then
+            echouer("Passants, reflets et poussière : un appel chacun.")
+        end
+        return supprimerPersonnes(params, prefs)
+    end
     if type(params.poussiere) == 'table' and type(params.reflets) ~= 'table' then
         local photo = photoVisee(params)
         verifierProtection({ photo }, prefs, params, 'remove_distractions')
@@ -295,7 +617,7 @@ function Suppression.supprimer(params)
     end
     local demande = type(params.reflets) == 'table' and params.reflets or nil
     if not demande then
-        echouer("Rien à supprimer : reflets ou poussiere.")
+        echouer("Rien à supprimer : reflets, personnes ou poussiere.")
     end
     local voulu = { actif = demande.actif ~= false, intensite = tonumber(demande.intensite), qualite = demande.qualite }
     if voulu.intensite and (voulu.intensite < 1 or voulu.intensite > 100) then
@@ -327,27 +649,64 @@ function Suppression.supprimer(params)
     return { mode = modeTexte(prefs), resultats = resultats }
 end
 
--- Remet l'état des reflets gardé en mémoire (annulation, retour à l'origine). Échoue si
--- Lightroom ne suit pas.
+-- Remet l'état des passants gardé en mémoire (annulation, retour à l'origine), sur la photo
+-- affichée. Échoue si Lightroom ne suit pas.
+local function remettrePersonnes(photo, dc, vue, voulu)
+    if etatPersonnes(photo, dc).actif == voulu then
+        return
+    end
+    local outil = outilActuel(dc)
+    local fait, raison
+    if voulu then
+        if not vue.pret then
+            echouer(string.format("Lightroom n'a pas remis la suppression des passants (%s) : %s.", nomFichier(photo), Amelioration.PAS_PRETE))
+        end
+        local resultat = lancerPersonnes(photo, dc)
+        fait = resultat.fait or resultat.deja
+        raison = resultat.raison or (resultat.aucun and "Lightroom n'y détecte plus de passant")
+    else
+        fait, raison = retirerPersonnes(photo, dc, "Claude · passants rendus")
+    end
+    remettreOutil(dc, outil)
+    if not fait then
+        echouer(string.format("Lightroom n'a pas remis les passants comme avant (%s) : %s.", nomFichier(photo), tostring(raison)))
+    end
+end
+
+-- Remet l'état des reflets et des passants gardé en mémoire (annulation, retour à l'origine).
+-- Échoue si Lightroom ne suit pas.
 function Suppression.remettre(photo, voulue)
-    if type(voulue) ~= 'table' or voulue.reflets == nil then
+    if type(voulue) ~= 'table' then
+        return
+    end
+    voulue = { reflets = voulue.reflets, intensite = voulue.intensite, personnes = voulue.personnes }
+    -- Passants à laisser sans suppression, et la photo n'en a pas : rien à demander à Lightroom
+    -- (Lightroom avant la 16.0 compris).
+    if voulue.personnes == false and not Suppression.filtrePersonnes(photo:getDevelopSettings()) then
+        voulue.personnes = nil
+    end
+    if voulue.reflets == nil and voulue.personnes == nil then
         return
     end
     avecVerrou(function()
-        local dc = controleur()
+        local dc = voulue.reflets ~= nil and controleur() or controleurPersonnes()
         local vue = afficherEnDeveloppement(photo, dc)
         local ok, erreur = LrTasks.pcall(function()
-            local voulu = { actif = voulue.reflets == true, intensite = tonumber(voulue.intensite) }
-            local avant = etatReflets(photo, dc)
-            if dejaFait(avant, voulu) then
-                return
+            if voulue.reflets ~= nil then
+                local voulu = { actif = voulue.reflets == true, intensite = tonumber(voulue.intensite) }
+                local avant = etatReflets(photo, dc)
+                if not dejaFait(avant, voulu) then
+                    if voulu.actif and not avant.actif and not vue.pret then
+                        echouer(string.format("Lightroom n'a pas remis la suppression des reflets (%s) : %s.", nomFichier(photo), Amelioration.PAS_PRETE))
+                    end
+                    local fait, raison = lancer(photo, dc, voulu, avant)
+                    if not fait then
+                        echouer(string.format("Lightroom n'a pas remis les reflets comme avant (%s) : %s.", nomFichier(photo), raison))
+                    end
+                end
             end
-            if voulu.actif and not avant.actif and not vue.pret then
-                echouer(string.format("Lightroom n'a pas remis la suppression des reflets (%s) : %s.", nomFichier(photo), Amelioration.PAS_PRETE))
-            end
-            local fait, raison = lancer(photo, dc, voulu, avant)
-            if not fait then
-                echouer(string.format("Lightroom n'a pas remis les reflets comme avant (%s) : %s.", nomFichier(photo), raison))
+            if voulue.personnes ~= nil then
+                remettrePersonnes(photo, dc, vue, voulue.personnes == true)
             end
         end)
         remettreVue(vue)

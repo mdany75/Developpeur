@@ -612,6 +612,11 @@ cadre.
 - Débruitage IA, détails bruts et super résolution, que Lightroom calcule lui-même : la photo
   s'affiche le temps du calcul dans le module Développement, puis la vue revient comme avant.
   Suppression des reflets d'une vitre (Suppression des distractions › Reflets), de même.
+- Passants retirés (Lightroom Classic 16, Suppression des distractions › Personnes) : sur votre
+  demande, Claude fait détecter les passants par Lightroom, puis les fait retirer par le
+  remplissage génératif d'Adobe (réseau et compte Adobe, une à quelques minutes). L'étape
+  « Claude · passants » se défait comme les autres ; si Lightroom ne voit aucun passant, rien ne
+  change et Claude le dit.
 - Redresser et recadrer : angle, ratio (« 4:5 », « 16:9 »…), taille et centre, sans bord vide.
   Après Upright ou une perspective, le module coche « Contraindre le recadrage » et Lightroom
   resserre le cadre pour ne laisser aucun coin vide.
@@ -1308,8 +1313,6 @@ Le SDK de Lightroom ne donne pas tout aux modules. Claude vous propose de faire 
 - **Poussière du capteur** : Suppression des distractions › Poussière sur une photo ; pour une
   série, Copier puis Coller de Lightroom avec la case Poussière (Lightroom la refait pour chaque
   photo). Un module ne peut ni la lancer ni la faire refaire ; Claude peut seulement la retirer.
-- **Passants** : Suppression des distractions › Personnes, qui passe par le remplissage génératif
-  d'Adobe.
 - **Suppression générative d'Adobe** : l'outil Supprimer avec l'IA générative ; les taches de
   Claude emploient l'outil Supprimer sans elle. Pour changer ou retirer un objet sur votre demande,
   Claude peut aussi passer par Fibo 2 (Retouche générative par Fibo 2, plus haut), qui crée une

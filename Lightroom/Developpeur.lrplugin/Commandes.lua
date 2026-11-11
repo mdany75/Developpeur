@@ -88,9 +88,10 @@
 --                                          source et filtre de la Bibliothèque
 --   vignettes   {photos, taille}        → vignettes du cache d'aperçus (chemins de JPEG temporaires),
 --                                          description, chemin du fichier et géométrie de chaque photo
---   supprimer   {photo?, reflets|poussiere, etape, raison?, confirme} → suppression des reflets,
---                                          calculée par Lightroom (filtre dereflect) ; poussière :
---                                          seulement la retirer
+--   supprimer   {photo?, reflets|personnes|poussiere, etape, raison?, confirme} → suppression
+--                                          des reflets, calculée par Lightroom (filtre dereflect) ;
+--                                          des passants (personnes = true, Lightroom 16, génératif
+--                                          d'Adobe) ; poussière : seulement la retirer
 --   exporter    {photos, dossier, sous_dossier?, reglages, jetons?, texte_perso?, sequence?, suite?,
 --                confirme} → fichiers livrés (jamais d'écrasement : renommés)
 --   fenetreExport {photos?|selection?}  → fenêtre d'exportation de Lightroom, photos sélectionnées

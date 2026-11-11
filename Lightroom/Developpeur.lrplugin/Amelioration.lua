@@ -63,13 +63,13 @@ local DUREE_AMELIORATION = 180    -- secondes de calcul au plus par traitement
 local PAUSE_AMELIORATION = 0.5
 
 -- Un traitement calculé à la fois (débruitage, détails bruts, super résolution, et la suppression
--- des reflets de Suppression.lua) : une deuxième commande (Claude qui réessaie après un délai
+-- des reflets et des passants de Suppression.lua) : une deuxième commande (Claude qui réessaie après un délai
 -- dépassé, le menu Revenir) trouverait la vue et la mémoire au milieu du premier.
 local ameliorationEnCours = false
 
 local function avecVerrou(fonction)
     if ameliorationEnCours then
-        echouer("Lightroom calcule déjà un traitement pour Claude (débruitage, détails bruts, super résolution ou reflets) : réessayer quand ce sera fini.")
+        echouer("Lightroom calcule déjà un traitement pour Claude (débruitage, détails bruts, super résolution, reflets ou passants) : réessayer quand ce sera fini.")
     end
     ameliorationEnCours = true
     local ok, erreur = LrTasks.pcall(fonction)

@@ -1,5 +1,18 @@
 # Changements
 
+## Non publié
+
+### Ajouté
+- **Claude retire les passants** (Lightroom Classic 16) : « retire les passants » suffit. Claude
+  passe par Suppression des distractions › Personnes de Lightroom (`remove_distractions` avec
+  `people`) : Lightroom détecte les personnes de passage sur ce Mac, puis les retire par le
+  remplissage génératif d'Adobe (réseau et compte Adobe). La photo s'affiche le temps du calcul
+  dans le module Développement, puis la vue revient comme avant. L'étape « Claude · passants » se
+  défait par `undo_last` ou `revert_to_original`. Si Lightroom ne voit aucun passant, ou les a déjà
+  retirés, rien ne change et Claude le dit ; avant Lightroom Classic 16, c'est refusé avec sa
+  raison. Ce n'est plus à faire à la main. Pas encore essayé dans Lightroom : à vérifier à la
+  prochaine recette.
+
 ## 1.9 — 2026-11-10
 
 ### Ajouté

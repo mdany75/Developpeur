@@ -77,7 +77,7 @@ CLAUDE.md principal, qui garde les règles communes à tout le projet. Le détai
 
 - Toute écriture dans le catalogue passe par `withWriteAccessDo` (`ecrire` dans `Ecriture.lua`) ;
   la simulation des tests le vérifie. Mais `updateAISettings`, `setEnhance`, la suppression des
-  reflets, `deleteAllEmptyMasks`, la rotation d'un quart de tour et les instantanés
+  reflets et des passants, `deleteAllEmptyMasks`, la rotation d'un quart de tour et les instantanés
   (`applyDevelopSnapshot`, `deleteDevelopSnapshot`) se font **hors** de `withWriteAccessDo`.
 - La mémoire de Claude (champs de `Metadonnees.lua`) se lit par `lireChamp` ou `lireJson` et
   s'écrit par `garder` : Lightroom copie ces champs dans une copie virtuelle, et seuls ceux-là

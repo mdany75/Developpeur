@@ -3804,6 +3804,126 @@ test("supprimer : comparaison et résumé d'une étape de reflets", function()
     egal(resultat.resultats[1].reglages_remis.Suppression, "reflets laissés")
 end)
 
+-- Passants (Suppression des distractions › Personnes, Lightroom Classic 16) --------------------
+
+local function passants(params)
+    params.etape = params.etape or 'passants'
+    return Commandes.executer('supprimer', params)
+end
+
+local function nomsFiltres(photo)
+    local noms = {}
+    for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
+        noms[#noms + 1] = filtre.Name
+    end
+    return table.concat(noms, ',')
+end
+
+-- Relevé dans le code de Lightroom Classic 16.0 : detectDistractingPeople sans rappel, puis
+-- applyRemovalOnDetectedDistractingPeople, qui pose le filtre remove_people à la fin.
+test("supprimer : passants détectés puis retirés dans le module Développement, vue remise, annulation", function()
+    S.versionLightroom = '16.0'
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 3
+    local resultat = passants({ personnes = true, raison = "Passants derrière le sujet." })
+    egal(S.modulesOuverts[1], 'develop', "photo affichée dans le module Développement")
+    egal(S.module, 'library', "vue d'avant remise")
+    egal(S.outil, 'loupe', "outil d'avant remis")
+    egal(S.appelsPersonnes[1].fonction, 'detectDistractingPeople')
+    egal(S.appelsPersonnes[2].fonction, 'applyRemovalOnDetectedDistractingPeople')
+    egal(S.appelsPersonnes[2].detectes, 3, "suppression lancée après la détection finie")
+    egal(nomsFiltres(photo), 'remove_people')
+    local changement = resultat.resultats[1].changements[1]
+    egal(changement.cle, 'Suppression.personnes')
+    egal(changement.avant, "présents")
+    egal(changement.apres, "retirés")
+    egal(resultat.resultats[1].personnes.personnes, true)
+    egal(resultat.resultats[1].personnes.detectes, 3)
+    local etapes = Json.decode(photo.proprietes.etapesClaude)
+    egal(etapes[1].avant.Suppression.personnes, false, "l'état d'avant est mémorisé")
+    egal(Json.decode(photo.proprietes.avantClaude).Suppression.personnes, false)
+    egal(#photo.appliques, 0, "jamais par applyDevelopSettings")
+
+    resultat = passants({ personnes = true })
+    egal(contient(resultat.resultats[1].remarques, "déjà retirés"), true)
+    egal(#S.appelsPersonnes, 2, "rien de relancé")
+
+    resultat = Commandes.executer('annuler', {})
+    egal(resultat.resultats[1].annulee, true)
+    egal(resultat.resultats[1].reglages_remis.Suppression, "passants laissés")
+    egal(nomsFiltres(photo), '', "les passants sont rendus")
+    egal(S.appelsPersonnes[#S.appelsPersonnes].fonction, 'resetFilterWithName')
+    egal(S.module, 'library')
+    egal(#photo.appliques, 0)
+end)
+
+test("supprimer : aucun passant détecté, déjà retirés pour Lightroom, suppression annulée : rien de mémorisé", function()
+    S.versionLightroom = '16.0'
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 0
+    local resultat = passants({ personnes = true })
+    egal(contient(resultat.resultats[1].remarques, "aucun passant"), true)
+    egal(#resultat.resultats[1].changements, 0)
+    egal(photo.proprietes.etapesClaude, nil, "rien de mémorisé")
+    egal(S.outil, 'loupe', "outil d'avant remis")
+
+    photo.passants = 2
+    photo.passantsDejaRetires = true
+    resultat = passants({ personnes = true })
+    egal(contient(resultat.resultats[1].remarques, "déjà retirés"), true)
+    egal(photo.proprietes.etapesClaude, nil)
+    photo.passantsDejaRetires = false
+
+    S.personnesAnnulees = true
+    resultat = passants({ personnes = true })
+    egal(contient(resultat.resultats[1].remarques, "sans ranger de suppression des passants"), true)
+    egal(photo.proprietes.etapesClaude, nil)
+    egal(nomsFiltres(photo), '')
+end)
+
+test("supprimer : passants sans compte lisible (essais répétés), puis retour à l'origine avec les reflets", function()
+    S.versionLightroom = '16.0.1'
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 1
+    S.compteIllisible = true
+    reflets({ reflets = { actif = true, intensite = 60 } })
+    local resultat = passants({ personnes = true })
+    egal(resultat.resultats[1].changements[1].cle, 'Suppression.personnes')
+    egal(nomsFiltres(photo), 'Reflections,remove_people')
+    local original = Json.decode(photo.proprietes.avantClaude).Suppression
+    egal(original.reflets, false, "l'état d'avant des reflets gardé")
+    egal(original.personnes, false, "et celui des passants ajouté")
+    -- resetFilterWithName sans effet : le filtre est retiré de la liste des filtres.
+    S.resetPersonnesIgnore = true
+    Commandes.executer('revenir', {})
+    egal(nomsFiltres(photo), '', "revenir retire reflets et passants")
+    egal(photo.proprietes.avantClaude, nil)
+end)
+
+test("supprimer : passants refusés avant Lightroom 16, sans les fonctions, avec reflets, ou sans booléen", function()
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 2
+    S.versionLightroom = '15.6'
+    echoue(function() passants({ personnes = true }) end, "Lightroom Classic 16.0 ou plus récent")
+    S.versionLightroom = '16.0'
+    local dc = import 'LrDevelopController'
+    local detecter = dc.detectDistractingPeople
+    dc.detectDistractingPeople = nil
+    local ok, erreur = pcall(passants, { personnes = true })
+    dc.detectDistractingPeople = detecter
+    egal(ok, false)
+    egal(tostring(erreur):find("Supprimer › Personnes", 1, true) ~= nil, true, tostring(erreur))
+    echoue(function() passants({ personnes = true, reflets = { actif = true } }) end, "un appel chacun")
+    echoue(function() passants({ personnes = 'oui' }) end, "personnes = true")
+    egal(photo.proprietes.etapesClaude, nil)
+    S.prefs.mode = 'proposer'
+    echoue(function() passants({ personnes = true }) end, "remove_distractions avec confirm")
+end)
+
 -- Version 1.9 : retouche avancée (plage de couleurs, de profondeur, objet par un rectangle,
 -- couleurs ponctuelles dans un masque) ------------------------------------------------------------
 

@@ -73,6 +73,10 @@ défait ensuite.
 - La remarque d'un style de Lueur sans quantité, et l'étalonnage d'un masque arrondi (0,5 envoyé 1) relu tel quel — dans la recette ou à la main ([Lightroom Classic 16](#lightroom-classic-16-18)).
 - Photo hors ligne (original et aperçu dynamique absents) : `applyDevelopSettings` de la 16 la saute avec une fenêtre ; ce que voit Claude — à la main, avec Dany ([Lightroom Classic 16](#lightroom-classic-16-18)).
 
+**Passants (après la 1.9)**
+
+- Suppression des passants (`remove_distractions` avec `people`, `Suppression.lua`) jamais encore lancée par un module : à constater sur une copie d'Essais remise à l'origine avec des passants, puis défaite — le nom exact du filtre rangé dans `FilterList` (supposé `remove_people`) et ce que rend `hasFilterWithName('remove_people')` ; si `countAllSpots('distractingPeopleRemoval')` compte les passants détectés (sinon le module réessaie la suppression toutes les 5 s) ; la durée de la détection et de la suppression ; si le rappel vient aussi quand Dany annule dans la fenêtre de progression ; si `resetFilterWithName('remove_people')` retire la suppression (sinon le module réécrit `FilterList` sans ce filtre) ; le message d'un refus du service génératif d'Adobe (hors ligne) — à la main dans Lightroom ([Suppression des passants](#suppression-des-passants-supprimer-avec-personnes-remove_distractions-avec-people)).
+
 **Retouche générative : choix du modèle (1.9)**
 
 - Banc d'essai jamais lancé : `--generatif-banc` sur une copie d'Essais, jugé par Dany ; la table « genre → modèle » à régler d'après son jugement ([Choix du modèle](#choix-du-modèle-model-10-novembre-2026)).
@@ -4936,7 +4940,7 @@ la fois, débruitage compris (`avecVerrou`). L'état d'avant va dans la mémoire
 `applyDevelopSettings`), écrite avant le calcul et remise telle qu'elle était si rien n'a changé ;
 `annuler` et `revenir` la remettent par les mêmes appels (`Annulation.remettreCalcules`, avec la clé
 `Amelioration`). Une comparaison (`apercu` avec `comparer`) ne la défait pas, et le dit. Les passants
-restent à faire à la main (remplissage génératif d'Adobe).
+se retirent depuis l'après-1.9 (ci-dessous).
 
 Constaté le 17 octobre 2026 dans Lightroom Classic 15.6, sur une copie d'essai RAW de X-H2S :
 
@@ -4953,6 +4957,45 @@ Constaté le 17 octobre 2026 dans Lightroom Classic 15.6, sur une copie d'essai 
   repose (50 → 80 en 6 s, l'annulation revient à 50) ;
 - une photo absente du film fixe est refusée, comme pour le débruitage (après une relance de
   Lightroom, la source affichée peut avoir changé : `show_photo` l'y remet).
+
+### Suppression des passants (`supprimer` avec `personnes`, `remove_distractions` avec `people`)
+
+Ajoutée après la 1.9, à la demande de Dany (« ne limite pas la retouche générative », 10 novembre
+2026). Rien n'en est encore constaté dans Lightroom : le module lit tout de façon défensive
+(`LrTasks.pcall`, attentes bornées, refus dits en clair). Points à constater : [À vérifier à la
+prochaine recette](#à-vérifier-à-la-prochaine-recette), Passants.
+
+- Le serveur envoie `personnes = true` (ou `false` pour rendre les passants), un appel à part des
+  reflets et de la poussière ; il refuse avant Lightroom Classic 16.0 (version lue par `etat`,
+  `verifierVersion`), et le module aussi (`LrApplication.versionString`), ainsi que sans
+  `detectDistractingPeople` ou `applyRemovalOnDetectedDistractingPeople` (« à la main :
+  Développement › Supprimer › Personnes »). L'original est exigé (`Photos.exigerOriginal`).
+- Comme les reflets : photo affichée dans le module Développement (`afficherEnDeveloppement`), un
+  seul traitement calculé à la fois (`avecVerrou`), hors de `withWriteAccessDo`, outil d'avant et
+  vue d'avant remis. `goToRemove`, puis `detectDistractingPeople` ; la détection est attendue par
+  `countAllSpots('distractingPeopleRemoval')`, le même nombre deux lectures de suite au-dessus de
+  0 ; sans compte lisible (ou à 0), `applyRemovalOnDetectedDistractingPeople` est réessayé toutes
+  les 5 s tant que Lightroom répond « No distracting people spots are present for removal. »,
+  une minute au plus (`Suppression.DUREE_DETECTION`). « Detected distracting people are already
+  removed. » : rien à refaire. Puis la fin est attendue (le rappel ou le filtre rangé, deux
+  lectures de suite), quatre minutes au plus (`Suppression.DUREE_PERSONNES`) ; le rappel sans
+  filtre dix secondes après : annulée dans la fenêtre de progression ou refusée par le service
+  d'Adobe, dit en remarque.
+- Le filtre des passants se reconnaît par son nom `remove_people` (relevé dans le code) ou par un
+  nom ou un titre qui contient « people » (`Suppression.filtrePersonnes`).
+- La mémoire : `Suppression = {personnes}` dans l'étape (changement `Suppression.personnes`,
+  « présents » → « retirés ») ; dans `avantClaude`, la clé `Suppression` réunit `reflets`,
+  `intensite` et `personnes`, chacun gardé à sa première étape. Rien de changé : la mémoire est
+  remise comme avant et la réponse ne porte pas d'étape.
+- Annuler et revenir (`Annulation.remettreCalcules`, `Suppression.remettre`) : les reflets puis les
+  passants. Rendre les passants : `resetFilterWithName('remove_people')`, attendu dix secondes,
+  sinon `FilterList` réécrite sans ce filtre (écriture ordinaire, les autres filtres gardés). Les
+  remettre : la détection et la suppression de nouveau. Une photo sans filtre des passants ne
+  demande rien à Lightroom (une version d'avant la 16 comprise).
+- La simulation de la liaison imite `detectDistractingPeople`, `countAllSpots`,
+  `applyRemovalOnDetectedDistractingPeople` (ses deux refus) et le filtre `remove_people`, avec la
+  version de Lightroom (`S.versionLightroom`), un compte illisible, une suppression annulée et un
+  `resetFilterWithName` sans effet (`tests.lua`, « supprimer : passants… »).
 
 ## Aperçus et masques IA
 

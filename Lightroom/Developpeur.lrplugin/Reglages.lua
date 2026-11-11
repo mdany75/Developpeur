@@ -217,11 +217,20 @@ local function resume(cle, valeur)
         end
         return #parties > 0 and table.concat(parties, ", ") or "aucune amélioration"
     elseif cle == 'Suppression' then
-        -- État de la suppression des reflets (pas un réglage).
-        if type(valeur) == 'table' and valeur.reflets == true then
-            return "reflets supprimés" .. (tonumber(valeur.intensite) and (" " .. valeur.intensite) or "")
+        -- État de la suppression des reflets et des passants (pas un réglage).
+        if type(valeur) ~= 'table' then
+            return "reflets laissés"
         end
-        return "reflets laissés"
+        local parties = {}
+        if valeur.reflets == true then
+            parties[#parties + 1] = "reflets supprimés" .. (tonumber(valeur.intensite) and (" " .. valeur.intensite) or "")
+        elseif valeur.reflets ~= nil or valeur.personnes == nil then
+            parties[#parties + 1] = "reflets laissés"
+        end
+        if valeur.personnes ~= nil then
+            parties[#parties + 1] = valeur.personnes == true and "passants retirés" or "passants laissés"
+        end
+        return table.concat(parties, ", ")
     elseif cle:match('^ToneCurvePV2012') then
         if type(valeur) ~= 'table' or egal(valeur, COURBE_LINEAIRE) then
             return "linéaire"

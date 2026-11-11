@@ -272,7 +272,7 @@ public final class ToolHandler {
         "find_photos": "Chercher des photos", "set_metadata": "Classer des photos", "list_keywords": "Mots-clés",
         "manage_collections": "Collections", "create_virtual_copy": "Créer une copie virtuelle", "show_photo": "Montrer dans Lightroom",
         "cull_photos": "Trier une séance", "contact_sheet": "Planche contact", "propose_ratings": "Noter des photos",
-        "remove_distractions": "Supprimer les reflets", "generative_edit": "Retouche générative (Fibo 2)",
+        "remove_distractions": "Supprimer reflets et passants", "generative_edit": "Retouche générative (Fibo 2)",
         "remember_style": "Guide de style", "export_photos": "Exporter des photos", "compare_variants": "Comparer des variantes",
         "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série",
         "match_look": "Rendu d'une référence",
