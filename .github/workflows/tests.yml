@@ -27,6 +27,9 @@ jobs:
         run: swift test
       - name: Module Lightroom (LuaJIT)
         run: scripts/tester-module.sh
+        env:
+          # Machine plus lente que le Mac de Dany : borne des durées du Suivi multipliée par 3.
+          DEVELOPPEUR_LENTEUR: '3'
       - name: Compilation release
         run: |
           swift build -c release --product mcp-developpeur

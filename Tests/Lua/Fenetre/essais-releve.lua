@@ -2811,6 +2811,10 @@ end
 -- La taille réelle : 85 000 originaux (la bibliothèque de Dany), ou DEVELOPPEUR_SUIVI_ORIGINAUX
 -- (250 000, la borne : plus long).
 local ORIGINAUX = tonumber(os.getenv('DEVELOPPEUR_SUIVI_ORIGINAUX') or '') or 85000
+-- La borne de 0,3 s vaut pour le Mac de Dany ; la machine de la CI (GitHub, macos-15), deux à
+-- trois fois plus lente, y dépassait par moments (0,46 s, depuis la 1.7) : DEVELOPPEUR_LENTEUR
+-- (posée par .github/workflows/tests.yml) multiplie la borne, jamais en dessous de 1.
+local LENTEUR = math.max(1, tonumber(os.getenv('DEVELOPPEUR_LENTEUR') or '') or 1)
 
 essai(string.format("Taille réelle, %d originaux : la relecture, le relevé compacté, une vue de mille photos (au journal : suivi.json pas réécrit), la relecture avec le journal rejoué et la file refaite ne gardent jamais la main plus de 0,3 s ; l'écriture pendant l'analyse n'écrit que les entrées changées, au journal", ORIGINAUX), function()
     depart()
@@ -2865,7 +2869,7 @@ essai(string.format("Taille réelle, %d originaux : la relecture, le relevé com
     for _, nom in ipairs({ 'relecture', 'compaction', 'vue', 'suivante', 'rejeu', 'file' }) do
         local m = morceaux[nom]
         print(string.format('       %-10s %6.2f s, plus long morceau %.3f s (%d yields)', nom, temps[nom], m.plusLong, m.n))
-        vrai(m.plusLong < 0.3, nom .. ' : un morceau de ' .. string.format('%.3f', m.plusLong) .. ' s sans rendre la main')
+        vrai(m.plusLong < 0.3 * LENTEUR, nom .. ' : un morceau de ' .. string.format('%.3f', m.plusLong) .. ' s sans rendre la main')
         egal(0, m.traversees, nom .. ' : à travers un pcall simple')
     end
     print(string.format('       suivi.json %.1f Mo, journal de la vue %.0f Ko (%.2f %%)', taille / 1e6, journal / 1e3, 100 * journal / taille))
