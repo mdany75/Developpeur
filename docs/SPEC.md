@@ -4976,6 +4976,15 @@ Constaté dans Lightroom Classic 16.0 (10 novembre 2026, copie « Essai passants
   raccord visible. Reste une personne en partie cachée derrière le sujet, collée à lui : Adobe ne
   la retire pas.
 - `undo_last` rend les passants : `FilterList` revient vide.
+- Paramètre prédéfini (10 novembre 2026, au soir) : Lightroom 16 accepte Supprimer › Reflets,
+  Personnes, Imperfections et Poussière dans un paramètre prédéfini de développement. Créé d'une
+  photo sans la suppression cochée, le paramètre ne range qu'un signal d'effacement
+  (`IsSignalForDelete="true"`) : l'appliquer retire la suppression au lieu de la faire. Le
+  paramètre « Claude / Personnes » de Dany (filtre `FilterID` 4 et signaux d'effacement de 3, 6
+  et 7), appliqué par `apply_settings` avec `preset` à la copie 54868923, a refait la détection
+  sur cette photo en 6 s : passants retirés comme par `people`, rendu un peu différent ; `undo_last`
+  le défait. À voir : Poussière et Imperfections par un paramètre créé d'une photo où elles sont
+  faites (un module ne peut pas les lancer autrement).
 - Bien meilleur que Fibo 2 et Qwen-Image 2.1 au banc sur la même photo (Dany : « un comme l'autre
   est pas bon ») : pour des passants, toujours ce chemin, jamais `generative_edit`.
 
