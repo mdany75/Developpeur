@@ -5103,7 +5103,7 @@ La règle (`PresetSuppression.swift`, `ToolHandler.appliquerParametreSuppression
   paramètre, `PresetSuppression.attributsDuParametre`, ou éléments hors de Name, ShortName,
   SortName, Group, Description et FilterList) : jamais retoucher autre chose sans le dire.
 - Valide, il passe par le chemin des paramètres prédéfinis : `apply_settings` avec `preset` =
-  l'UUID (commande `appliquer`, `applyDevelopPreset` du module), étape « Claude · poussière » ou
+  « Claude/Poussière » ou « Claude/Imperfections », son nom (commande `appliquer`, `applyDevelopPreset` du module), étape « Claude · poussière » ou
   « Claude · imperfections » (ou `step_name`), `undo_last` et `revert_to_original` comme toute
   retouche ; le mode « Proposer d'abord » est jugé par le module (`confirm`), et son refus nomme
   `remove_distractions` à rappeler. La réponse dit de vérifier par un zoom que les taches retirées
