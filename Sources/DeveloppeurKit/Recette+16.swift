@@ -8,8 +8,11 @@ import Foundation
 extension Recette {
     /// Version de Lightroom Classic qui connaît la Lueur, la Projection et l'étalonnage local.
     static let version16 = "16.0"
-    /// Écart de L* moyen au moins, entre l'aperçu sans Lueur et l'aperçu avec Glow 40.
-    static let ecartLueurMin = 0.2
+    /// Plus grand écart de luminance au moins (niveaux sur 255, trois fois `ecartIdentique`) entre
+    /// l'aperçu sans Lueur et l'aperçu avec Glow 40. Le L* moyen ne convenait pas : la Lueur répartit
+    /// la lumière autour des hautes lumières plus qu'elle n'éclaircit l'image (constaté le
+    /// 10 novembre 2026 sur la copie RAW du portrait : 36,5 → 36,58).
+    static let ecartLueurMin = 6.0
     /// Hauteur du trait de pinceau de l'étape de la Projection, et écart permis (part de la hauteur).
     static let hauteurTraitProjection = 0.2, ecartTraitProjection = 0.02
     /// Abscisses des points du trait : cinq, comme au constat réussi de la 1.8 (le module ne recale
@@ -52,12 +55,13 @@ extension Recette {
             let glow = tous?["Glow"]?.double, style = tous?["GlowStyle"]?.double
             try verifier(glow == 40 && style == 2,
                          "Lueur relue : Glow \(glow.map(Self.nombre) ?? "absent"), GlowStyle \(style.map(Self.nombre) ?? "absent") au lieu de 40 et 2")
-            guard let a = imagesAvant.first.flatMap(Self.luminanceMoyenne), let b = imagesApres.first.flatMap(Self.luminanceMoyenne) else {
+            guard let a = imagesAvant.first, let b = imagesApres.first, let ecart = Self.ecartMax(a, b) else {
                 throw Echec(description: "aperçu illisible avant ou après la Lueur")
             }
-            try verifier(abs(b - a) >= Self.ecartLueurMin,
-                         "rendu inchangé par la Lueur : L* moyen \(Self.nombre(a)) → \(Self.nombre(b))")
-            return "Glow 40 et GlowStyle 2 relus ; L* moyen \(Self.nombre(a)) → \(Self.nombre(b)) ; annulée"
+            let part = Self.partChangee(a, b)
+            try verifier(ecart >= Self.ecartLueurMin,
+                         "rendu inchangé par la Lueur : écart maximal de \(Self.nombre(ecart)) niveaux, \(Self.nombre(part * 100)) % des pixels changés")
+            return "Glow 40 et GlowStyle 2 relus ; écart maximal de \(Self.nombre(ecart)) niveaux, \(Self.nombre(part * 100)) % des pixels changés ; annulée"
         }
         try etape(photo, "étalonnage dans un masque radial (ombres 220, 30), relu en entiers, annulé") {
             if let saut = try sautAvant16() { return saut }
