@@ -75,7 +75,7 @@ défait ensuite.
 
 **Passants (après la 1.9)**
 
-- Suppression des passants (`remove_distractions` avec `people`, `Suppression.lua`) jamais encore lancée par un module : à constater sur une copie d'Essais remise à l'origine avec des passants, puis défaite — le nom exact du filtre rangé dans `FilterList` (supposé `remove_people`) et ce que rend `hasFilterWithName('remove_people')` ; si `countAllSpots('distractingPeopleRemoval')` compte les passants détectés (sinon le module attend 20 s, puis réessaie la suppression toutes les 5 s), et s'il les compte au fil de l'eau ou d'un coup à la fin ; la durée de la détection (régler `ATTENTE_SANS_COMPTE` 20 s, `DUREE_ZERO` 15 s et `DUREE_STABLE` 2 s d'après elle) et de la suppression (au-delà de 4 min, l'étape reste « en cours ») ; le nom que le module a gardé dans l'étape (`Suppression.filtre`) ; si le rappel vient aussi quand Dany annule dans la fenêtre de progression ; si `resetFilterWithName('remove_people')` retire la suppression (sinon le module réécrit `FilterList` sans ce filtre) ; le message d'un refus du service génératif d'Adobe (hors ligne) — à la main dans Lightroom ([Suppression des passants](#suppression-des-passants-supprimer-avec-personnes-remove_distractions-avec-people)).
+- Suppression des passants (`remove_distractions` avec `people`, `Suppression.lua`) : lancée une fois le 10 novembre 2026 (filtre `Distracting People Removal`, 20 s, annulation qui rend les passants : constatés). Reste à voir : ce que rend `hasFilterWithName('remove_people')` ; si `countAllSpots('distractingPeopleRemoval')` compte les passants détectés (sinon le module attend 20 s, puis réessaie la suppression toutes les 5 s), et s'il les compte au fil de l'eau ou d'un coup à la fin ; la durée de la détection (régler `ATTENTE_SANS_COMPTE` 20 s, `DUREE_ZERO` 15 s et `DUREE_STABLE` 2 s d'après elle) et de la suppression (au-delà de 4 min, l'étape reste « en cours ») ; le nom que le module a gardé dans l'étape (`Suppression.filtre`) ; si le rappel vient aussi quand Dany annule dans la fenêtre de progression ; si `resetFilterWithName('remove_people')` retire la suppression (sinon le module réécrit `FilterList` sans ce filtre) ; le message d'un refus du service génératif d'Adobe (hors ligne) — à la main dans Lightroom ([Suppression des passants](#suppression-des-passants-supprimer-avec-personnes-remove_distractions-avec-people)).
 
 **Retouche générative : choix du modèle (1.9)**
 
@@ -4961,9 +4961,23 @@ Constaté le 17 octobre 2026 dans Lightroom Classic 15.6, sur une copie d'essai 
 ### Suppression des passants (`supprimer` avec `personnes`, `remove_distractions` avec `people`)
 
 Ajoutée après la 1.9, à la demande de Dany (« ne limite pas la retouche générative », 10 novembre
-2026). Rien n'en est encore constaté dans Lightroom : le module lit tout de façon défensive
-(`LrTasks.pcall`, attentes bornées, refus dits en clair). Points à constater : [À vérifier à la
-prochaine recette](#à-vérifier-à-la-prochaine-recette), Passants.
+2026). Le module lit tout de façon défensive (`LrTasks.pcall`, attentes bornées, refus dits en
+clair). Points encore à constater : [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette),
+Passants.
+
+Constaté dans Lightroom Classic 16.0 (10 novembre 2026, copie « Essai passants » d'IMG_8173.HEIC,
+54868923, remise à l'origine, puis défaite) :
+
+- Le filtre rangé dans `FilterList` s'appelle `Distracting People Removal`, `FilterID` 4, titre
+  `$$$/CRaw/Filter/PeopleRemoval/FilterPanelTitle=People Removal` (pas `remove_people`, nom
+  supposé) : le module le reconnaît au mot « people » de son nom, et la simulation le range ainsi.
+- Détection et suppression en 20 s en tout (commande `supprimer` : 19,7 s), 2 détections
+  (`personnes.detectes`) ; six passants retirés avec leurs ombres, rue et pavé refaits sans
+  raccord visible. Reste une personne en partie cachée derrière le sujet, collée à lui : Adobe ne
+  la retire pas.
+- `undo_last` rend les passants : `FilterList` revient vide.
+- Bien meilleur que Fibo 2 et Qwen-Image 2.1 au banc sur la même photo (Dany : « un comme l'autre
+  est pas bon ») : pour des passants, toujours ce chemin, jamais `generative_edit`.
 
 - Le serveur envoie `personnes = true` (ou `false` pour rendre les passants), un appel à part des
   reflets et de la poussière ; il refuse avant Lightroom Classic 16.0 (version lue par `etat`,

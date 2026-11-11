@@ -272,7 +272,7 @@ end
 
 -- Passants (Suppression des distractions › Personnes) -------------------------------------------
 
-Suppression.FILTRE_PERSONNES = 'remove_people'           -- nom du filtre (supposé)
+Suppression.FILTRE_PERSONNES = 'remove_people'           -- nom pour hasFilterWithName (supposé ; rangé : « Distracting People Removal »)
 Suppression.MODE_PERSONNES = 'distractingPeopleRemoval'  -- mode de countAllSpots (supposé)
 Suppression.VERSION_PERSONNES = 16
 Suppression.DUREE_DETECTION = 60     -- secondes d'attente de la détection au plus

@@ -1984,7 +1984,7 @@ function S.avancerAmeliorations()
                     for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
                         filtres[#filtres + 1] = filtre
                     end
-                    filtres[#filtres + 1] = { Name = S.nomFiltrePersonnes, FilterID = 7,
+                    filtres[#filtres + 1] = { Name = S.nomFiltrePersonnes, FilterID = 4,
                         Title = S.titreFiltrePersonnes,
                         CompressedSettings = 'passants ' .. tostring(photo.personnesDetectees) }
                     photo.reglages.FilterList = { Filters = filtres }
@@ -2088,7 +2088,7 @@ local controleur = {
         elseif nom == 'remove_people' and not S.resetPersonnesIgnore then
             local filtres = {}
             for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
-                if filtre.FilterID ~= 7 then
+                if filtre.FilterID ~= 4 then
                     filtres[#filtres + 1] = filtre
                 end
             end
@@ -2128,7 +2128,7 @@ local controleur = {
             error("this operation can be executed only when Remove-tool is opened in Develop module", 0)
         end
         for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
-            if filtre.FilterID == 7 then
+            if filtre.FilterID == 4 then
                 error("Detected distracting people are already removed.", 0)
             end
         end
@@ -2756,11 +2756,11 @@ function S.reinitialiser()
     -- (S.dureePersonnes attentes) ; S.compteIllisible : countAllSpots en erreur ;
     -- S.resetPersonnesIgnore : resetFilterWithName sans effet sur le filtre des passants ;
     -- S.detectionPartielle : passants comptés pendant la détection ; S.nomFiltrePersonnes et
-    -- S.titreFiltrePersonnes : le filtre rangé (FilterID 7 ; son vrai nom reste à constater).
+    -- S.titreFiltrePersonnes : le filtre rangé (FilterID 4, nom et titre constatés le 10 novembre 2026).
     S.appelsPersonnes = {}
     S.detectionPartielle = nil
-    S.nomFiltrePersonnes = 'remove_people'
-    S.titreFiltrePersonnes = '$$$/CRaw/Filter/DistractionRemoval/People=People Removal'
+    S.nomFiltrePersonnes = 'Distracting People Removal'
+    S.titreFiltrePersonnes = '$$$/CRaw/Filter/PeopleRemoval/FilterPanelTitle=People Removal'
     S.versionLightroom = nil
     S.dureeDetection = 4
     S.dureePersonnes = 3

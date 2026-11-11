@@ -3833,7 +3833,7 @@ test("supprimer : passants détectés puis retirés dans le module Développemen
     egal(S.appelsPersonnes[1].fonction, 'detectDistractingPeople')
     egal(S.appelsPersonnes[2].fonction, 'applyRemovalOnDetectedDistractingPeople')
     egal(S.appelsPersonnes[2].detectes, 3, "suppression lancée après la détection finie")
-    egal(nomsFiltres(photo), 'remove_people')
+    egal(nomsFiltres(photo), 'Distracting People Removal')
     local changement = resultat.resultats[1].changements[1]
     egal(changement.cle, 'Suppression.personnes')
     egal(changement.avant, "présents")
@@ -3892,7 +3892,7 @@ test("supprimer : passants sans compte lisible (essais répétés), puis retour 
     reflets({ reflets = { actif = true, intensite = 60 } })
     local resultat = passants({ personnes = true })
     egal(resultat.resultats[1].changements[1].cle, 'Suppression.personnes')
-    egal(nomsFiltres(photo), 'Reflections,remove_people')
+    egal(nomsFiltres(photo), 'Reflections,Distracting People Removal')
     local original = Json.decode(photo.proprietes.avantClaude).Suppression
     egal(original.reflets, false, "l'état d'avant des reflets gardé")
     egal(original.personnes, false, "et celui des passants ajouté")
@@ -4002,7 +4002,7 @@ test("supprimer : passants rendus sans l'original, puis l'annulation relance la 
     S.active, S.selection = photo, { photo }
     photo.passants = 2
     passants({ personnes = true })
-    egal(nomsFiltres(photo), 'remove_people')
+    egal(nomsFiltres(photo), 'Distracting People Removal')
     photo.absente = true
     local resultat = passants({ personnes = false })
     egal(resultat.resultats[1].changements[1].apres, "présents", "rendre les passants ne demande pas l'original")
@@ -4013,7 +4013,7 @@ test("supprimer : passants rendus sans l'original, puis l'annulation relance la 
     resultat = Commandes.executer('annuler', {})
     egal(resultat.resultats[1].annulee, true)
     egal(S.appelsPersonnes[appels + 1].fonction, 'detectDistractingPeople', "la suppression est relancée")
-    egal(nomsFiltres(photo), 'remove_people', "les passants sont de nouveau retirés")
+    egal(nomsFiltres(photo), 'Distracting People Removal', "les passants sont de nouveau retirés")
 end)
 
 -- Version 1.9 : retouche avancée (plage de couleurs, de profondeur, objet par un rectangle,
