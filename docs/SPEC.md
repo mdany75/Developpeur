@@ -5080,9 +5080,12 @@ Constaté dans Lightroom Classic 16.0 (10 novembre 2026) :
   recalculé pour cette photo ; `undo_last` le retire. Imperfections : rien sur IMG_8173 (visage
   petit, vu de loin), même appliqué à la main ; sur une autre copie du portrait DSCF2402
   (54867139), le filtre `Blemish Removal` est rangé ; `undo_last` le retire.
-- « Mettre à jour avec les paramètres actuels » écrit un fichier au nouvel `crs:UUID`, mais
-  Lightroom garde l'ancien en mémoire jusqu'à sa relance : `remove_distractions` refuse alors
-  (« quitter et relancer Lightroom »), comme prévu.
+- L'uuid que Lightroom donne au paramètre (`LrDevelopPreset:getUuid`, `list_presets`) n'est pas
+  le `crs:UUID` de son fichier, même après une relance (11 novembre 2026) : le serveur l'applique
+  donc par son nom « Claude/Poussière » ou « Claude/Imperfections » (les doubles sont refusés).
+  Par le connecteur ensuite, sur les copies 54868923 (poussière) et 54867139 (imperfections) :
+  étapes « Claude · poussière » et « Claude · imperfections », filtres `Dust Removal` et
+  `Blemish Removal` rangés, puis `undo_last` qui rend `FilterList` vide.
 
 La règle (`PresetSuppression.swift`, `ToolHandler.appliquerParametreSuppression`) :
 

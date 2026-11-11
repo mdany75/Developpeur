@@ -248,11 +248,9 @@ extension ToolHandler {
         guard let dossier = dossierParametresPredefinis else {
             throw LightroomError.invalid("\(genre.nomComplet) : les paramètres prédéfinis de Lightroom ne sont pas lus ici. Rien n'a été fait. " + Self.aLaMain(genre))
         }
-        let uuid: String
         let fichier: URL
         switch PresetSuppression.chercher(genre, dans: dossier) {
-        case .valide(let trouve, let lu):
-            uuid = trouve
+        case .valide(_, let lu):
             fichier = lu
         case .absent:
             throw LightroomError.invalid("Pas de paramètre prédéfini « \(genre.nomComplet) » dans Lightroom. Rien n'a été fait. Pour le créer, une fois : " + Self.refaire(genre, creer: true) + " " + Self.aLaMain(genre))
@@ -275,7 +273,12 @@ extension ToolHandler {
                 throw LightroomError.invalid("« \(genre.nomComplet) » porte la version de processus \(duParametre) et la photo est en \(deLaPhoto) : l'appliquer pourrait la mettre à jour, et le rendu peut changer nettement. Rien n'a été fait. Le dire à l'utilisateur (preview_settings avec process_version pour le montrer), attendre son accord, puis rappeler remove_distractions avec confirm = true.")
             }
         }
-        var brut: [String: JSONValue] = ["preset": .string(uuid)]
+        // Par « Claude/Nom », pas par crs:UUID : l'uuid que Lightroom donne à un paramètre
+        // (LrDevelopPreset:getUuid, list_presets) n'est pas celui de son fichier (constaté dans
+        // Lightroom 16.0 le 11 novembre 2026, même après une relance). Le nom est unique : les
+        // doubles sont refusés plus haut.
+        let nomLightroom = "\(PresetSuppression.groupe)/\(genre.nom)"
+        var brut: [String: JSONValue] = ["preset": .string(nomLightroom)]
         brut["step_name"] = args.raw["step_name"].flatMap { $0.isNull ? nil : $0 } ?? .string(genre.etape)
         for cle in ["confirm", "reason"] { if let valeur = args.raw[cle] { brut[cle] = valeur } }
         if let id = args.int("photo_id") { brut["photo_ids"] = .array([.number(Double(id))]) }
@@ -286,7 +289,7 @@ extension ToolHandler {
             // Fichier valide, mais Lightroom ne connaît pas (encore) ce paramètre : créé ou refait
             // hors de Lightroom, ou pas encore relu.
             if message.contains("Paramètre prédéfini introuvable") {
-                throw LightroomError.plugin("Lightroom ne trouve pas « \(genre.nomComplet) » (\(uuid)), alors que son fichier est là : quitter et relancer Lightroom pour qu'il relise ses paramètres prédéfinis, puis rappeler remove_distractions. Rien n'a été fait. " + Self.aLaMain(genre))
+                throw LightroomError.plugin("Lightroom ne trouve pas « \(genre.nomComplet) », alors que son fichier est là : quitter et relancer Lightroom pour qu'il relise ses paramètres prédéfinis, puis rappeler remove_distractions. Rien n'a été fait. " + Self.aLaMain(genre))
             }
             // Le refus du mode « Proposer d'abord » nomme apply_settings : c'est remove_distractions qu'il faut rappeler.
             throw LightroomError.plugin(message.replacingOccurrences(of: "apply_settings", with: "remove_distractions"))

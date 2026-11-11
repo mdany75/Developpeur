@@ -50,7 +50,7 @@ public enum PresetSuppression {
     static let elementsDuParametre: Set<String> = ["Name", "ShortName", "SortName", "Group", "Description", "FilterList"]
 
     public enum Etat: Equatable, Sendable {
-        /// Le seul filtre voulu, sans signal d'effacement, avec sa recette : à appliquer par son UUID.
+        /// Le seul filtre voulu, sans signal d'effacement, avec sa recette : à appliquer par son nom « Claude/… » (l'uuid de Lightroom n'est pas celui du fichier).
         case valide(uuid: String, fichier: URL)
         /// Aucun paramètre « Claude / <nom> » dans le dossier.
         case absent
