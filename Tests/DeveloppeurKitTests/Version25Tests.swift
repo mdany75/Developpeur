@@ -383,6 +383,22 @@ final class Version25Tests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: notes.path))
     }
 
+    /// Constaté le 10 novembre 2026 à 19 h 42 : au catalogue mais pas encore empilé, le TIFF retiré
+    /// puis jeté a bloqué de même « Ajout de photos au catalogue ». Il reste tel quel, noté.
+    func testRecetteLeavesATiffNotYetStackedAsItIs() throws {
+        let notes = FileManager.default.temporaryDirectory.appendingPathComponent("recette-en-attente-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: notes) }
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { _ in ["photos": [["id": 901, "fichier": "DSCF2402.tif"]]] }, retrait: retire)
+        recette.fichiersEnAttente = notes
+        let depart = try recette.etat(5)
+        XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
+        let detail = recette.etapes.last?.detail ?? ""
+        XCTAssertTrue(detail.contains("pas encore empilé") && detail.contains("laissé tel quel"), detail)
+        XCTAssertEqual(retraits(), [], "rien retiré du catalogue pendant l'ajout")
+        XCTAssertEqual(corbeille.chemins, [])
+        XCTAssertEqual(Recette.lireEnAttente(notes), chemins)
+    }
+
     /// Arrivé entre la dernière lecture et le retrait : l'ajout est fini, le fichier va à la Corbeille.
     func testRecetteTrashesTheTiffThatArrivedJustBeforeBeingLeft() throws {
         let notes = FileManager.default.temporaryDirectory.appendingPathComponent("recette-en-attente-\(UUID().uuidString).json")

@@ -119,6 +119,35 @@ extension ToolHandler {
         return .object(objet)
     }
 
+    /// Lightroom Classic 16, Projection (constaté le 10 novembre 2026, recette de la 1.9) : la case
+    /// « Contraindre le recadrage » cochée dans la même écriture que ReshapeAmount, Lightroom rend
+    /// l'image resserrée mais laisse le cadre rangé à 0 et 1, et les positions données ensuite dans
+    /// l'aperçu tombaient à côté (un trait demandé à 0,2 de la hauteur posé à 0,15). Ni une
+    /// réécriture du cadre, ni les rendus du recalage ne le lui font ranger ; une vignette du cache
+    /// d'aperçus (commande « vignettes », requestJpegThumbnail), si : le module signale ces photos
+    /// (`cadre_a_ranger`), le serveur la demande, puis jette le fichier.
+    func rangerCadres(_ reponse: JSONValue, notes: inout [JSONValue]) -> JSONValue {
+        guard var objet = reponse.object, var resultats = objet["resultats"]?.array else { return reponse }
+        var ids: [Int] = []
+        for (index, resultat) in resultats.enumerated() {
+            guard var r = resultat.object, r.removeValue(forKey: "cadre_a_ranger") != nil else { continue }
+            resultats[index] = .object(r)
+            if let id = r["photo"]?["id"]?.int { ids.append(id) }
+        }
+        objet["resultats"] = .array(resultats)
+        guard !ids.isEmpty else { return .object(objet) }
+        do {
+            let vignettes = try lightroom.send("vignettes", ["photos": .array(ids.map { .number(Double($0)) }), "taille": 128], timeout: 60)
+            for photo in vignettes["photos"]?.array ?? [] {
+                if let chemin = photo["vignette"]?.string { try? FileManager.default.removeItem(atPath: chemin) }
+            }
+        } catch {
+            notes.append(.string("Projection et « Contraindre le recadrage » : le cadre resserré par Lightroom n'est peut-être pas encore rangé "
+                                 + "(\(error.localizedDescription)) ; les positions données ensuite peuvent être décalées, vérifier avec view_photo."))
+        }
+        return .object(objet)
+    }
+
     /// Le recadrage d'une retouche peut-il tenir compte de la géométrie actuelle ? Non si la même
     /// retouche change la géométrie (le module le signale alors après l'écriture).
     static func changeGeometrie(_ params: [String: JSONValue]) -> Bool {

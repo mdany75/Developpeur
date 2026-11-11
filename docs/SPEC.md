@@ -66,7 +66,7 @@ défait ensuite.
 
 **Lightroom Classic 16 (1.8)**
 
-- Recette, étape « TIFF réimporté, empilé avec l'original » : réussie le 10 novembre 2026 au matin (88/88), puis en échec trois fois sous la charge d'un tri assisté de 20 000 photos (réimporté en retard, puis au catalogue sans pile après 2 min ; fichier retiré et mis à la Corbeille chaque fois). La 1.8 est publiée sur l'accord de Dany ; refaire la recette une fois le tri fini. Constaté le même soir : le TIFF mis à la Corbeille pendant que Lightroom l'ajoutait encore a bloqué la tâche « Ajout de photos au catalogue » près de deux heures, jusqu'à ce que Dany quitte Lightroom. Depuis la 1.9, un TIFF jamais vu au catalogue reste à sa place, noté dans `~/Library/Application Support/Developpeur/recette-tiff-en-attente.json`, et la recette suivante le retire du catalogue puis le met à la Corbeille (`Version25Tests`).
+- Recette, étape « TIFF réimporté, empilé avec l'original » : réussie le 10 novembre 2026 au matin (88/88), puis en échec trois fois sous la charge d'un tri assisté de 20 000 photos (réimporté en retard, puis au catalogue sans pile après 2 min ; fichier retiré et mis à la Corbeille chaque fois). La 1.8 est publiée sur l'accord de Dany ; refaire la recette une fois le tri fini. Constaté le même soir : le TIFF mis à la Corbeille pendant que Lightroom l'ajoutait encore a bloqué la tâche « Ajout de photos au catalogue » près de deux heures, jusqu'à ce que Dany quitte Lightroom. Revu le soir même (19 h 42, recette de la 1.9 : au catalogue mais pas empilé, retiré puis jeté, même blocage). Depuis la 1.9, un TIFF jamais vu au catalogue, ou vu mais pas encore empilé, reste tel quel, noté dans `~/Library/Application Support/Developpeur/recette-tiff-en-attente.json`, et la recette suivante le retire du catalogue puis le met à la Corbeille (`Version25Tests`).
 - Réimportation arrivée après le retrait de la recette (`pas_au_catalogue`, fichier mis à la Corbeille avant que Lightroom, occupé, ne l'ajoute) : ce que fait Lightroom (fenêtre d'erreur ou photo manquante) — dans la recette, Lightroom chargé ([Réimportation, aperçus dynamiques](#réimportation-aperçus-dynamiques)).
 - Les trois étapes de la recette de la 16 (Lueur, étalonnage dans un masque radial, Projection et trait de pinceau droit, à cinq points) : jamais encore passées dans Lightroom ; le seuil de L* de la Lueur (0,2) et la mesure de la bande aux bords sont à confirmer — dans la recette ([Lightroom Classic 16](#lightroom-classic-16-18)).
 - Un long trait coupé avant le recalage (`Geometrie.trait`, 1.9) : un trait de deux points sous la Projection 100 reste droit au rendu, et le nombre de touches d'un pinceau ne change pas — à la main dans Lightroom, sur une copie d'Essais ([Lightroom Classic 16](#lightroom-classic-16-18)).
@@ -3298,6 +3298,16 @@ Constaté le 10 novembre 2026 sur la copie RAW 53918083 (« Essai mesures 16 »)
   l'aperçu tous les 0,05 au plus (`Geometrie.PAS_TRAIT`) avant le recalage, quand une grille est
   donnée (pinceau, objet désigné par un trait, affinage du flou d'objectif) ; sans grille, rien
   ne change. La simulation imite la courbure (`S.projection`, `ModuleRecette16`).
+  Constaté le 10 novembre 2026 au soir (recette de la 1.9, copie JPEG 54858042) : la Projection
+  posée avec « Contraindre le recadrage » (`preparerContrainte`), Lightroom rend l'image resserrée
+  (environ 7 % de chaque bord) mais laisse le cadre rangé à 0 et 1 ; le trait de la recette, placé
+  d'après ce cadre faux, tombait à 0,15 au lieu de 0,2. Ni une réécriture du cadre (case cochée, ou
+  décochée puis recochée), ni les rendus du recalage (même dans une autre commande), ni le temps ne
+  le font ranger ; une vignette du cache d'aperçus (`requestJpegThumbnail`, commande `vignettes`) le
+  fait ranger aussitôt (CropTop 0,0708). Le module signale ces photos (`cadre_a_ranger`, `relireCadres`,
+  `signalerARecadrer`) ; `apply_settings` et `copy_settings` demandent alors une vignette de 128 px
+  (`ToolHandler.rangerCadres`) et jettent le fichier. Vérifié ensuite dans Lightroom : trait à 0,2,
+  droit, de 0,03 à 0,97. La simulation range le cadre sous la Projection à la vignette seulement.
 - **Étalonnage dans un masque** (`LocalColorGrade*`) : rangé à l'échelle des curseurs globaux, en
   entiers (0,5 devient 1). Un radial couvrant toute l'image, teinte 240 et saturation 50 (puis 100),
   rend au pixel près comme le même étalonnage global (moyennes 47,6/48,5/61,9 et 32,9/42,0/71,7).

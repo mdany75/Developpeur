@@ -74,10 +74,15 @@
   ni lu ni effacé : il reste sur le disque, et seul `uninstall.sh --tout` le retire, avec le reste.
 
 ### Corrigé
-- **Recette** : un TIFF que Lightroom, très occupé, n'a pas encore ajouté au catalogue n'est plus
-  mis à la Corbeille pendant l'ajout, ce qui bloquait la tâche « Ajout de photos au catalogue »
-  jusqu'à ce qu'on quitte Lightroom. Il reste à sa place, puis la recette suivante le retire du
-  catalogue et le met à la Corbeille.
+- **Projection et retouches locales** : juste après la Projection (Lightroom Classic 16), un
+  pinceau, une tache ou un dégradé tombait à côté (un trait demandé à 0,2 de la hauteur posé à
+  0,15). Lightroom resserre bien le cadre pour ne laisser aucun bord vide, mais ne l'enregistrait
+  pas tout de suite ; Développeur le lui fait maintenant enregistrer aussitôt.
+- **Recette** : un TIFF que Lightroom, très occupé, n'a pas fini d'ajouter au catalogue (pas
+  encore là, ou là mais pas encore empilé avec l'original) n'est plus retiré ni mis à la Corbeille
+  pendant l'ajout, ce qui bloquait la tâche « Ajout de photos au catalogue » jusqu'à ce qu'on
+  quitte Lightroom. Il reste tel quel, puis la recette suivante le retire du catalogue et le met à
+  la Corbeille.
 
 ### Après l'installation
 - Quittez et relancez Lightroom, puis Claude Desktop, et ouvrez une nouvelle session de Claude

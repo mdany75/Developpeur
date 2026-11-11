@@ -783,6 +783,36 @@ test("Upright : « Contraindre le recadrage » coché, cadre resserré par Light
     egal(photo.reglages.CropConstrainToWarp, 0)
 end)
 
+-- Constaté le 10 novembre 2026 (Lightroom Classic 16.0, recette de la 1.9, copie JPEG d'Essais) :
+-- la Projection et la case cochée dans la même écriture, Lightroom rendait l'image resserrée sans
+-- ranger le cadre (0 et 1) ; le trait demandé ensuite à 0,2 de la hauteur tombait à 0,15. Seule
+-- une vignette du cache d'aperçus le fait ranger : le module signale la photo (cadre_a_ranger), le
+-- serveur la demande ; l'annulation remet tout.
+test("Projection : cadre que Lightroom ne range pas, signalé au serveur, rangé par une vignette", function()
+    local photo = photoFuji()
+    photo.brut.orientation = 'AB'
+    photo.reglages.LensProfileEnable = 0
+    photo.deformation = S.projection(1)
+    S.active = photo
+    local resultat = appliquer({ reglages = { ReshapeAmount = 100 }, plages = { ReshapeAmount = { 0, 100 } }, etape = 'projection' })
+    local r = resultat.resultats[1]
+    egal(photo.reglages.CropConstrainToWarp, 1, "case cochée avec la Projection")
+    egal(photo.reglages.CropTop or 0, 0, "cadre pas encore rangé (constaté)")
+    egal(r.cadre_a_ranger, true, "signalé au serveur")
+    Commandes.executer('geometrie', { photos = { 4 }, rendre = true, taille = 256 })
+    egal(photo.reglages.CropTop or 0, 0, "les rendus du recalage ne le rangent pas (constaté)")
+    Commandes.executer('vignettes', { photos = { 4 }, taille = 128 })
+    egal(S.coinsVides(photo), 0, "cadre rangé après la vignette")
+    egal(photo.reglages.CropTop > 0, true, "CropTop " .. tostring(photo.reglages.CropTop))
+    Commandes.executer('annuler', {})
+    egal(photo.reglages.ReshapeAmount, 0)
+    egal(photo.reglages.CropTop, 0) egal(photo.reglages.CropBottom, 1)
+    egal(photo.reglages.CropConstrainToWarp, 0)
+    -- Sans Projection (Upright), Lightroom range le cadre lui-même : rien à signaler.
+    local autre = appliquer({ reglages = { PerspectiveUpright = 2 }, plages = { PerspectiveUpright = { 0, 5 } }, etape = 'upright' })
+    egal(autre.resultats[1].cadre_a_ranger, nil)
+end)
+
 test("Upright déjà posé : le cadre demandé tient compte de la grille et Lightroom le garde", function()
     local photo = photoFuji()
     photo.reglages.PerspectiveUpright = 2

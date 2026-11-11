@@ -530,6 +530,19 @@ local function relireCadres(plans)
             plan.cadreChange = plan.cadreChange or relire(plan)
         end
     end
+    -- Lightroom Classic 16, Projection (constaté le 10 novembre 2026, recette de la 1.9) : la case
+    -- cochée dans la même écriture que ReshapeAmount, Lightroom rend l'image resserrée mais laisse le
+    -- cadre rangé à 0 et 1 ; les positions données ensuite dans l'aperçu (pinceau, taches, dégradés)
+    -- se plaçaient d'après ce cadre faux (un trait demandé à 0,2 de la hauteur posé à 0,15). Ni une
+    -- réécriture du cadre, ni la case décochée puis recochée, ni les rendus du recalage ne le font
+    -- ranger ; une vignette du cache d'aperçus (requestJpegThumbnail), si : le serveur la demande
+    -- (cadre_a_ranger, signalerARecadrer ; commande « vignettes »).
+    for _, plan in ipairs(suivis) do
+        if not plan.cadreChange and plan.nouveaux.ReshapeAmount ~= nil
+            and (tonumber(valeurActuelle(plan.photo:getDevelopSettings(), 'ReshapeAmount')) or 0) ~= 0 then
+            plan.cadreARanger = true
+        end
+    end
     local journaux = {}
     for _, plan in ipairs(suivis) do
         if plan.cadreChange then
@@ -595,6 +608,9 @@ end
 -- étape que « recadrer » doit compléter.
 local function signalerARecadrer(plans, resultats)
     for i, plan in ipairs(plans) do
+        if plan.cadreARanger then
+            resultats[i].cadre_a_ranger = true
+        end
         if cadreARecadrer(plan) then
             resultats[i].a_recadrer = true
             resultats[i].etape_ecrite = aDesChangements(plan)

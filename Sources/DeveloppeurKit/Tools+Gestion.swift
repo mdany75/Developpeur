@@ -165,7 +165,9 @@ extension ToolHandler {
             params["essai"] = true
             params.removeValue(forKey: "confirme")
         }
-        return Self.withLabels(try lightroom.send("copier", params, timeout: 240))
+        var notes: [JSONValue] = []
+        let reponse = rangerCadres(try lightroom.send("copier", params, timeout: 240), notes: &notes)
+        return Self.withLabels(reponse, notes: notes)
     }
 
     /// Libellés des changements d'une copie (copy_settings).

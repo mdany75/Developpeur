@@ -970,7 +970,9 @@ public final class Recette {
             }
             // Jamais vu au catalogue : Lightroom l'ajoute peut-être encore. Le fichier reste à sa place,
             // noté pour la recette suivante ; à la Corbeille, la tâche d'ajout de Lightroom se bloquerait.
-            if nouvelle == nil, erreurAttente == nil, let laisse = laisserEnAttente(fichier) {
+            // Au catalogue, pas encore empilé : la tâche d'ajout de Lightroom n'est pas finie ; retirer la
+            // photo ou jeter le fichier la bloquerait de même (constaté le 10 novembre 2026, 19 h 42).
+            if empilee == nil, erreurAttente == nil, let laisse = laisserEnAttente(fichier, auCatalogue: nouvelle != nil) {
                 try verifierEgal(try etat(id), depart)
                 throw Echec(description: laisse)
             }
@@ -991,14 +993,19 @@ public final class Recette {
         }
     }
 
-    /// Le TIFF jamais vu au catalogue : retiré du catalogue et mis à la Corbeille s'il y est arrivé
+    /// Le TIFF pas encore empilé (`auCatalogue`) : laissé tel quel, noté. Jamais vu au catalogue : retiré du catalogue et mis à la Corbeille s'il y est arrivé
     /// entre-temps (le retrait le dit), sinon laissé sur le disque et noté dans `fichiersEnAttente`.
     /// Rend le texte de l'échec ; nil (sans fichier de notes, ou notes illisibles en écriture) : le
     /// ménage habituel suit.
-    func laisserEnAttente(_ fichier: String) -> String? {
+    func laisserEnAttente(_ fichier: String, auCatalogue: Bool = false) -> String? {
         let nom = (fichier as NSString).lastPathComponent
         let minutes = Self.nombre(Self.attenteReimportation / 60)
         guard let fichiersEnAttente else { return nil }
+        if auCatalogue {
+            guard Self.noter(fichier, fichiersEnAttente) else { return nil }
+            return "\(nom) au catalogue, mais pas encore empilé avec l'original après \(minutes) min (Lightroom occupé) ; laissé tel quel "
+                + "pour que Lightroom finisse de l'ajouter, puis retiré du catalogue et mis à la Corbeille au début de la prochaine recette"
+        }
         if let retrait = try? tools.lightroom.send("retirerReimportees", ["chemins": [.string(fichier)]], timeout: 60),
            retrait["retires"]?.array?.contains(where: { $0.string == fichier }) == true {
             // Arrivé entre la dernière lecture et ce retrait : l'ajout est fini, la Corbeille ne gêne plus.
@@ -1009,9 +1016,7 @@ public final class Recette {
             return "\(nom) arrivé au catalogue après les \(minutes) min d'attente (Lightroom occupé), "
                 + "entre la dernière lecture et le retrait ; retiré du catalogue et mis à la Corbeille"
         }
-        var liste = Self.lireEnAttente(fichiersEnAttente)
-        if !liste.contains(fichier) { liste.append(fichier) }
-        guard Self.ecrireEnAttente(liste, fichiersEnAttente) else { return nil }
+        guard Self.noter(fichier, fichiersEnAttente) else { return nil }
         return "\(nom) pas encore au catalogue après \(minutes) min (Lightroom occupé) ; laissé à sa place pour que Lightroom "
             + "finisse de l'ajouter, puis retiré du catalogue et mis à la Corbeille au début de la prochaine recette"
     }
@@ -1024,6 +1029,12 @@ public final class Recette {
         guard !liste.isEmpty else { return }
         let restent = liste.filter { menageTiff($0).probleme != nil }
         _ = Self.ecrireEnAttente(restent, fichiersEnAttente)
+    }
+
+    static func noter(_ fichier: String, _ url: URL) -> Bool {
+        var liste = lireEnAttente(url)
+        if !liste.contains(fichier) { liste.append(fichier) }
+        return ecrireEnAttente(liste, url)
     }
 
     static func lireEnAttente(_ url: URL) -> [String] {

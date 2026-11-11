@@ -716,7 +716,13 @@ function S.Photo(id, reglages, meta, brut)
         if reglages.PerspectiveUpright ~= nil then
             self.uprightACalculer = true
         end
-        contraindre(self)
+        -- Constaté dans Lightroom Classic 16.0 (10 novembre 2026, copie JPEG d'Essais) : sous la
+        -- Projection, la case cochée fait rendre l'image resserrée, mais le cadre (CropLeft…) reste
+        -- rangé à 0 et 1 après toute écriture (cadre réécrit, case décochée puis recochée, rendus du
+        -- recalage) ; il n'est rangé qu'après une vignette du cache d'aperçus (requestJpegThumbnail).
+        if (tonumber(self.reglages.ReshapeAmount) or 0) == 0 then
+            contraindre(self)
+        end
         self.appliques[#self.appliques + 1] = { reglages = reglages, nom = nom }
     end
     -- Constaté dans Lightroom Classic 15.6 : editCount et lastEditTime (métadonnées brutes, des
@@ -1086,6 +1092,7 @@ function S.Photo(id, reglages, meta, brut)
     -- raison (photo.vignetteImpossible) ; avec S.vignettesDifferees, au prochain LrTasks.sleep ;
     -- photo.vignetteJamais : jamais de rappel. La taille demandée est un minimum.
     function photo:requestJpegThumbnail(largeur, hauteur, rappel)
+        contraindre(self)
         S.vignettesDemandees[#S.vignettesDemandees + 1] = { photo = self.localIdentifier, largeur = largeur, hauteur = hauteur }
         local requete = { photo = self }
         local function rendre()

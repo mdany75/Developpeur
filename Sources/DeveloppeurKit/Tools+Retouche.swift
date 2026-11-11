@@ -221,6 +221,7 @@ extension ToolHandler {
         // Une rotation attend que Lightroom ait tourné la photo.
         let delai: TimeInterval = develop["rotation"] != nil ? 300 : 180
         var reponse = recadrerApres(try lightroom.send("appliquer", params, timeout: delai), params, notes: &notes)
+        reponse = rangerCadres(reponse, notes: &notes)
         noterVersionLightroom(reponse)
         if let remarque = Self.remarqueLueur(develop["reglages"]?.object ?? [:], relatif: args.bool("relative") == true, reponse: reponse) {
             notes.append(.string(remarque))

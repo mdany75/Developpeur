@@ -176,6 +176,29 @@ final class Version18Tests: XCTestCase {
         XCTAssertEqual(fake.commands, ["etat"], "relue une fois avant le refus")
     }
 
+    /// Constaté le 10 novembre 2026 (recette de la 1.9) : sous la Projection, Lightroom ne range le
+    /// cadre resserré par « Contraindre le recadrage » qu'après une vignette du cache d'aperçus ; le
+    /// module signale la photo (cadre_a_ranger), le serveur la demande puis jette le fichier.
+    func testProjectionLeServeurFaitRangerLeCadre() throws {
+        let fichier = FileManager.default.temporaryDirectory.appendingPathComponent("vignette-\(UUID().uuidString).jpg")
+        FileManager.default.createFile(atPath: fichier.path, contents: Data([0xFF, 0xD8]))
+        fake.replies["etat"] = ["lightroom": "16.0"]
+        fake.replies["appliquer"] = ["resultats": [["photo": ["id": 7], "cadre_a_ranger": true, "changements": []]]]
+        fake.replies["vignettes"] = ["photos": [["id": 7, "vignette": .string(fichier.path)]]]
+        let result = call("apply_settings", ["photo_ids": [7], "settings": ["ReshapeAmount": 100]])
+        XCTAssertFalse(result.isError, result.text)
+        let vignettes = fake.calls.filter { $0.command == "vignettes" }
+        XCTAssertEqual(vignettes.count, 1, "une vignette, dans une autre commande que l'écriture")
+        XCTAssertEqual(vignettes.first?.params["photos"]?.array?.compactMap(\.int), [7])
+        XCTAssertFalse(result.text.contains("cadre_a_ranger"), result.text)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fichier.path), "vignette jetée")
+
+        fake.calls.removeAll()
+        fake.replies["appliquer"] = ["resultats": [["photo": ["id": 7], "changements": []]]]
+        _ = call("apply_settings", ["photo_ids": [7], "settings": ["Exposure2012": 0.1]])
+        XCTAssertFalse(fake.calls.contains { $0.command == "vignettes" }, "rien sans cadre à ranger")
+    }
+
     func testDescriptionsDisentLesNouveautes() throws {
         let definitions = tools.definitions
         let applique = try XCTUnwrap(definitions.first { $0["name"] == "apply_settings" }?["description"]?.string)
