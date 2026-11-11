@@ -88,6 +88,10 @@ public final class Recette {
             sequenceLiaison(pont)
             sequenceEcran()
         }
+        // Les TIFF laissés par la recette d'avant, retirés dès le début : retirer puis réimporter au
+        // même chemin à quelques secondes d'écart a bloqué l'ajout au catalogue (constaté le
+        // 10 novembre 2026, 20 h 46, Lightroom Classic 16.0).
+        menagePrecedent()
         if let raw { sequence("RAW \(raw)", id: raw, corps: sequenceRAW) }
         if let jpeg { sequence("JPEG \(jpeg)", id: jpeg, corps: sequenceJPEG) }
         if let flash { sequence("flash \(flash)", id: flash, corps: sequenceFlash) }
@@ -621,10 +625,12 @@ public final class Recette {
         try sequenceLivraison(id, photo)
         try sequenceVariantes(id, photo)
         try sequenceHDR(id, photo)
-        try sequenceLivraison25(id, photo)
         try sequenceRetoucheMasques(id, photo)
         // Lightroom Classic 16 (Recette+16.swift) : la Lueur et l'étalonnage d'un masque.
         try sequenceLightroom16(id, photo)
+        // En dernier : elle finit par le TIFF réimporté et empilé, que Lightroom peut mettre plusieurs
+        // minutes à empiler ; son échec ne doit pas faire sauter les séquences d'avant (1.9).
+        try sequenceLivraison25(id, photo)
     }
 
     /// Version 2.1 (pistes 2.3 et 2.4) : profil d'objectif choisi puis remis par défaut à
@@ -938,7 +944,6 @@ public final class Recette {
     /// la main. Quand export_photos échoue après le rendu, les fichiers que le module a inscrits
     /// pendant l'appel (retirerReimportees, lister) sont retirés de même.
     func etapeTiffReimporte(_ id: Int, _ photo: String, depart: Etat) throws {
-        menagePrecedent()
         try etape(photo, "TIFF réimporté, empilé avec l'original, puis retiré du catalogue et mis à la Corbeille") {
             let inscritsAvant = try? inscritsReimportes()
             let reponse: JSONValue

@@ -253,7 +253,8 @@ final class Recette16Tests: XCTestCase {
         XCTAssertEqual(centre.centre, 0.505, accuracy: 0.02)
     }
 
-    /// Les deux séquences appellent la recette de la 16, à la fin.
+    /// Les deux séquences appellent la recette de la 16 ; la séquence RAW finit par la livraison 2.5
+    /// (son TIFF réimporté peut tarder plusieurs minutes, et son échec ne doit rien faire sauter).
     func testLesSequencesRAWEtJPEGAppellentLaRecette16() throws {
         let racine = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: racine.appendingPathComponent("Sources/DeveloppeurKit/Recette.swift"), encoding: .utf8)
@@ -262,7 +263,9 @@ final class Recette16Tests: XCTestCase {
             let f = try XCTUnwrap(source.range(of: "\n    }\n", range: d.upperBound..<source.endIndex))
             return String(source[d.upperBound..<f.lowerBound])
         }
-        XCTAssertTrue(try corps("func sequenceRAW(").hasSuffix("try sequenceLightroom16(id, photo)"))
+        let raw = try corps("func sequenceRAW(")
+        XCTAssertTrue(raw.hasSuffix("try sequenceLivraison25(id, photo)"))
+        XCTAssertTrue(raw.contains("try sequenceLightroom16(id, photo)"))
         XCTAssertTrue(try corps("func sequenceJPEG(").hasSuffix("try etapeProjection(id, photo)"))
     }
 }
