@@ -1,6 +1,6 @@
 # Changements
 
-## Non publié
+## 1.9 — 2026-11-10
 
 ### Ajouté
 - **Ce que fait chaque invite, à votre goût** : dans Fichier › Gestionnaire de modules externes ›
@@ -78,6 +78,10 @@
   mis à la Corbeille pendant l'ajout, ce qui bloquait la tâche « Ajout de photos au catalogue »
   jusqu'à ce qu'on quitte Lightroom. Il reste à sa place, puis la recette suivante le retire du
   catalogue et le met à la Corbeille.
+
+### Après l'installation
+- Quittez et relancez Lightroom, puis Claude Desktop, et ouvrez une nouvelle session de Claude
+  Code.
 
 ## 1.8 — 2026-11-10
 
