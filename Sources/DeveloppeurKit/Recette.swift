@@ -106,6 +106,20 @@ public final class Recette {
         if let raw, let flash { try? sequenceExpositions(reference: raw, autre: flash) }
         // 1.4, les groupes de lumière (Recette+14.swift) : sur toutes les photos données, en lecture seule.
         try? sequenceLumiere([raw, jpeg, flash, xt20, portrait, mixte, horizon].compactMap { $0 })
+        menageFinal()
+    }
+
+    /// En dernier, plusieurs minutes après l'étape du TIFF : les TIFF notés, retirés du catalogue et
+    /// mis à la Corbeille ; ceux qui restent le sont au début de la recette suivante.
+    func menageFinal() {
+        guard let fichiersEnAttente, !Self.lireEnAttente(fichiersEnAttente).isEmpty else { return }
+        try? etape("fin", "TIFF de la recette retiré du catalogue et mis à la Corbeille") {
+            menagePrecedent()
+            let restent = Self.lireEnAttente(fichiersEnAttente)
+            try verifier(restent.isEmpty, "pas encore retirés, ils le seront au début de la prochaine recette : "
+                         + restent.map { ($0 as NSString).lastPathComponent }.joined(separator: ", "))
+            return "retiré et mis à la Corbeille"
+        }
     }
 
     // MARK: - Liaison et écran (vrai pont seulement)
@@ -981,6 +995,14 @@ public final class Recette {
             if empilee == nil, erreurAttente == nil, let laisse = laisserEnAttente(fichier, auCatalogue: nouvelle != nil) {
                 try verifierEgal(try etat(id), depart)
                 throw Echec(description: laisse)
+            }
+            // Empilé : Lightroom poursuit pourtant sa tâche d'ajout, et retirer la photo ou jeter le
+            // fichier à ce moment la bloque aussi (constaté le 10 novembre 2026, 21 h 20, 3 s après
+            // l'empilement). Laissé tel quel, noté : la fin de la recette le retire (menageFinal).
+            if empilee != nil, erreurAttente == nil, let fichiersEnAttente, Self.noter(fichier, fichiersEnAttente) {
+                try verifierEgal(try etat(id), depart)
+                return "\(nom) empilé (\(empilee?["photos"]?.int ?? 0) photos dans la pile) ; laissé le temps que Lightroom finisse de "
+                    + "l'ajouter, retiré du catalogue et mis à la Corbeille à la fin de la recette"
             }
             let menage = menageTiff(fichier)
             if let erreurAttente { throw Echec(description: "\(erreurAttente) ; " + menage.texte) }
