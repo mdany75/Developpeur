@@ -920,6 +920,8 @@ case "--recette":
     }
     // L'étape « écran nommé » lit l'écran du Mac (la recette n'en lit aucun par défaut).
     recette.lireEcran = Ecran.lire
+    recette.fichiersEnAttente = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/Developpeur/recette-tiff-en-attente.json")
     if let hauteurHorizon { recette.hauteurHorizon = hauteurHorizon }
     recette.lancer(raw: raw, jpeg: jpeg, flash: flash, profondeur: profondeur, yeuxRouges: yeuxRouges, xt20: xt20,
                    portrait: portrait, mixte: mixte, horizon: horizon)

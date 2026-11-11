@@ -61,6 +61,12 @@ public final class Recette {
         try FileManager.default.trashItem(at: URL(fileURLWithPath: chemin), resultingItemURL: nil)
     }
 
+    /// Les TIFF de la recette que Lightroom n'avait pas encore ajoutés au catalogue à la fin de
+    /// l'attente : laissés à leur place (les mettre à la Corbeille pendant l'ajout bloque la tâche
+    /// « Ajout de photos au catalogue » de Lightroom, constaté le 10 novembre 2026), notés ici, puis
+    /// retirés au début de la recette suivante. nil (tests, par défaut) : rien n'est noté sur le disque.
+    public var fichiersEnAttente: URL?
+
     public init(lightroom: LightroomServing, images: URL? = nil, originaux: Bool = false,
                 rapport: @escaping (Etape) -> Void = { _ in }) {
         tools = ToolHandler(lightroom: lightroom)
@@ -931,6 +937,7 @@ public final class Recette {
     /// la main. Quand export_photos échoue après le rendu, les fichiers que le module a inscrits
     /// pendant l'appel (retirerReimportees, lister) sont retirés de même.
     func etapeTiffReimporte(_ id: Int, _ photo: String, depart: Etat) throws {
+        menagePrecedent()
         try etape(photo, "TIFF réimporté, empilé avec l'original, puis retiré du catalogue et mis à la Corbeille") {
             let inscritsAvant = try? inscritsReimportes()
             let reponse: JSONValue
@@ -961,6 +968,12 @@ public final class Recette {
             } catch {
                 erreurAttente = error
             }
+            // Jamais vu au catalogue : Lightroom l'ajoute peut-être encore. Le fichier reste à sa place,
+            // noté pour la recette suivante ; à la Corbeille, la tâche d'ajout de Lightroom se bloquerait.
+            if nouvelle == nil, erreurAttente == nil, let laisse = laisserEnAttente(fichier) {
+                try verifierEgal(try etat(id), depart)
+                throw Echec(description: laisse)
+            }
             let menage = menageTiff(fichier)
             if let erreurAttente { throw Echec(description: "\(erreurAttente) ; " + menage.texte) }
             guard menage.probleme == nil else { throw Echec(description: "\(nom) : " + (menage.probleme ?? "")) }
@@ -976,6 +989,53 @@ public final class Recette {
             try verifier(empilee != nil, "\(nom) au catalogue, mais pas empilé avec l'original après \(minutes) min ; retiré et mis à la Corbeille")
             return "\(nom) empilé (\(empilee?["photos"]?.int ?? 0) photos dans la pile), puis retiré et mis à la Corbeille"
         }
+    }
+
+    /// Le TIFF jamais vu au catalogue : retiré du catalogue et mis à la Corbeille s'il y est arrivé
+    /// entre-temps (le retrait le dit), sinon laissé sur le disque et noté dans `fichiersEnAttente`.
+    /// Rend le texte de l'échec ; nil (sans fichier de notes, ou notes illisibles en écriture) : le
+    /// ménage habituel suit.
+    func laisserEnAttente(_ fichier: String) -> String? {
+        let nom = (fichier as NSString).lastPathComponent
+        let minutes = Self.nombre(Self.attenteReimportation / 60)
+        guard let fichiersEnAttente else { return nil }
+        if let retrait = try? tools.lightroom.send("retirerReimportees", ["chemins": [.string(fichier)]], timeout: 60),
+           retrait["retires"]?.array?.contains(where: { $0.string == fichier }) == true {
+            // Arrivé entre la dernière lecture et ce retrait : l'ajout est fini, la Corbeille ne gêne plus.
+            do { try corbeille(fichier) } catch {
+                return "\(nom) arrivé au catalogue après les \(minutes) min d'attente, retiré du catalogue, mais pas mis à la Corbeille "
+                    + "(\(error.localizedDescription)) : mettre « \(fichier) » à la Corbeille à la main"
+            }
+            return "\(nom) arrivé au catalogue après les \(minutes) min d'attente (Lightroom occupé), "
+                + "entre la dernière lecture et le retrait ; retiré du catalogue et mis à la Corbeille"
+        }
+        var liste = Self.lireEnAttente(fichiersEnAttente)
+        if !liste.contains(fichier) { liste.append(fichier) }
+        guard Self.ecrireEnAttente(liste, fichiersEnAttente) else { return nil }
+        return "\(nom) pas encore au catalogue après \(minutes) min (Lightroom occupé) ; laissé à sa place pour que Lightroom "
+            + "finisse de l'ajouter, puis retiré du catalogue et mis à la Corbeille au début de la prochaine recette"
+    }
+
+    /// Les TIFF laissés par une recette précédente : retirés du catalogue, puis à la Corbeille. Ceux
+    /// dont le ménage échoue restent notés.
+    func menagePrecedent() {
+        guard let fichiersEnAttente else { return }
+        let liste = Self.lireEnAttente(fichiersEnAttente)
+        guard !liste.isEmpty else { return }
+        let restent = liste.filter { menageTiff($0).probleme != nil }
+        _ = Self.ecrireEnAttente(restent, fichiersEnAttente)
+    }
+
+    static func lireEnAttente(_ url: URL) -> [String] {
+        guard let data = try? Data(contentsOf: url), let liste = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return liste
+    }
+
+    static func ecrireEnAttente(_ liste: [String], _ url: URL) -> Bool {
+        if liste.isEmpty { try? FileManager.default.removeItem(at: url); return true }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard let data = try? JSONEncoder().encode(liste) else { return false }
+        return (try? data.write(to: url, options: .atomic)) != nil
     }
 
     /// Les chemins que le module a inscrits comme réimportés par lui (retirerReimportees, lister).

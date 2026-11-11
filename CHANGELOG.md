@@ -73,6 +73,12 @@
   messages reprend sa place. Le fichier de vos demandes déjà gardées (`mes-demandes.json`) n'est
   ni lu ni effacé : il reste sur le disque, et seul `uninstall.sh --tout` le retire, avec le reste.
 
+### Corrigé
+- **Recette** : un TIFF que Lightroom, très occupé, n'a pas encore ajouté au catalogue n'est plus
+  mis à la Corbeille pendant l'ajout, ce qui bloquait la tâche « Ajout de photos au catalogue »
+  jusqu'à ce qu'on quitte Lightroom. Il reste à sa place, puis la recette suivante le retire du
+  catalogue et le met à la Corbeille.
+
 ## 1.8 — 2026-11-10
 
 La 1.8 suit Lightroom Classic 16 : Développeur y a été vérifié en entier (recette de 88 étapes

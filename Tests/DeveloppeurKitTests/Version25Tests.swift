@@ -358,6 +358,45 @@ final class Version25Tests: XCTestCase {
         XCTAssertEqual(corbeille.chemins, chemins)
     }
 
+    /// Constaté le 10 novembre 2026 : le TIFF mis à la Corbeille pendant que Lightroom l'ajoutait
+    /// encore au catalogue a bloqué la tâche « Ajout de photos au catalogue » près de deux heures.
+    /// Jamais vu au catalogue : il reste à sa place, noté, et la recette suivante le retire.
+    func testRecetteLeavesANotYetImportedTiffAndCleansItUpNextTime() throws {
+        let notes = FileManager.default.temporaryDirectory.appendingPathComponent("recette-en-attente-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: notes) }
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { _ in ["photos": []] },
+                                                        retrait: { ["retires": [], "pas_au_catalogue": [.string($0)]] })
+        recette.fichiersEnAttente = notes
+        let depart = try recette.etat(5)
+        XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
+        let detail = recette.etapes.last?.detail ?? ""
+        XCTAssertTrue(detail.contains("laissé à sa place"), detail)
+        XCTAssertEqual(corbeille.chemins, [], "jamais à la Corbeille pendant que Lightroom peut encore l'ajouter")
+        XCTAssertEqual(Recette.lireEnAttente(notes), chemins)
+
+        // Recette suivante : le fichier est arrivé, il est retiré puis mis à la Corbeille, la note s'efface.
+        let (suivante, _, corbeille2) = recetteTiff(chercher: { _ in ["photos": []] }, retrait: retire)
+        suivante.fichiersEnAttente = notes
+        suivante.menagePrecedent()
+        XCTAssertEqual(corbeille2.chemins, chemins)
+        XCTAssertEqual(Recette.lireEnAttente(notes), [])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: notes.path))
+    }
+
+    /// Arrivé entre la dernière lecture et le retrait : l'ajout est fini, le fichier va à la Corbeille.
+    func testRecetteTrashesTheTiffThatArrivedJustBeforeBeingLeft() throws {
+        let notes = FileManager.default.temporaryDirectory.appendingPathComponent("recette-en-attente-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: notes) }
+        let (recette, chemins, corbeille) = recetteTiff(chercher: { _ in ["photos": []] }, retrait: retire)
+        recette.fichiersEnAttente = notes
+        let depart = try recette.etat(5)
+        XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
+        let detail = recette.etapes.last?.detail ?? ""
+        XCTAssertTrue(detail.contains("arrivé au catalogue après les 2 min d'attente"), detail)
+        XCTAssertEqual(corbeille.chemins, chemins)
+        XCTAssertEqual(Recette.lireEnAttente(notes), [])
+    }
+
     /// export_photos échoue après le rendu (délai, réponse perdue) : le fichier que le module a
     /// inscrit pendant l'appel est retiré du catalogue et mis à la Corbeille ; un fichier inscrit
     /// avant l'appel n'est jamais touché.
