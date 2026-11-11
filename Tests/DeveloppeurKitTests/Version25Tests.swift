@@ -305,9 +305,9 @@ final class Version25Tests: XCTestCase {
         let depart = try recette.etat(5)
         XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
         let detail = recette.etapes.last?.detail ?? ""
-        XCTAssertTrue(detail.contains("pas encore au catalogue après 2 min"), detail)
+        XCTAssertTrue(detail.contains("pas encore au catalogue après 5 min"), detail)
         XCTAssertTrue(detail.contains("le retirer du catalogue à la main s'il apparaît"), detail)
-        XCTAssertEqual(fake.calls.filter { $0.command == "chercher" }.count, 25, "deux minutes, toutes les 5 s")
+        XCTAssertEqual(fake.calls.filter { $0.command == "chercher" }.count, 61, "cinq minutes, toutes les 5 s")
         XCTAssertEqual(retraits(), [chemins])
         XCTAssertEqual(corbeille.chemins, chemins, "pas au catalogue : le fichier va quand même à la Corbeille")
     }
@@ -352,7 +352,7 @@ final class Version25Tests: XCTestCase {
         let depart = try recette.etat(5)
         XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
         let detail = recette.etapes.last?.detail ?? ""
-        XCTAssertTrue(detail.contains("arrivé au catalogue après les 2 min d'attente"), detail)
+        XCTAssertTrue(detail.contains("arrivé au catalogue après les 5 min d'attente"), detail)
         XCTAssertTrue(detail.contains("retiré du catalogue et mis à la Corbeille"), detail)
         XCTAssertFalse(detail.contains("pas encore au catalogue"), detail)
         XCTAssertEqual(corbeille.chemins, chemins)
@@ -408,7 +408,7 @@ final class Version25Tests: XCTestCase {
         let depart = try recette.etat(5)
         XCTAssertThrowsError(try recette.etapeTiffReimporte(5, "RAW 5", depart: depart))
         let detail = recette.etapes.last?.detail ?? ""
-        XCTAssertTrue(detail.contains("arrivé au catalogue après les 2 min d'attente"), detail)
+        XCTAssertTrue(detail.contains("arrivé au catalogue après les 5 min d'attente"), detail)
         XCTAssertEqual(corbeille.chemins, chemins)
         XCTAssertEqual(Recette.lireEnAttente(notes), [])
     }

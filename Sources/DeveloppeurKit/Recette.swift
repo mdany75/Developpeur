@@ -925,8 +925,9 @@ public final class Recette {
 
     /// Attente de la photo réimportée et empilée (find_photos répété) : Lightroom, très occupé,
     /// l'ajoute au catalogue et l'empile bien après la réponse d'export_photos (constaté le
-    /// 10 novembre 2026, Lightroom Classic 16.0, pendant un tri assisté de 20 000 photos).
-    static let attenteReimportation: TimeInterval = 120
+    /// 10 novembre 2026, Lightroom Classic 16.0, pendant un tri assisté de 20 000 photos ; puis le
+    /// soir, sans tri, empilé en 3 min environ dans une pile de 25 photos : 5 min d'attente).
+    static let attenteReimportation: TimeInterval = 300
     static let pauseReimportation: TimeInterval = 5
 
     /// TIFF réimporté et empilé avec l'original, puis retiré du catalogue et mis à la Corbeille.
