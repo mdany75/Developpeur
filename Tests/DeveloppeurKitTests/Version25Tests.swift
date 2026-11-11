@@ -399,6 +399,28 @@ final class Version25Tests: XCTestCase {
         XCTAssertEqual(Recette.lireEnAttente(notes), chemins)
     }
 
+    /// Constaté le 10 novembre 2026 : après une relance de Lightroom, le module refuse de retirer un
+    /// fichier qu'il n'a pas réimporté dans cette session. Pas au catalogue : à la Corbeille, note
+    /// effacée ; au catalogue : laissé, toujours noté.
+    func testRecetteTrashesANotedTiffAbsentFromTheCatalogueAfterARelaunch() throws {
+        let notes = FileManager.default.temporaryDirectory.appendingPathComponent("recette-en-attente-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: notes) }
+        let refus: (String) throws -> JSONValue = { _ in throw LightroomError.plugin("n'a pas été réimporté par Claude dans cette session") }
+        let (absente, chemins, corbeille) = recetteTiff(chercher: { _ in ["photos": []] }, retrait: refus)
+        XCTAssertTrue(Recette.ecrireEnAttente(chemins, notes))
+        absente.fichiersEnAttente = notes
+        absente.menagePrecedent()
+        XCTAssertEqual(corbeille.chemins, chemins)
+        XCTAssertEqual(Recette.lireEnAttente(notes), [])
+
+        let (presente, _, corbeille2) = recetteTiff(chercher: { _ in ["photos": [["id": 901, "fichier": "DSCF2402.tif"]]] }, retrait: refus)
+        XCTAssertTrue(Recette.ecrireEnAttente(chemins, notes))
+        presente.fichiersEnAttente = notes
+        presente.menagePrecedent()
+        XCTAssertEqual(corbeille2.chemins, [], "au catalogue : jamais jeté")
+        XCTAssertEqual(Recette.lireEnAttente(notes), chemins)
+    }
+
     /// Arrivé entre la dernière lecture et le retrait : l'ajout est fini, le fichier va à la Corbeille.
     func testRecetteTrashesTheTiffThatArrivedJustBeforeBeingLeft() throws {
         let notes = FileManager.default.temporaryDirectory.appendingPathComponent("recette-en-attente-\(UUID().uuidString).json")

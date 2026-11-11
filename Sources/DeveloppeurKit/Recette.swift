@@ -1033,8 +1033,23 @@ public final class Recette {
         guard let fichiersEnAttente else { return }
         let liste = Self.lireEnAttente(fichiersEnAttente)
         guard !liste.isEmpty else { return }
-        let restent = liste.filter { menageTiff($0).probleme != nil }
+        let restent = liste.filter { chemin in
+            guard menageTiff(chemin).probleme != nil else { return false }
+            // Le module ne retire que ce qu'il a réimporté depuis le lancement de Lightroom (constaté
+            // le 10 novembre 2026 après une relance) : un fichier noté qui n'est pas au catalogue va
+            // seul à la Corbeille ; au catalogue, il reste noté.
+            guard !auCatalogue(chemin) else { return true }
+            return (try? corbeille(chemin)) == nil
+        }
         _ = Self.ecrireEnAttente(restent, fichiersEnAttente)
+    }
+
+    /// Le fichier est-il au catalogue (find_photos dans son dossier) ? Dans le doute, oui.
+    func auCatalogue(_ chemin: String) -> Bool {
+        let nom = (chemin as NSString).lastPathComponent
+        guard let (trouve, _) = try? appel("find_photos", ["folder": .string((chemin as NSString).deletingLastPathComponent),
+                                                           "text": .string((nom as NSString).deletingPathExtension), "limit": 20]) else { return true }
+        return (trouve["photos"]?.array ?? []).contains { $0["fichier"]?.string == nom }
     }
 
     static func noter(_ fichier: String, _ url: URL) -> Bool {
