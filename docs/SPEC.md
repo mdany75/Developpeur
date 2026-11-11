@@ -75,7 +75,7 @@ défait ensuite.
 
 **Passants (après la 1.9)**
 
-- Suppression des passants (`remove_distractions` avec `people`, `Suppression.lua`) jamais encore lancée par un module : à constater sur une copie d'Essais remise à l'origine avec des passants, puis défaite — le nom exact du filtre rangé dans `FilterList` (supposé `remove_people`) et ce que rend `hasFilterWithName('remove_people')` ; si `countAllSpots('distractingPeopleRemoval')` compte les passants détectés (sinon le module réessaie la suppression toutes les 5 s) ; la durée de la détection et de la suppression ; si le rappel vient aussi quand Dany annule dans la fenêtre de progression ; si `resetFilterWithName('remove_people')` retire la suppression (sinon le module réécrit `FilterList` sans ce filtre) ; le message d'un refus du service génératif d'Adobe (hors ligne) — à la main dans Lightroom ([Suppression des passants](#suppression-des-passants-supprimer-avec-personnes-remove_distractions-avec-people)).
+- Suppression des passants (`remove_distractions` avec `people`, `Suppression.lua`) jamais encore lancée par un module : à constater sur une copie d'Essais remise à l'origine avec des passants, puis défaite — le nom exact du filtre rangé dans `FilterList` (supposé `remove_people`) et ce que rend `hasFilterWithName('remove_people')` ; si `countAllSpots('distractingPeopleRemoval')` compte les passants détectés (sinon le module attend 20 s, puis réessaie la suppression toutes les 5 s), et s'il les compte au fil de l'eau ou d'un coup à la fin ; la durée de la détection (régler `ATTENTE_SANS_COMPTE` 20 s, `DUREE_ZERO` 15 s et `DUREE_STABLE` 2 s d'après elle) et de la suppression (au-delà de 4 min, l'étape reste « en cours ») ; le nom que le module a gardé dans l'étape (`Suppression.filtre`) ; si le rappel vient aussi quand Dany annule dans la fenêtre de progression ; si `resetFilterWithName('remove_people')` retire la suppression (sinon le module réécrit `FilterList` sans ce filtre) ; le message d'un refus du service génératif d'Adobe (hors ligne) — à la main dans Lightroom ([Suppression des passants](#suppression-des-passants-supprimer-avec-personnes-remove_distractions-avec-people)).
 
 **Retouche générative : choix du modèle (1.9)**
 
@@ -4969,33 +4969,50 @@ prochaine recette](#à-vérifier-à-la-prochaine-recette), Passants.
   reflets et de la poussière ; il refuse avant Lightroom Classic 16.0 (version lue par `etat`,
   `verifierVersion`), et le module aussi (`LrApplication.versionString`), ainsi que sans
   `detectDistractingPeople` ou `applyRemovalOnDetectedDistractingPeople` (« à la main :
-  Développement › Supprimer › Personnes »). L'original est exigé (`Photos.exigerOriginal`).
+  Développement › Supprimer › Personnes »). L'original est exigé pour retirer les passants
+  (`Photos.exigerOriginal`), pas pour les rendre (un filtre retiré, rien de calculé).
 - Comme les reflets : photo affichée dans le module Développement (`afficherEnDeveloppement`), un
   seul traitement calculé à la fois (`avecVerrou`), hors de `withWriteAccessDo`, outil d'avant et
   vue d'avant remis. `goToRemove`, puis `detectDistractingPeople` ; la détection est attendue par
-  `countAllSpots('distractingPeopleRemoval')`, le même nombre deux lectures de suite au-dessus de
-  0 ; sans compte lisible (ou à 0), `applyRemovalOnDetectedDistractingPeople` est réessayé toutes
-  les 5 s tant que Lightroom répond « No distracting people spots are present for removal. »,
-  une minute au plus (`Suppression.DUREE_DETECTION`). « Detected distracting people are already
-  removed. » : rien à refaire. Puis la fin est attendue (le rappel ou le filtre rangé, deux
-  lectures de suite), quatre minutes au plus (`Suppression.DUREE_PERSONNES`) ; le rappel sans
-  filtre dix secondes après : annulée dans la fenêtre de progression ou refusée par le service
-  d'Adobe, dit en remarque.
-- Le filtre des passants se reconnaît par son nom `remove_people` (relevé dans le code) ou par un
-  nom ou un titre qui contient « people » (`Suppression.filtrePersonnes`).
-- La mémoire : `Suppression = {personnes}` dans l'étape (changement `Suppression.personnes`,
-  « présents » → « retirés ») ; dans `avantClaude`, la clé `Suppression` réunit `reflets`,
-  `intensite` et `personnes`, chacun gardé à sa première étape. Rien de changé : la mémoire est
-  remise comme avant et la réponse ne porte pas d'étape.
+  `countAllSpots('distractingPeopleRemoval')` : un nombre au-dessus de 0 inchangé pendant 2 s
+  (`Suppression.DUREE_STABLE`), ou resté à 0 pendant 15 s (`Suppression.DUREE_ZERO` : aucun
+  passant, réponse bien avant les 50 s de la file d'outils). Sans compte lisible, le premier essai
+  de `applyRemovalOnDetectedDistractingPeople` attend 20 s (`Suppression.ATTENTE_SANS_COMPTE` :
+  une détection pas finie n'en retirerait qu'une partie, puis Lightroom dirait « already
+  removed »), puis il est réessayé toutes les 5 s tant que Lightroom répond « No distracting people
+  spots are present for removal. », une minute au plus (`Suppression.DUREE_DETECTION`). « Detected
+  distracting people are already removed. » : rien à refaire. Puis la fin est attendue : un filtre
+  ajouté à `FilterList` (quel que soit son nom, hors débruitage, reflets et poussière), avec le
+  rappel, ou deux lectures de suite sans lui ; quatre minutes au plus
+  (`Suppression.DUREE_PERSONNES`) ; le rappel sans filtre dix secondes après : annulée dans la
+  fenêtre de progression ou refusée par le service d'Adobe, dit en remarque. Délai dépassé : la
+  suppression peut encore arriver, l'étape est donc gardée (changement « présents » → « en
+  cours ») et `undo_last` la retirera.
+- Le filtre des passants se reconnaît par son nom `remove_people` (relevé dans le code), par un
+  nom ou un titre qui contient « people », par un nom déjà vu dans ce processus, ou par ce que la
+  mémoire en garde (`Suppression.filtrePersonnes(reglages, garde)`) : `filtre`, le nom rangé par
+  Lightroom, et `filtres`, les noms des filtres d'avant la suppression (un filtre ajouté depuis,
+  hors débruitage, reflets et poussière, est celui des passants).
+- La mémoire : `Suppression = {personnes, filtres, filtre}` dans l'étape (changement
+  `Suppression.personnes`, « présents » → « retirés ») ; dans `avantClaude`, la clé `Suppression`
+  réunit `reflets`, `intensite`, `personnes` et ses `filtres` et `filtre`, chacun gardé à sa
+  première étape. Rien de changé : la mémoire est remise comme avant et la réponse ne porte pas
+  d'étape. Annuler un retour des passants (`people = false`) relance la suppression : nouveau
+  résultat génératif, dit dans la remarque et la description de `people`.
 - Annuler et revenir (`Annulation.remettreCalcules`, `Suppression.remettre`) : les reflets puis les
   passants. Rendre les passants : `resetFilterWithName('remove_people')`, attendu dix secondes,
   sinon `FilterList` réécrite sans ce filtre (écriture ordinaire, les autres filtres gardés). Les
   remettre : la détection et la suppression de nouveau. Une photo sans filtre des passants ne
-  demande rien à Lightroom (une version d'avant la 16 comprise).
+  demande rien à Lightroom (une version d'avant la 16 comprise). Les passants à remettre vérifient
+  leur version et leurs fonctions (`controleurPersonnes`) même quand les reflets sont remis aussi.
 - La simulation de la liaison imite `detectDistractingPeople`, `countAllSpots`,
   `applyRemovalOnDetectedDistractingPeople` (ses deux refus) et le filtre `remove_people`, avec la
-  version de Lightroom (`S.versionLightroom`), un compte illisible, une suppression annulée et un
-  `resetFilterWithName` sans effet (`tests.lua`, « supprimer : passants… »).
+  version de Lightroom (`S.versionLightroom`), un compte illisible, une détection au fil de l'eau
+  (`S.detectionPartielle`), un filtre au nom inattendu (`S.nomFiltrePersonnes`), une suppression
+  plus longue que le délai, une suppression annulée et un `resetFilterWithName` sans effet
+  (`tests.lua`, « supprimer : passants… », « filtre des passants au nom inattendu », « encore en
+  cours après le délai », « détection au fil de l'eau », « compte lisible resté à 0 », « rendus
+  sans l'original »).
 
 ## Aperçus et masques IA
 

@@ -106,7 +106,7 @@ CLAUDE.md principal, qui garde les règles communes à tout le projet. Le détai
 ## Réglages, profils et calculs IA
 
 Avant de toucher à l'écriture des réglages, aux profils, aux masques, au débruitage, aux reflets,
-aux variantes ou aux instantanés : lire `docs/regles/module-reglages-et-traitements.md`.
+aux passants, aux variantes ou aux instantanés : lire `docs/regles/module-reglages-et-traitements.md`.
 Les pièges :
 
 - Ce qui revient du JSON passe par `pourLightroom` avant `applyDevelopSettings` : une table qui

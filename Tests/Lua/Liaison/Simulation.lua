@@ -1964,6 +1964,11 @@ function S.avancerAmeliorations()
     for _, photo in pairs(S.photos) do
         if photo.detectionPersonnes then
             photo.detectionPersonnes = photo.detectionPersonnes - 1
+            -- Détection au fil de l'eau (S.detectionPartielle) : une partie des passants comptée
+            -- avant la fin.
+            if S.detectionPartielle and photo.detectionPersonnes > 0 then
+                photo.personnesDetectees = S.detectionPartielle
+            end
             if photo.detectionPersonnes <= 0 then
                 photo.detectionPersonnes = nil
                 photo.personnesDetectees = photo.passants or 0
@@ -1979,8 +1984,8 @@ function S.avancerAmeliorations()
                     for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
                         filtres[#filtres + 1] = filtre
                     end
-                    filtres[#filtres + 1] = { Name = 'remove_people', FilterID = 7,
-                        Title = '$$$/CRaw/Filter/DistractionRemoval/People=People Removal',
+                    filtres[#filtres + 1] = { Name = S.nomFiltrePersonnes, FilterID = 7,
+                        Title = S.titreFiltrePersonnes,
                         CompressedSettings = 'passants ' .. tostring(photo.personnesDetectees) }
                     photo.reglages.FilterList = { Filters = filtres }
                     photo.reglages.EnableDistractionRemoval = true
@@ -2083,7 +2088,7 @@ local controleur = {
         elseif nom == 'remove_people' and not S.resetPersonnesIgnore then
             local filtres = {}
             for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
-                if filtre.Name ~= 'remove_people' then
+                if filtre.FilterID ~= 7 then
                     filtres[#filtres + 1] = filtre
                 end
             end
@@ -2123,7 +2128,7 @@ local controleur = {
             error("this operation can be executed only when Remove-tool is opened in Develop module", 0)
         end
         for _, filtre in ipairs((photo.reglages.FilterList or {}).Filters or {}) do
-            if filtre.Name == 'remove_people' then
+            if filtre.FilterID == 7 then
                 error("Detected distracting people are already removed.", 0)
             end
         end
@@ -2749,8 +2754,13 @@ function S.reinitialiser()
     S.appelsReflets = {}
     -- Passants (Lightroom Classic 16) : détection (S.dureeDetection attentes), puis suppression
     -- (S.dureePersonnes attentes) ; S.compteIllisible : countAllSpots en erreur ;
-    -- S.resetPersonnesIgnore : resetFilterWithName sans effet sur le filtre des passants.
+    -- S.resetPersonnesIgnore : resetFilterWithName sans effet sur le filtre des passants ;
+    -- S.detectionPartielle : passants comptés pendant la détection ; S.nomFiltrePersonnes et
+    -- S.titreFiltrePersonnes : le filtre rangé (FilterID 7 ; son vrai nom reste à constater).
     S.appelsPersonnes = {}
+    S.detectionPartielle = nil
+    S.nomFiltrePersonnes = 'remove_people'
+    S.titreFiltrePersonnes = '$$$/CRaw/Filter/DistractionRemoval/People=People Removal'
     S.versionLightroom = nil
     S.dureeDetection = 4
     S.dureePersonnes = 3

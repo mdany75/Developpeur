@@ -17,8 +17,8 @@
 --     amount, quality, enabled (pleine qualité), isSupported ; getSelectedTool, selectTool.
 -- Comme le débruitage, ces fonctions agissent sur la photo affichée dans le module Développement
 -- (Amelioration.afficherEnDeveloppement), hors de withWriteAccessDo. L'état d'avant va dans la
--- mémoire sous la clé Suppression ({reflets, intensite} et {personnes}), qui n'est pas un
--- réglage, écrite avant le calcul.
+-- mémoire sous la clé Suppression ({reflets, intensite} et {personnes, filtre, filtres}), qui
+-- n'est pas un réglage, écrite avant le calcul.
 --
 -- Passants (relevé dans le code de Lightroom Classic 16.0, rien encore constaté par un module :
 -- lectures défensives ; voir docs/SPEC.md, Passants) :
@@ -28,7 +28,9 @@
 --   applyRemovalOnDetectedDistractingPeople(rappel, argument) refuse « Detected distracting people
 --     are already removed. » ou « No distracting people spots are present for removal. », sinon
 --     lance la suppression en arrière-plan (fenêtre de progression annulable) et appelle
---     rappel(argument) à la fin ; le résultat est un filtre remove_people de FilterList (supposé).
+--     rappel(argument) à la fin ; le résultat est un filtre remove_people de FilterList (supposé :
+--     le module tient pour fait tout filtre ajouté hors débruitage, reflets et poussière, et garde
+--     son nom, filtre, et les noms d'avant, filtres, pour le retirer à l'annulation).
 
 local LrApplication = import 'LrApplication'
 local LrDate = import 'LrDate'
@@ -276,8 +278,14 @@ Suppression.VERSION_PERSONNES = 16
 Suppression.DUREE_DETECTION = 60     -- secondes d'attente de la détection au plus
 Suppression.DUREE_PERSONNES = 240    -- secondes de suppression au plus
 Suppression.ESSAI_SANS_COMPTE = 5    -- secondes entre deux essais quand le compte ne se lit pas
+Suppression.ATTENTE_SANS_COMPTE = 20 -- secondes avant le premier essai quand le compte ne se lit pas
+Suppression.DUREE_ZERO = 15          -- secondes d'un compte lisible resté à 0 : aucun passant
+Suppression.DUREE_STABLE = 2         -- secondes d'un compte de passants inchangé : détection finie
 local DEJA_RETIRES = 'already removed'
 local AUCUN_PASSANT = 'No distracting people'
+
+-- Noms de filtre des passants vus dans ce processus (le nom exact reste à constater).
+local nomsAppris = {}
 
 -- Le module LrDevelopController, s'il offre la suppression des passants (Lightroom Classic 16.0 ou
 -- plus récent, et ses deux fonctions).
@@ -296,15 +304,38 @@ local function controleurPersonnes()
     return module
 end
 
+-- Un filtre connu qui n'est pas celui des passants : débruitage (Enhance), reflets, poussière.
+local function autreFiltre(filtre)
+    local id = tonumber(filtre.FilterID)
+    return filtre.Name == 'Enhance' or filtre.Name == 'Reflections' or filtre.Name == Locaux.NOM_POUSSIERE
+        or id == 1 or id == 3 or id == 6
+        or tostring(filtre.Title or ''):find('ReflectionRemoval', 1, true) ~= nil
+end
+
+local function dansListe(liste, nom)
+    for _, element in ipairs(type(liste) == 'table' and liste or {}) do
+        if element == nom then
+            return true
+        end
+    end
+    return false
+end
+
 -- Le filtre des passants dans FilterList, ou nil. Son nom exact reste à constater : remove_people
--- (relevé dans le code), ou un nom ou un titre qui parle de personnes.
-function Suppression.filtrePersonnes(reglages)
+-- (relevé dans le code), un nom ou un titre qui parle de personnes, un nom déjà vu, ou ce que la
+-- mémoire en garde (garde) : filtre, le nom rangé par Lightroom ; filtres, les noms des filtres
+-- d'avant la suppression (un filtre ajouté depuis, hors débruitage, reflets et poussière).
+function Suppression.filtrePersonnes(reglages, garde)
     local liste = type(reglages) == 'table' and type(reglages.FilterList) == 'table' and reglages.FilterList.Filters
+    garde = type(garde) == 'table' and garde or {}
     for _, filtre in ipairs(type(liste) == 'table' and liste or {}) do
         if type(filtre) == 'table' then
-            local nom = tostring(filtre.Name or ''):lower()
+            local brut = tostring(filtre.Name or '')
+            local nom = brut:lower()
             local titre = tostring(filtre.Title or ''):lower()
-            if nom == Suppression.FILTRE_PERSONNES or nom:find('people', 1, true) or titre:find('people', 1, true) then
+            if nom == Suppression.FILTRE_PERSONNES or nom:find('people', 1, true) or titre:find('people', 1, true)
+                or nomsAppris[brut] or (garde.filtre ~= nil and brut == garde.filtre)
+                or (type(garde.filtres) == 'table' and not dansListe(garde.filtres, brut) and not autreFiltre(filtre)) then
                 return filtre
             end
         end
@@ -313,11 +344,11 @@ function Suppression.filtrePersonnes(reglages)
 end
 
 -- FilterList sans le filtre des passants, les autres filtres (débruitage, reflets…) gardés.
-function Suppression.sansPersonnes(filterList)
+function Suppression.sansPersonnes(filterList, garde)
     local filtres = {}
     local liste = type(filterList) == 'table' and filterList.Filters
     for _, filtre in ipairs(type(liste) == 'table' and liste or {}) do
-        if not Suppression.filtrePersonnes({ FilterList = { Filters = { filtre } } }) then
+        if not Suppression.filtrePersonnes({ FilterList = { Filters = { filtre } } }, garde) then
             filtres[#filtres + 1] = pourLightroom(filtre)
         end
     end
@@ -327,9 +358,49 @@ function Suppression.sansPersonnes(filterList)
     return { Filters = filtres }
 end
 
+-- Noms des filtres d'une liste FilterList (tableau neuf).
+local function nomsFiltres(filterList)
+    local noms = {}
+    local liste = type(filterList) == 'table' and filterList.Filters
+    for _, filtre in ipairs(type(liste) == 'table' and liste or {}) do
+        if type(filtre) == 'table' and filtre.Name ~= nil then
+            noms[#noms + 1] = tostring(filtre.Name)
+        end
+    end
+    return noms
+end
+
+-- Le filtre ajouté à FilterList depuis `noms` (les noms d'avant), hors des filtres connus, ou nil.
+local function filtreAjoute(filterList, noms)
+    local liste = type(filterList) == 'table' and filterList.Filters
+    for _, filtre in ipairs(type(liste) == 'table' and liste or {}) do
+        if type(filtre) == 'table' and not dansListe(noms, tostring(filtre.Name or '')) and not autreFiltre(filtre) then
+            return filtre
+        end
+    end
+    return nil
+end
+
+-- Ce que la mémoire garde du filtre des passants de la photo : l'étape la plus récente qui en
+-- parle, sinon l'état d'avant Claude.
+local function gardeMemoire(photo)
+    local etapes = lireJson(photo, 'etapesClaude', {})
+    for i = #etapes, 1, -1 do
+        local s = type(etapes[i]) == 'table' and type(etapes[i].avant) == 'table' and etapes[i].avant.Suppression
+        if type(s) == 'table' and (s.filtre ~= nil or type(s.filtres) == 'table') then
+            return { filtre = s.filtre, filtres = s.filtres }
+        end
+    end
+    local s = lireJson(photo, 'avantClaude', {}).Suppression
+    if type(s) == 'table' then
+        return { filtre = s.filtre, filtres = s.filtres }
+    end
+    return nil
+end
+
 -- État des passants de la photo affichée : retirés ou non.
-local function etatPersonnes(photo, dc)
-    if Suppression.filtrePersonnes(photo:getDevelopSettings()) then
+local function etatPersonnes(photo, dc, garde)
+    if Suppression.filtrePersonnes(photo:getDevelopSettings(), garde) then
         return { actif = true }
     end
     if type(dc.hasFilterWithName) == 'function' then
@@ -379,9 +450,10 @@ local function appliquerPersonnes(dc, fin)
 end
 
 -- Détection puis suppression des passants sur la photo affichée, outil Supprimer ouvert. Renvoie
--- {fait, raison, lance, deja, aucun, detectes}.
-local function lancerPersonnes(photo, dc)
+-- {fait, filtre (nom rangé), enCours, raison, lance, deja, aucun, detectes}.
+local function lancerPersonnes(photo, dc, garde)
     local filtresAvant = pourLightroom(photo:getDevelopSettings().FilterList)
+    local nomsAvant = nomsFiltres(filtresAvant)
     local ok, erreur = LrTasks.pcall(dc.goToRemove)
     if ok then
         ok, erreur = LrTasks.pcall(dc.detectDistractingPeople)
@@ -389,23 +461,33 @@ local function lancerPersonnes(photo, dc)
     if not ok then
         return { raison = "Lightroom refuse la détection des passants : " .. (tostring(Liaison.messageErreur(erreur)):gsub('%.+$', '')) }
     end
-    -- Détection en arrière-plan, sans rappel : le compte des passants, stable deux fois de suite ;
-    -- sans compte (ou à 0), la suppression réessayée tant que Lightroom dit n'en voir aucun.
+    -- Détection en arrière-plan, sans rappel. Compte lisible : un nombre inchangé pendant
+    -- DUREE_STABLE secondes, ou resté à 0 pendant DUREE_ZERO secondes (aucun passant). Sans compte :
+    -- la suppression essayée après ATTENTE_SANS_COMPTE secondes (une détection pas finie n'en
+    -- retirerait qu'une partie), puis réessayée tant que Lightroom dit n'en voir aucun.
     local fin, statut, refus = {}, nil, nil
-    local precedent, stables, detectes = nil, 0, nil
-    local dernierEssai = 0
+    local precedent, depuis, detectes = nil, nil, nil
+    local dernierEssai = nil
     local debut = LrDate.currentTime()
     repeat
         LrTasks.sleep(PAUSE)
         local nombre = compterPersonnes(dc)
-        local ecoule = LrDate.currentTime() - debut
-        if nombre and nombre > 0 then
-            stables = (nombre == precedent) and stables + 1 or 0
-            precedent, detectes = nombre, nombre
-            if stables >= 2 then
+        local maintenant = LrDate.currentTime()
+        local ecoule = maintenant - debut
+        if nombre then
+            if nombre ~= precedent then
+                precedent, depuis = nombre, maintenant
+            end
+            if nombre > 0 then
+                detectes = nombre
+                if maintenant - depuis >= Suppression.DUREE_STABLE then
+                    statut, refus = appliquerPersonnes(dc, fin)
+                end
+            elseif maintenant - depuis >= Suppression.DUREE_ZERO then
                 statut, refus = appliquerPersonnes(dc, fin)
             end
-        elseif ecoule - dernierEssai >= Suppression.ESSAI_SANS_COMPTE then
+        elseif ecoule >= Suppression.ATTENTE_SANS_COMPTE
+            and (not dernierEssai or ecoule - dernierEssai >= Suppression.ESSAI_SANS_COMPTE) then
             dernierEssai = ecoule
             statut, refus = appliquerPersonnes(dc, fin)
             if statut == 'aucun' then
@@ -423,16 +505,25 @@ local function lancerPersonnes(photo, dc)
     elseif statut == 'refus' then
         return { raison = "Lightroom refuse la suppression des passants : " .. refus:gsub('%.+$', ''), detectes = detectes }
     end
-    -- Suppression en arrière-plan : le rappel, ou le filtre rangé (deux lectures de suite).
-    stables = 0
+    -- Suppression en arrière-plan : finie quand FilterList porte un filtre de plus (quel que soit
+    -- son nom, à constater), avec le rappel, ou deux lectures de suite sans lui.
+    local stables = 0
     local rappelA
     debut = LrDate.currentTime()
     repeat
         LrTasks.sleep(PAUSE)
-        local fini = etatPersonnes(photo, dc).actif and not egal(photo:getDevelopSettings().FilterList, filtresAvant)
+        local reglages = photo:getDevelopSettings()
+        local change = not egal(reglages.FilterList, filtresAvant)
+        local nouveau = change and (filtreAjoute(reglages.FilterList, nomsAvant)
+            or Suppression.filtrePersonnes(reglages, garde)) or nil
+        local fini = nouveau ~= nil or (change and etatPersonnes(photo, dc, garde).actif)
         stables = fini and stables + 1 or 0
         if stables >= 2 or (fini and fin.rappel) then
-            return { fait = true, lance = true, detectes = detectes }
+            local nom = nouveau and nouveau.Name ~= nil and tostring(nouveau.Name) or nil
+            if nom then
+                nomsAppris[nom] = true
+            end
+            return { fait = true, lance = true, detectes = detectes, filtre = nom, filtres = nomsAvant }
         end
         if fin.rappel and not rappelA then
             rappelA = LrDate.currentTime()
@@ -442,36 +533,38 @@ local function lancerPersonnes(photo, dc)
                 raison = "Lightroom a fini sans ranger de suppression des passants (annulée dans sa fenêtre de progression, ou refusée par le service génératif d'Adobe : réseau, compte)" }
         end
     until LrDate.currentTime() - debut > Suppression.DUREE_PERSONNES
-    return { lance = true, detectes = detectes,
-        raison = string.format("Lightroom retire encore les passants après %d minutes (service génératif d'Adobe)", Suppression.DUREE_PERSONNES / 60) }
+    return { lance = true, enCours = true, detectes = detectes, filtres = nomsAvant,
+        raison = string.format("Lightroom retire encore les passants après %d minutes (service génératif d'Adobe) : la suppression peut encore arriver ; undo_last la retirera", Suppression.DUREE_PERSONNES / 60) }
 end
 
 -- Retire la suppression des passants de la photo affichée : resetFilterWithName, sinon la liste des
 -- filtres sans elle (écriture ordinaire). Renvoie si elle est retirée, la raison sinon.
-local function retirerPersonnes(photo, dc, etape)
+local function retirerPersonnes(photo, dc, etape, garde)
     if type(dc.resetFilterWithName) == 'function' then
         LrTasks.pcall(dc.resetFilterWithName, Suppression.FILTRE_PERSONNES)
         local debut = LrDate.currentTime()
         repeat
             LrTasks.sleep(PAUSE)
-            if not etatPersonnes(photo, dc).actif then
+            if not etatPersonnes(photo, dc, garde).actif then
                 return true
             end
         until LrDate.currentTime() - debut > 10
     end
     ecrire(etape, function()
-        photo:applyDevelopSettings({ FilterList = Suppression.sansPersonnes(photo:getDevelopSettings().FilterList) }, etape)
+        photo:applyDevelopSettings({ FilterList = Suppression.sansPersonnes(photo:getDevelopSettings().FilterList, garde) }, etape)
     end)
-    if etatPersonnes(photo, dc).actif then
+    if etatPersonnes(photo, dc, garde).actif then
         return false, "Lightroom garde la suppression des passants"
     end
     return true
 end
 
 -- La suppression des passants demandée, sur la photo affichée. La mémoire est écrite avant le
--- calcul, et remise telle qu'elle était si rien n'a changé.
+-- calcul ; le nom du filtre rangé y est ajouté après. Elle est remise telle qu'elle était si rien
+-- n'a changé, mais gardée si la suppression peut encore arriver (délai dépassé).
 local function supprimerPersonnesAffichee(photo, dc, voulu, vue, etape, prefs, params, plan)
-    local avant = etatPersonnes(photo, dc)
+    local garde = gardeMemoire(photo)
+    local avant = etatPersonnes(photo, dc, garde)
     plan.apres = { personnes = avant.actif }
     if avant.actif == voulu then
         noter(plan, voulu and "Passants déjà retirés sur cette photo (Suppression des distractions › Personnes) : rien à refaire."
@@ -491,10 +584,20 @@ local function supprimerPersonnesAffichee(photo, dc, voulu, vue, etape, prefs, p
     local premiere = sansRetouche(original)
     local etapes = lireJson(photo, 'etapesClaude', {})
     original.Suppression = type(original.Suppression) == 'table' and original.Suppression or {}
+    local nomsAvant = nomsFiltres(photo:getDevelopSettings().FilterList)
     if original.Suppression.personnes == nil then
         original.Suppression.personnes = avant.actif
+        if not avant.actif then
+            original.Suppression.filtres = nomsAvant
+        end
     end
-    local etapeId = nouvelleEtape(etapes, etape, { Suppression = { personnes = avant.actif } })
+    local memoireEtape = { personnes = avant.actif }
+    if voulu then
+        memoireEtape.filtres = nomsAvant
+    elseif garde then
+        memoireEtape.filtre, memoireEtape.filtres = garde.filtre, garde.filtres
+    end
+    local etapeId = nouvelleEtape(etapes, etape, { Suppression = memoireEtape })
     plan.etapeId = etapeId
     if premiere and prefs.instantane then
         ecrire(etape, function() creerInstantane(photo) end)
@@ -508,9 +611,9 @@ local function supprimerPersonnesAffichee(photo, dc, voulu, vue, etape, prefs, p
     local outil = outilActuel(dc)
     local resultat
     if voulu then
-        resultat = lancerPersonnes(photo, dc)
+        resultat = lancerPersonnes(photo, dc, garde)
     else
-        local fait, raison = retirerPersonnes(photo, dc, etape)
+        local fait, raison = retirerPersonnes(photo, dc, etape, garde)
         resultat = { fait = fait, raison = raison, lance = true }
     end
     remettreOutil(dc, outil)
@@ -521,11 +624,24 @@ local function supprimerPersonnesAffichee(photo, dc, voulu, vue, etape, prefs, p
     elseif resultat.raison then
         noter(plan, "Passants : " .. resultat.raison .. ".")
     end
-    local apres = etatPersonnes(photo, dc)
+    -- Le nom du filtre rangé par Lightroom, gardé pour le retirer à l'annulation.
+    if resultat.filtre then
+        memoireEtape.filtre = resultat.filtre
+        if original.Suppression.personnes == false then
+            original.Suppression.filtre = original.Suppression.filtre or resultat.filtre
+        end
+    end
+    local gardeApres = { filtre = resultat.filtre or (garde and garde.filtre), filtres = memoireEtape.filtres }
+    local apres = etatPersonnes(photo, dc, voulu and gardeApres or garde)
     plan.apres = { personnes = apres.actif, detectes = resultat.detectes }
     if apres.actif ~= avant.actif then
         plan.changements[#plan.changements + 1] = { cle = 'Suppression.personnes',
             avant = avant.actif and "retirés" or "présents", apres = apres.actif and "retirés" or "présents" }
+        if not voulu then
+            noter(plan, "Annuler ce retour (undo_last) relancera la suppression des passants : nouveau résultat génératif, différent du précédent.")
+        end
+    elseif resultat.enCours then
+        plan.changements[#plan.changements + 1] = { cle = 'Suppression.personnes', avant = "présents", apres = "en cours" }
     else
         ecrireMemoire("Claude · rien lancé", function()
             for _, champ in ipairs(champs) do
@@ -538,6 +654,10 @@ local function supprimerPersonnesAffichee(photo, dc, voulu, vue, etape, prefs, p
     local journal = lireJson(photo, 'journalClaude', {})
     ajouterJournal(journal, { etape = etape, etape_id = etapeId, type = 'retouche', raison = params.raison, changements = plan.changements })
     ecrireMemoire(etape, function()
+        if resultat.filtre then
+            garder(photo, 'avantClaude', Json.encode(original))
+            garder(photo, 'etapesClaude', Json.encode(Json.tableau(etapes)))
+        end
         garder(photo, 'journalClaude', Json.encode(Json.tableau(journal)))
     end)
 end
@@ -549,7 +669,10 @@ local function supprimerPersonnes(params, prefs)
     end
     local dc = controleurPersonnes()
     local photo = photoVisee(params)
-    Photos.exigerOriginal(photo, "La suppression des passants se calcule sur l'original : rien n'a été fait.")
+    -- Rendre les passants retire un filtre : rien ne se calcule sur l'original.
+    if params.personnes then
+        Photos.exigerOriginal(photo, "La suppression des passants se calcule sur l'original : rien n'a été fait.")
+    end
     verifierProtection({ photo }, prefs, params, 'remove_distractions')
     local etape = nomEtape(params, "passants")
     local plan = { photo = photo, changements = Json.tableau(), notes = Json.tableau() }
@@ -651,8 +774,8 @@ end
 
 -- Remet l'état des passants gardé en mémoire (annulation, retour à l'origine), sur la photo
 -- affichée. Échoue si Lightroom ne suit pas.
-local function remettrePersonnes(photo, dc, vue, voulu)
-    if etatPersonnes(photo, dc).actif == voulu then
+local function remettrePersonnes(photo, dc, vue, voulu, garde)
+    if etatPersonnes(photo, dc, garde).actif == voulu then
         return
     end
     local outil = outilActuel(dc)
@@ -661,11 +784,11 @@ local function remettrePersonnes(photo, dc, vue, voulu)
         if not vue.pret then
             echouer(string.format("Lightroom n'a pas remis la suppression des passants (%s) : %s.", nomFichier(photo), Amelioration.PAS_PRETE))
         end
-        local resultat = lancerPersonnes(photo, dc)
+        local resultat = lancerPersonnes(photo, dc, garde)
         fait = resultat.fait or resultat.deja
         raison = resultat.raison or (resultat.aucun and "Lightroom n'y détecte plus de passant")
     else
-        fait, raison = retirerPersonnes(photo, dc, "Claude · passants rendus")
+        fait, raison = retirerPersonnes(photo, dc, "Claude · passants rendus", garde)
     end
     remettreOutil(dc, outil)
     if not fait then
@@ -679,17 +802,21 @@ function Suppression.remettre(photo, voulue)
     if type(voulue) ~= 'table' then
         return
     end
+    local garde = { filtre = voulue.filtre, filtres = type(voulue.filtres) == 'table' and voulue.filtres or nil }
     voulue = { reflets = voulue.reflets, intensite = voulue.intensite, personnes = voulue.personnes }
     -- Passants à laisser sans suppression, et la photo n'en a pas : rien à demander à Lightroom
     -- (Lightroom avant la 16.0 compris).
-    if voulue.personnes == false and not Suppression.filtrePersonnes(photo:getDevelopSettings()) then
+    if voulue.personnes == false and not Suppression.filtrePersonnes(photo:getDevelopSettings(), garde) then
         voulue.personnes = nil
     end
     if voulue.reflets == nil and voulue.personnes == nil then
         return
     end
     avecVerrou(function()
-        local dc = voulue.reflets ~= nil and controleur() or controleurPersonnes()
+        -- Les passants vérifient leur version et leurs fonctions même quand les reflets sont remis
+        -- aussi (sinon le refus serait celui d'un appel à nil, moins clair).
+        local dcPersonnes = voulue.personnes ~= nil and controleurPersonnes() or nil
+        local dc = voulue.reflets ~= nil and controleur() or dcPersonnes
         local vue = afficherEnDeveloppement(photo, dc)
         local ok, erreur = LrTasks.pcall(function()
             if voulue.reflets ~= nil then
@@ -706,7 +833,7 @@ function Suppression.remettre(photo, voulue)
                 end
             end
             if voulue.personnes ~= nil then
-                remettrePersonnes(photo, dc, vue, voulue.personnes == true)
+                remettrePersonnes(photo, dcPersonnes, vue, voulue.personnes == true, garde)
             end
         end)
         remettreVue(vue)

@@ -154,7 +154,7 @@ extension ToolHandler {
                         "amount": prop("number", "Intensité, de 1 à 100 (défaut de Lightroom : 100) ; sur des reflets déjà supprimés, change seulement l'intensité."),
                         "quality": enumProp(["preview", "standard", "best"], "Qualité du calcul (défaut : celle de Lightroom, standard) : best est plus lent."),
                     ])),
-                    ("people", prop("boolean", "Passants (Suppression des distractions › Personnes, Lightroom Classic 16) : true les détecte et les retire ; false rend une suppression des passants. Un appel à part des reflets.")),
+                    ("people", prop("boolean", "Passants (Suppression des distractions › Personnes, Lightroom Classic 16) : true les détecte et les retire ; false rend une suppression des passants (undo_last de ce retour la relance : nouveau résultat génératif). Un appel à part des reflets.")),
                     ("dust", objectProp("{\"remove\": false} retire la suppression de la poussière du capteur (faite à la main dans Lightroom).", [
                         "remove": prop("boolean", "false = retirer la suppression de la poussière."),
                     ])),

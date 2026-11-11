@@ -3924,6 +3924,98 @@ test("supprimer : passants refusés avant Lightroom 16, sans les fonctions, avec
     echoue(function() passants({ personnes = true }) end, "remove_distractions avec confirm")
 end)
 
+-- Revue du 10 novembre 2026 : le nom du filtre, la durée de la détection et de la suppression
+-- restent à constater ; ces essais couvrent les chemins où la supposition ne tient pas.
+test("supprimer : filtre des passants au nom inattendu, mémorisé puis retiré par l'annulation", function()
+    S.versionLightroom = '16.0'
+    S.nomFiltrePersonnes = 'DistractionRemoval'
+    S.titreFiltrePersonnes = '$$$/CRaw/Filter/DistractionRemoval/Title=Distraction Removal'
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 2
+    local resultat = passants({ personnes = true })
+    egal(nomsFiltres(photo), 'DistractionRemoval')
+    egal(resultat.resultats[1].changements[1].apres, "retirés", "fait, quel que soit le nom du filtre")
+    local etapes = Json.decode(photo.proprietes.etapesClaude)
+    egal(etapes[1].avant.Suppression.filtre, 'DistractionRemoval', "le nom rangé est gardé")
+    egal(Json.decode(photo.proprietes.avantClaude).Suppression.filtre, 'DistractionRemoval')
+    -- resetFilterWithName sans effet : retiré de la liste des filtres par le nom gardé.
+    S.resetPersonnesIgnore = true
+    resultat = Commandes.executer('annuler', {})
+    egal(resultat.resultats[1].annulee, true)
+    egal(nomsFiltres(photo), '', "l'annulation retire le filtre au nom inattendu")
+end)
+
+test("supprimer : passants encore en cours après le délai : l'étape reste, undo_last les retire à leur arrivée", function()
+    S.versionLightroom = '16.0'
+    S.nomFiltrePersonnes = 'DistractionRemoval'
+    S.titreFiltrePersonnes = 'Distraction Removal'
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 2
+    S.dureePersonnes = 600   -- 300 s : plus que DUREE_PERSONNES (240 s)
+    local resultat = passants({ personnes = true })
+    egal(contient(resultat.resultats[1].remarques, "undo_last la retirera"), true)
+    egal(resultat.resultats[1].changements[1].apres, "en cours")
+    egal(nomsFiltres(photo), '', "pas encore arrivée")
+    local etapes = Json.decode(photo.proprietes.etapesClaude)
+    egal(#etapes, 1, "l'étape est gardée")
+    egal(etapes[1].avant.Suppression.personnes, false)
+    local LrTasks = import 'LrTasks'
+    for _ = 1, 200 do
+        LrTasks.sleep(0.5)
+    end
+    egal(nomsFiltres(photo), 'DistractionRemoval', "la suppression arrive en retard")
+    resultat = Commandes.executer('annuler', {})
+    egal(resultat.resultats[1].annulee, true)
+    egal(nomsFiltres(photo), '', "undo_last retire la suppression arrivée en retard")
+end)
+
+test("supprimer : sans compte lisible, la suppression attend la fin d'une détection au fil de l'eau", function()
+    S.versionLightroom = '16.0'
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 3
+    S.compteIllisible = true
+    S.detectionPartielle = 1
+    S.dureeDetection = 24   -- 12 s de détection, un seul passant compté avant la fin
+    passants({ personnes = true })
+    local lancee = S.appelsPersonnes[#S.appelsPersonnes]
+    egal(lancee.fonction, 'applyRemovalOnDetectedDistractingPeople')
+    egal(lancee.detectes, 3, "tous les passants détectés, pas les premiers seulement")
+end)
+
+test("supprimer : un compte lisible resté à 0 dit vite « aucun passant »", function()
+    S.versionLightroom = '16.0'
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 0
+    local debut = S.horloge
+    local resultat = passants({ personnes = true })
+    egal(contient(resultat.resultats[1].remarques, "aucun passant"), true)
+    egal(S.horloge - debut < 30, true, "réponse bien avant les 50 s de la file d'outils : " .. tostring(S.horloge - debut))
+end)
+
+test("supprimer : passants rendus sans l'original, puis l'annulation relance la suppression", function()
+    S.versionLightroom = '16.0'
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    photo.passants = 2
+    passants({ personnes = true })
+    egal(nomsFiltres(photo), 'remove_people')
+    photo.absente = true
+    local resultat = passants({ personnes = false })
+    egal(resultat.resultats[1].changements[1].apres, "présents", "rendre les passants ne demande pas l'original")
+    egal(contient(resultat.resultats[1].remarques, "nouveau résultat génératif"), true)
+    egal(nomsFiltres(photo), '')
+    photo.absente = false
+    local appels = #S.appelsPersonnes
+    resultat = Commandes.executer('annuler', {})
+    egal(resultat.resultats[1].annulee, true)
+    egal(S.appelsPersonnes[appels + 1].fonction, 'detectDistractingPeople', "la suppression est relancée")
+    egal(nomsFiltres(photo), 'remove_people', "les passants sont de nouveau retirés")
+end)
+
 -- Version 1.9 : retouche avancée (plage de couleurs, de profondeur, objet par un rectangle,
 -- couleurs ponctuelles dans un masque) ------------------------------------------------------------
 

@@ -82,7 +82,9 @@ final class RetoucheAvanceeTests: XCTestCase {
         XCTAssertTrue(outil["description"]?.string?.contains("people = true") == true)
         XCTAssertFalse(outil["description"]?.string?.contains("à proposer de faire à la main") == true)
         XCTAssertNotNil(outil["inputSchema"]?["properties"]?["people"])
-        XCTAssertTrue(ServerInfo.instructions.contains("passants (Distractions › Personnes) : people."))
+        // Le nom de l'outil avec le paramètre : un modèle ne cherche pas d'outil « people » (revue).
+        XCTAssertTrue(ServerInfo.instructions.contains("remove_distractions, avant toute autre retouche, et les passants (people)."))
+        XCTAssertTrue(outil["inputSchema"]?["properties"]?["people"]?["description"]?.string?.contains("nouveau résultat génératif") == true)
         XCTAssertFalse(ServerInfo.instructions.contains("main dans Lightroom : passants"))
         XCTAssertTrue(Prompts.retouchePro.render([:]).contains("les passants aussi (remove_distractions avec people)"))
     }

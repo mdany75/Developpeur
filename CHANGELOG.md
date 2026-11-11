@@ -11,7 +11,9 @@
   défait par `undo_last` ou `revert_to_original`. Si Lightroom ne voit aucun passant, ou les a déjà
   retirés, rien ne change et Claude le dit ; avant Lightroom Classic 16, c'est refusé avec sa
   raison. Ce n'est plus à faire à la main. Pas encore essayé dans Lightroom : à vérifier à la
-  prochaine recette.
+  prochaine recette. Une suppression plus longue que quatre minutes garde son étape (elle peut
+  encore arriver, `undo_last` la retirera) ; rendre les passants ne demande pas l'original ;
+  annuler ce retour relance la suppression, avec un nouveau résultat.
 
 ## 1.9 — 2026-11-10
 

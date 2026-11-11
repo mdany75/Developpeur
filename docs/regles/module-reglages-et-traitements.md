@@ -41,6 +41,12 @@ aux masques, au débruitage, aux reflets, aux rotations, aux variantes ou aux in
   le refuse) ; une autre intensité se pose en retirant puis reposant le filtre
   (`changeReflectionRemovalAmount` ne change rien au filtre rangé, constaté). `annuler` et
   `revenir` remettent les traitements calculés par `Annulation.remettreCalcules`.
+- La suppression des passants (même commande, `personnes`, Lightroom Classic 16) suit le même
+  chemin ; rien n'en est constaté : lectures sous `LrTasks.pcall`, attentes bornées. Son filtre a
+  un nom supposé (`remove_people`) : la fin se reconnaît à tout filtre ajouté à `FilterList` (hors
+  débruitage, reflets et poussière), et la mémoire (`Suppression = {personnes, filtres, filtre}`)
+  garde les noms d'avant et le nom rangé, pour le retirer à l'annulation ; un délai dépassé garde
+  l'étape (la suppression peut encore arriver). `docs/SPEC.md`, Suppression des passants.
 - Débruitage, détails bruts et super résolution passent par `LrDevelopController`
   (`setEnhance`), sur la photo affichée dans le module Développement : le module l'y affiche,
   seule sélectionnée, laisse le temps de la charger, puis remet la vue. Un seul traitement à la

@@ -3,8 +3,8 @@
 Sorti de `Lightroom/CLAUDE.md` le 31 octobre 2026 (qui y renvoie) ; à lire avant de toucher à
 `Photos.exigerOriginal`, à `--marquer-af`, à `--focus`, à `--boitier` ou à `LecteurBoitier`.
 
-- Une commande qui calcule sur l'original (débruitage, détails bruts, super résolution, reflets)
-  passe par `Photos.exigerOriginal` ; un rendu sans original ni aperçu dynamique est refusé
+- Une commande qui calcule sur l'original (débruitage, détails bruts, super résolution, reflets,
+  passants retirés ; pas les passants rendus) passe par `Photos.exigerOriginal` ; un rendu sans original ni aperçu dynamique est refusé
   (`rendre`) ; une livraison saute la photo. `checkPhotoAvailability` suit le disque à quelques
   secondes près (constaté).
 - Le connecteur n'ouvre un original que
